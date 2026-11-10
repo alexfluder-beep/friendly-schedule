@@ -243,3 +243,8 @@ Database: run `supabase/update.sql` once in Supabase > SQL Editor (safe to run a
 - **Personal expenses** (Me > My pay, and "Add a cost of this tour" on a past tour): meal, fuel, car service, accommodation, parking, other. Totals per period in the main currency; the admin sees them in the person's statement and marks them paid back. A friendly nudge when tours have no costs noted. Needs `supabase/update.sql`.
 - **Look at the app as…** (Back office): the admin sees exactly what one guide or driver sees; nothing can be saved while looking.
 - Time off lists aligned: picture, name and label, date on the right.
+
+## 3.9
+- **Setmore Appointments report (.xls/.xlsx/.csv)** reads more: options from the name, service and both Comments columns (+wine, front seat, pick-up, drop-off, non-refundable…), the platform from booking codes (GYG… = GetYourGuide, BR-… = Viator, Klook, Airbnb…), the pick-up address or hotel, the Label ("online" = paid online), and counts the cancelled rows it leaves out. The preview shows what it found.
+- **Non-refundable** is a new option for bookings; it is also picked up from booking emails.
+- **Guest list check** (Back office > Guests > Check guest list): looks through all guests and bookings and suggests fixes – platform from booking codes, options from names and comments, booking codes from comments, clean names without "X2 +wine", no platform relay emails, phone format. Untick a group you do not want, press Apply; every fix is written in the booking history ("Checked: …").
