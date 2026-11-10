@@ -16,6 +16,7 @@ create table if not exists public.profiles (
   work_days text,              -- weekdays the person works, 0 = Monday ... 6 = Sunday, e.g. "0,1,2,3,4"; empty = every day
   work_from text, work_to text, -- usual working hours
   languages text,              -- tour languages this guide can lead, e.g. "EN, RU"
+  telegram text,               -- Telegram username without @, shown as a one-tap button to colleagues
   active boolean not null default false,
   telegram_id bigint unique,   -- set by the crew bot when the person sends it /link with the code below
   link_code text,              -- one-time code the person creates in the app (Me > Telegram bot)
@@ -180,7 +181,7 @@ create table if not exists public.invites (            -- people the admin has a
   id uuid primary key default gen_random_uuid(),
   email text not null unique, name text not null default '',
   role text not null default 'guide' check (role in ('admin','guide','driver')),
-  phone text, languages text, color text, vehicle text, work_week jsonb, work_days text, work_from text, work_to text, skills text[] not null default '{}',
+  phone text, languages text, telegram text, color text, vehicle text, work_week jsonb, work_days text, work_from text, work_to text, skills text[] not null default '{}',
   created_by uuid references public.profiles(id) on delete set null, created_at timestamptz not null default now()
 );
 create table if not exists public.push_subscriptions (
@@ -232,8 +233,8 @@ declare inv public.invites%rowtype;
 begin
   select * into inv from public.invites where lower(email) = lower(new.email) limit 1;
   if found then
-    insert into public.profiles (id, name, role, phone, languages, color, vehicle, work_week, work_days, work_from, work_to, skills, email, active)
-    values (new.id, coalesce(nullif(inv.name, ''), new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)), inv.role, inv.phone, inv.languages, coalesce(inv.color, '#66737f'), inv.vehicle, inv.work_week, inv.work_days, inv.work_from, inv.work_to, inv.skills, new.email, true)
+    insert into public.profiles (id, name, role, phone, languages, telegram, color, vehicle, work_week, work_days, work_from, work_to, skills, email, active)
+    values (new.id, coalesce(nullif(inv.name, ''), new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)), inv.role, inv.phone, inv.languages, inv.telegram, coalesce(inv.color, '#66737f'), inv.vehicle, inv.work_week, inv.work_days, inv.work_from, inv.work_to, inv.skills, new.email, true)
     on conflict (id) do nothing;
     delete from public.invites where id = inv.id;
   else

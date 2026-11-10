@@ -157,3 +157,9 @@ To let people in without an email confirmation step, turn off **Authentication >
 - **Weak internet.** A request that hangs is stopped after 15 seconds and the change is kept on the phone. The app tries to send again every 30 seconds, when the app is opened again, and when the phone reports the internet is back.
 - **Status line** at the top of every screen: "Up to date · 14:32", "Last update 14:10" (older than 10 minutes), "No internet. Schedule from 14:10. Waiting to send: 2." or "Sending 2 saved changes…". A tap tries again. Two short notices: "Saved on this phone. It will be sent when the internet is back." and "All your changes are sent."
 - **Test notice.** A small "Test version" chip sits in the pinned top bar next to the status line, so both stay in view while scrolling. A tap opens: "There can be mistakes and glitches… take a screenshot and send it to Alex", three short steps and a "Send to Alex" WhatsApp button (the message already holds the app version, screen and phone type). Each person sees this window once by itself, on the first opening. Settings in `config.js`: `testBanner` (set `false` when testing is over), `reportTo`, `reportWhatsApp`.
+
+## Version 2.4: Telegram username
+
+- Each person can have a Telegram username. The admin types it in **Edit person** (`@nino`, `nino` or a `t.me/nino` link all work), or in the 5th column of **Add several people at once**. Each person can also set or change their own on the **Me** screen.
+- Colleagues then get a Telegram button next to WhatsApp and Call: on the tour card, in the tour view and in the contacts list. The team list shows `@username`.
+- Database: run `supabase/update-2.4.sql` once (safe to run again).

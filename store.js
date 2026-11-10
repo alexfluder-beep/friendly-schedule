@@ -3,7 +3,7 @@
   'use strict';
   const CFG = window.APP_CONFIG || {};
   const TABLES = ['profiles', 'tours', 'bookings', 'clients', 'client_ratings', 'tour_ratings', 'payout_details', 'log', 'change_requests', 'pay_adjustments', 'personal_dates', 'usage', 'offers', 'time_off', 'holidays', 'tasks', 'notifications', 'settings', 'invites', 'pay_disputes', 'tour_costs'];
-  const DEMO_KEY = 'fs-demo-v17';
+  const DEMO_KEY = 'fs-demo-v18';
   const db = {}; TABLES.forEach(t => db[t] = []);
   const listeners = [];
   let sb = null, me = null;
@@ -54,7 +54,7 @@
     const mon = -((today.getDay() + 6) % 7);
     const P = (name, role, color) => ({ id: uid(), name, role, color, lang: 'en', active: true, phone: role === 'admin' ? '' : '+9955000000' + String(Math.floor(Math.random() * 90) + 10), languages: role === 'guide' ? 'EN, RU' : '' });
     const admin = P('Sample Admin', 'admin', '#0b6e7a');
-    const g1 = P('Nino (sample)', 'guide', '#6243bd'), g2 = P('Dato (sample)', 'guide', '#a8500c'), g3 = P('Mariam (sample)', 'guide', '#1c7439');
+    const g1 = { ...P('Nino (sample)', 'guide', '#6243bd'), telegram: 'nino_sample' }, g2 = P('Dato (sample)', 'guide', '#a8500c'), g3 = P('Mariam (sample)', 'guide', '#1c7439');
     const d1 = P('Zura (sample)', 'driver', '#2f6f73'), d2 = P('Gela (sample)', 'driver', '#3b5bbd');
     db.profiles = [admin, g1, g2, g3, d1, d2];
     const Tr = (off, s, e, title, kind, cap, pax, g, d, extra = {}) => ({ id: uid(), date: day(mon + off), start_time: s, end_time: e, title, kind, capacity: cap, pax, adults: pax, children: 0, date_to: null, guide_pay: null, driver_pay: null, pickup_url: null, language: 'EN', pickup: '', notes: '', status: 'confirmed', guide_id: g ? g.id : null, driver_id: d ? d.id : null, external_id: null, ...extra });
