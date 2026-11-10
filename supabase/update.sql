@@ -1,4 +1,4 @@
--- Friendly Schedule: ONE update with everything added since the first setup (versions 2.4 to 3.8).
+-- Friendly Schedule: ONE update with everything added since the first setup (versions 2.4 to 3.9).
 -- Safe to run more than once. Paste all of it into Supabase > SQL Editor and press Run.
 
 -- 2.4 Telegram username; 2.5 badges already celebrated (so the welcome badge shows once per account)
@@ -244,3 +244,26 @@ create policy exp_remove on public.expenses for delete to authenticated using (u
 create policy exp_admin on public.expenses for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
 grant select, insert, update, delete on public.expenses to authenticated;
 do $$ begin alter publication supabase_realtime add table public.expenses; exception when duplicate_object then null; when undefined_object then null; end $$;
+
+-- 3.9 Indexes on the columns the access rules and links use (Supabase Postgres best practices: RLS columns and foreign keys).
+create index if not exists client_ratings_user_id_fk_idx on public.client_ratings(user_id);
+create index if not exists time_off_user_id_fk_idx on public.time_off(user_id);
+create index if not exists tasks_tour_id_fk_idx on public.tasks(tour_id);
+create index if not exists tour_ratings_user_id_fk_idx on public.tour_ratings(user_id);
+create index if not exists tour_ratings_tour_id_fk_idx on public.tour_ratings(tour_id);
+create index if not exists log_user_id_fk_idx on public.log(user_id);
+create index if not exists change_requests_user_id_fk_idx on public.change_requests(user_id);
+create index if not exists change_requests_tour_id_fk_idx on public.change_requests(tour_id);
+create index if not exists change_requests_swap_with_fk_idx on public.change_requests(swap_with);
+create index if not exists pay_adjustments_user_id_fk_idx on public.pay_adjustments(user_id);
+create index if not exists pay_disputes_user_id_fk_idx on public.pay_disputes(user_id);
+create index if not exists pay_disputes_tour_id_fk_idx on public.pay_disputes(tour_id);
+create index if not exists personal_dates_user_id_fk_idx on public.personal_dates(user_id);
+create index if not exists offers_user_id_fk_idx on public.offers(user_id);
+create index if not exists offers_tour_id_fk_idx on public.offers(tour_id);
+create index if not exists app_errors_user_id_fk_idx on public.app_errors(user_id);
+create index if not exists push_subscriptions_user_id_fk_idx on public.push_subscriptions(user_id);
+create index if not exists expenses_tour_id_fk_idx on public.expenses(tour_id);
+create index if not exists tasks_assignees_idx on public.tasks using gin (assignees);
+revoke execute on function public.my_tour_ids() from anon;
+revoke execute on function public.my_client_ids() from anon;
