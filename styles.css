@@ -680,3 +680,34 @@ html[data-os="android"] .btn:active,html[data-os="android"] .iconbtn:active,html
   .acard{background:var(--surface)}
   .tag{background:var(--surface);color:var(--ink)}
 }
+/* Who can work next week */
+.avt td.avc{text-align:center;font-size:var(--t-sm);white-space:nowrap}
+.avt td.avc.on{background:color-mix(in srgb,var(--ok) 10%,var(--surface));color:var(--ink)}
+.avt td.avc.no{color:var(--muted)}
+.avt td.avc.usual{background:var(--surface2);color:var(--muted)}
+.avt td.avc.off{color:var(--dayoff);font-weight:600}
+.wkcard form{border-top:1px solid var(--line);padding-top:12px}
+/* Tour exchange */
+.xrow{display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);padding:6px 0}
+.xrow .arow{border:0;background:none;padding:6px 0;min-height:48px;text-align:left;display:flex;gap:10px;align-items:center;font-size:var(--t-body);color:var(--ink)}
+.xasked{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+/* Personal expenses */
+.explist{display:flex;flex-direction:column}
+.exrow{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line);font-size:var(--t-body)}
+.exrow .msi{width:22px;height:22px;color:var(--muted)}
+.kinds{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.kinds .kind{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--ink);font-weight:600;cursor:pointer;min-height:72px;justify-content:center;text-align:center}
+.kinds .kind input{position:absolute;opacity:0;pointer-events:none}
+.kinds .kind .msi{width:26px;height:26px}
+.kinds .kind:has(input:checked){border:2px solid var(--accent);background:var(--accent-soft)}
+.exptour{align-self:flex-start}
+/* Look-as bar */
+.vabar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px var(--gutr) 8px var(--gut);background:var(--ink);color:var(--bg);font-weight:600;font-size:var(--t-body)}
+.vabar .btn{background:var(--bg);color:var(--ink)}
+/* Aligned list rows: picture | name and label | date on the right, the same in every row */
+.card.lrow{display:grid;grid-template-columns:32px minmax(0,1fr) auto;align-items:center;gap:6px 12px;padding:12px 16px}
+.card.lrow.nohead{grid-template-columns:minmax(0,1fr) auto}
+.card.lrow>.muted{grid-column:1/-1}
+.lrow .lmain{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;min-width:0}
+.lrow .ldate{text-align:right;white-space:nowrap;font-size:var(--t-body)}
+.stats .stat{display:flex;flex-direction:column;gap:2px;line-height:1.25}

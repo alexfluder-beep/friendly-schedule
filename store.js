@@ -2,7 +2,7 @@
 (() => {
   'use strict';
   const CFG = window.APP_CONFIG || {};
-  const TABLES = ['profiles', 'tours', 'bookings', 'clients', 'client_ratings', 'tour_ratings', 'payout_details', 'log', 'change_requests', 'pay_adjustments', 'personal_dates', 'usage', 'offers', 'time_off', 'holidays', 'tasks', 'notifications', 'settings', 'invites', 'pay_disputes', 'tour_costs'];
+  const TABLES = ['profiles', 'expenses', 'tours', 'bookings', 'clients', 'client_ratings', 'tour_ratings', 'payout_details', 'log', 'change_requests', 'pay_adjustments', 'personal_dates', 'usage', 'offers', 'time_off', 'holidays', 'tasks', 'notifications', 'settings', 'invites', 'pay_disputes', 'tour_costs'];
   const DEMO_KEY = 'fs-demo-v18';
   const db = {}; TABLES.forEach(t => db[t] = []);
   const listeners = [];

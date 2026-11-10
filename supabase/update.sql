@@ -1,4 +1,4 @@
--- Friendly Schedule: ONE update with everything added since the first setup (versions 2.4 to 3.4).
+-- Friendly Schedule: ONE update with everything added since the first setup (versions 2.4 to 3.8).
 -- Safe to run more than once. Paste all of it into Supabase > SQL Editor and press Run.
 
 -- 2.4 Telegram username; 2.5 badges already celebrated (so the welcome badge shows once per account)
@@ -207,3 +207,40 @@ drop policy if exists invites_admin on public.invites;
 create policy invites_admin on public.invites for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
 drop policy if exists push_own on public.push_subscriptions;
 create policy push_own on public.push_subscriptions for all to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
+
+-- 3.8 Tour exchange: anyone in the team may offer to take a tour that still needs a guide or a driver,
+-- and may take back their own request while it waits (pressed by mistake). The admin approves as before.
+drop policy if exists creq_take on public.change_requests;
+create policy creq_take on public.change_requests for insert to authenticated
+  with check (user_id = (select auth.uid()) and status = 'pending' and (select public.app_role()) is not null
+    and exists (select 1 from public.tours t where t.id = tour_id and (t.guide_id is null or t.driver_id is null)));
+drop policy if exists creq_withdraw on public.change_requests;
+create policy creq_withdraw on public.change_requests for delete to authenticated using (user_id = (select auth.uid()) and status = 'pending');
+
+-- 3.8 Personal expenses of guides and drivers (meal, fuel, car service, accommodation...). Each person sees their own; the admin sees all and marks what was paid back.
+create table if not exists public.expenses (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  tour_id uuid references public.tours(id) on delete set null,
+  date date not null default current_date,
+  kind text not null default 'other',
+  amount numeric not null default 0,
+  currency text not null default 'GEL',
+  note text,
+  paid_back boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index if not exists expenses_user_idx on public.expenses(user_id, date);
+alter table public.expenses enable row level security;
+drop policy if exists exp_read on public.expenses;
+drop policy if exists exp_add on public.expenses;
+drop policy if exists exp_edit on public.expenses;
+drop policy if exists exp_remove on public.expenses;
+drop policy if exists exp_admin on public.expenses;
+create policy exp_read on public.expenses for select to authenticated using (user_id = (select auth.uid()) or (select public.is_admin()));
+create policy exp_add on public.expenses for insert to authenticated with check (user_id = (select auth.uid()) and not paid_back and (select public.app_role()) is not null);
+create policy exp_edit on public.expenses for update to authenticated using (user_id = (select auth.uid()) and not paid_back) with check (user_id = (select auth.uid()) and not paid_back);
+create policy exp_remove on public.expenses for delete to authenticated using (user_id = (select auth.uid()) and not paid_back);
+create policy exp_admin on public.expenses for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
+grant select, insert, update, delete on public.expenses to authenticated;
+do $$ begin alter publication supabase_realtime add table public.expenses; exception when duplicate_object then null; when undefined_object then null; end $$;

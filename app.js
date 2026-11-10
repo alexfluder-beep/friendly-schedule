@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.7';
+  const APP_VERSION = '3.8';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -46,7 +46,10 @@
   // ---------- state ----------
   const state = { meTab: 'profile', adminTab: null, view: 'calendar', mode: 'week', date: today(), mine: false, modal: null, year: new Date().getFullYear(), auth: 'signin', authMsg: '', taskFilter: 'open', imp: null, bell: false };
   let memo = {};
-  const me = () => S.me;
+  // "Look as": the admin sees the app exactly as one guide or driver would. Nothing can be saved while looking.
+  const me = () => (state.viewAs && S.me && S.me.role === 'admin' && db.profiles.find(p => p.id === state.viewAs)) || S.me;
+  const viewOnly = () => { const e = new Error('view only'); e.viewOnly = true; return Promise.reject(e); };
+  ['save', 'saveMany', 'remove'].forEach(k => { const f = S[k]; if (typeof f === 'function') S[k] = (...a) => (state.viewAs ? viewOnly() : f.apply(S, a)); });
   const isAdmin = () => me() && me().role === 'admin';
   const lang = () => (me() && me().lang) || S.ls.get('fs-lang') || (['ru', 'ka'].includes((navigator.language || '').slice(0, 2)) ? navigator.language.slice(0, 2) : 'en');
   const T = (k, v) => window.I18N.t(lang(), k, v);
@@ -217,9 +220,11 @@
   const offOn = (id, date) => db.time_off.find(o => o.user_id === id && o.status !== 'declined' && o.date_from <= date && o.date_to >= date);
   const personalOn = (id, date) => db.personal_dates.find(x => x.user_id === id && (x.date === date || (x.yearly && x.date.slice(5) === date.slice(5))));
   // One entry per weekday (0 = Monday): null = not working, otherwise [from, until]; older profiles are converted on the fly.
-  const weekOf = p => { if (p && Array.isArray(p.work_week) && p.work_week.length === 7) return p.work_week; const ds = String((p && p.work_days) || '').split(',').filter(x => x !== '').map(Number); return [0, 1, 2, 3, 4, 5, 6].map(i => (!ds.length || ds.includes(i) ? [(p && p.work_from) || '', (p && p.work_to) || ''] : null)); };
-  const workDaysOf = p => { const w = weekOf(p), on = w.map((x, i) => (x ? i : -1)).filter(i => i >= 0); return on.length === 7 ? [] : on; };
-  const weekEditor = p => `<div class="wweek">${weekOf(p).map((x, i) => `<div class="wrow"><label class="wday"><input type="checkbox" name="wd${i}" ${x ? 'checked' : ''}>${esc(fmt(addDays('2024-01-01', i), { weekday: 'short' }))}</label><input class="inp" type="time" name="wf${i}" value="${esc((x || [])[0] || '')}" aria-label="${T('ws_from')}"><span class="muted">–</span><input class="inp" type="time" name="wt${i}" value="${esc((x || [])[1] || '')}" aria-label="${T('ws_to')}"></div>`).join('')}<div class="bar"><button type="button" class="lnk" data-act="wsame">${T('ws_same')}</button><span class="muted small">${T('ws_hint')}</span></div></div>`;
+  // Hours for one week, set on Sunday evening (Tasks > Check next week), win over the usual working hours.
+  const availOf = (p, date) => { const a = p && p.display && p.display.avail; return a && date ? a[monday(date)] || null : null; };
+  const weekOf = (p, date) => { const av = availOf(p, date); if (av && Array.isArray(av.w) && av.w.length === 7) return av.w; if (p && Array.isArray(p.work_week) && p.work_week.length === 7) return p.work_week; const ds = String((p && p.work_days) || '').split(',').filter(x => x !== '').map(Number); return [0, 1, 2, 3, 4, 5, 6].map(i => (!ds.length || ds.includes(i) ? [(p && p.work_from) || '', (p && p.work_to) || ''] : null)); };
+  const workDaysOf = (p, date) => { const w = weekOf(p, date), on = w.map((x, i) => (x ? i : -1)).filter(i => i >= 0); return on.length === 7 ? [] : on; };
+  const weekEditor = (p, date) => `<div class="wweek">${weekOf(p, date).map((x, i) => `<div class="wrow"><label class="wday"><input type="checkbox" name="wd${i}" ${x ? 'checked' : ''}>${esc(fmt(addDays('2024-01-01', i), { weekday: 'short' }))}</label><input class="inp" type="time" name="wf${i}" value="${esc((x || [])[0] || '')}" aria-label="${T('ws_from')}"><span class="muted">–</span><input class="inp" type="time" name="wt${i}" value="${esc((x || [])[1] || '')}" aria-label="${T('ws_to')}"></div>`).join('')}<div class="bar"><button type="button" class="lnk" data-act="wsame">${T('ws_same')}</button><span class="muted small">${T('ws_hint')}</span></div></div>`;
   const weekFrom = fd => [0, 1, 2, 3, 4, 5, 6].map(i => (fd.get('wd' + i) ? [fd.get('wf' + i) || '', fd.get('wt' + i) || ''] : null));
   const weekFields = w => ({ work_week: w, work_days: w.every(Boolean) ? '' : w.map((x, i) => (x ? i : -1)).filter(i => i >= 0).join(','), work_from: null, work_to: null });
   // Georgian public holidays, shown for information on every calendar (they do not close the company; company days off are in Back office > Holidays).
@@ -308,7 +313,7 @@
       const o = tourDays(t).map(d => offOn(id, d)).find(Boolean);
       if (o) w.push({ lv: o.status === 'approved' ? 'danger' : 'warn', tx: T(o.type === 'sick' ? 'w_sick' : (o.status === 'approved' ? 'w_off' : 'w_offpending'), { name: n }) });
       if (tourDays(t).some(dd => toursOnDay(dd).some(x => x.id !== t.id && involves(x, id) && overlap(x, t)))) w.push({ lv: 'danger', tx: T('w_double', { name: n }) });
-      const pp = person(id) || {}, wds = workDaysOf(pp), wd = (D(t.date).getDay() + 6) % 7, hrs = weekOf(pp)[wd] || [];
+      const pp = person(id) || {}, wds = workDaysOf(pp, t.date), wd = (D(t.date).getDay() + 6) % 7, hrs = weekOf(pp, t.date)[wd] || [];
       if (id === t.guide_id && ce && ce.id && (pp.skills || []).length && !pp.skills.includes(String(ce.id))) w.push({ lv: 'warn', tx: T('w_skill', { name: n }) });
       if (endOf(t) === t.date) for (const x of toursOnDay(t.date)) {
         if (x.id === t.id || !involves(x, id) || endOf(x) !== x.date || overlap(x, t)) continue;
@@ -424,7 +429,7 @@
     errBusy = true; try { localStorage.setItem(ERRQ, '[]'); await S.reportErrors(q.map(x => ({ ...x, user_id: me().id }))); } catch (e) { try { const now = JSON.parse(localStorage.getItem(ERRQ) || '[]'); localStorage.setItem(ERRQ, JSON.stringify([...q, ...now].slice(-60))); } catch (e2) { /* blocked */ } } errBusy = false;
   }
   window.addEventListener('error', ev => logErr('error', ev.message, [ev.filename && ev.filename.split('/').pop() + ':' + ev.lineno, ev.error && ev.error.stack].filter(Boolean).join('\n')));
-  window.addEventListener('unhandledrejection', ev => { const r = ev.reason || {}; logErr('error', r.message || String(r), r.stack || ''); });
+  window.addEventListener('unhandledrejection', ev => { const r = ev.reason || {}; if (r.viewOnly) { ev.preventDefault(); return; } logErr('error', r.message || String(r), r.stack || ''); });
   // When the connection drops for more than 30 seconds, write down for how long.
   let offSince = null;
   function watchConn() { if (S.mode === 'demo') return; if (S.offline && !offSince) offSince = Date.now(); else if (!S.offline && offSince) { const sec = Math.round((Date.now() - offSince) / 1000), from = new Date(offSince); offSince = null; if (sec >= 30) logErr('offline', `No connection for ${sec >= 120 ? Math.round(sec / 60) + ' min' : sec + ' s'}, from ${from.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`, navigator.onLine ? 'phone was online: database or network did not answer' : 'phone had no internet'); else flushErr(); } }
@@ -472,6 +477,7 @@
     Promise.resolve(p).catch(() => {}).finally(() => { clearTimeout(t); if (--busyN <= 0) { busyN = 0; document.documentElement.classList.remove('busy'); } if (b) { b.removeAttribute('aria-busy'); b.disabled = false; } });
   }
   async function run(fn, okText) {
+    if (state.viewAs) { toast(T('va_readonly')); return; }
     try { await fn(); if (okText) toast(okText); } catch (e) { console.error(e); const m = String((e && e.message) || ''); logErr('save', `${errCode(e)} ${m || 'Save failed'}`, e && e.stack); toast(/invalid login/i.test(m) ? T('err_login') : /already registered|already exists/i.test(m) ? T('err_exists') : `${T('err_save')} (${errCode(e)}): ${T('ec_' + errCode(e))}`); }
     render();
   }
@@ -536,7 +542,8 @@
     return `<div class="card f wkcard" data-key="wk${k.id}"><b>${T('wk_title')}</b><span class="muted small num">${esc(fmtRange(from, to))}</span>
       ${ts.length ? `<div class="list">${ts.map(t => `<button class="arow" data-act="tour" data-id="${t.id}">${emblem(t)}<span><b class="num">${esc(fmt(t.date, { weekday: 'short', day: 'numeric' }))} ${esc(t.start_time || '')}</b> ${esc(t.title)}</span></button>`).join('')}</div>` : `<span class="small">${T('wk_none')}</span>`}
       ${offs.length ? `<span class="small">${T('dayoff')}: <span class="num">${offs.map(o => esc(fmtRange(o.date_from, o.date_to))).join(', ')}</span></span>` : ''}
-      <div class="actions"><button class="btn primary" data-act="weekok" data-id="${k.id}">${T('wk_ok')}</button></div></div>`;
+      <form class="f" data-form="avail" data-wk="${from}" data-task="${k.id}"><b>${T('av_title')}</b><span class="muted small">${T('av_text')}</span>${weekEditor(me(), from)}
+      <div class="actions"><button class="btn primary">${T('av_save')}</button></div></form></div>`;
   }
   function nextHtml() {
     const td = today(), id = me().id;
@@ -593,7 +600,7 @@
   function guideHomeHtml(days, title) {
     const td = today(), sel = state.date, id = me().id, now = days.includes(td) ? tourNow() : null;
     const asks = db.change_requests.filter(q => q.swap_with === id && q.status === 'pending' && !q.agreed);
-    return `${setupCard(true)}${weekCardHtml()}${asks.length ? nextHtml() : ''}
+    return `${setupCard(true)}${xcBanner()}${weekCardHtml()}${asks.length ? nextHtml() : ''}
       <div class="bar homebar"><h2>${esc(fmt(days[3], { month: 'long', year: 'numeric' }))}</h2><label class="jump" title="${T('pick_date')}">${ico('cal')}<input type="date" id="jump" data-ch="jump" value="${esc(state.date)}" aria-label="${T('pick_date')}"></label><span class="spacer"></span><div class="seg"><button data-act="nav" data-d="-1" aria-label="${T('prev')}">‹</button><button data-act="today">${T('today')}</button><button data-act="nav" data-d="1" aria-label="${T('next')}">›</button></div></div>
       <div class="list home"><div class="strip">${days.map(d => `<button data-act="day" data-date="${d}" aria-pressed="${d === sel}" class="${d === td ? 'tdy' : ''} ${offCls(offOn(id, d))} ${holidayOn(d) ? 'hol' : ''}"><span>${esc(fmt(d, { weekday: 'short' }))}</span><b class="num">${D(d).getDate()}</b><span class="dot ${toursOnDay(d).some(t => involves(t, id)) ? '' : 'none'}"></span></button>`).join('')}</div>
       ${now ? nowCardHtml(now) : ''}${days.map(myDayHtml).join('')}</div>
@@ -657,7 +664,7 @@
     const people = crew().filter(p => !state.mine || p.id === me().id);
     const title = state.mode === 'week' ? (days[0].slice(0, 7) === days[6].slice(0, 7) ? `${D(days[0]).getDate()}–${fmt(days[6], { day: 'numeric', month: 'short', year: 'numeric' })}` : `${fmt(days[0], { day: 'numeric', month: 'short' })} – ${fmt(days[6], { day: 'numeric', month: 'short', year: 'numeric' })}`) : fmt(state.date, { month: 'long', year: 'numeric' });
     if (!isAdmin() && state.mine && state.mode === 'week') return guideHomeHtml(days, title);
-    let h = `${state.newVersion ? `<button class="banner small setupban" data-act="reload"><span>${T('nv_text')}</span><b>${T('nv_btn')} ›</b></button>` : ''}${setupCard(true)}${window.matchMedia('(max-width:760px)').matches ? installCardHtml(false) : ''}${nextHtml()}<div class="bar">
+    let h = `${state.newVersion ? `<button class="banner small setupban" data-act="reload"><span>${T('nv_text')}</span><b>${T('nv_btn')} ›</b></button>` : ''}${setupCard(true)}${xcBanner()}${window.matchMedia('(max-width:760px)').matches ? installCardHtml(false) : ''}${nextHtml()}<div class="bar">
       <div class="seg"><button data-act="mode" data-m="week" aria-pressed="${state.mode === 'week'}">${T('week')}</button><button data-act="mode" data-m="month" aria-pressed="${state.mode === 'month'}">${T('month')}</button></div>
       <div class="seg"><button data-act="mine" data-v="0" aria-pressed="${!state.mine}">${T('team')}</button><button data-act="mine" data-v="1" aria-pressed="${!!state.mine}">${T('mine')}</button></div>
       <span class="spacer"></span><button class="btn only-wide" data-act="summary">${T('day_summary')}</button>${isAdmin() ? `<button class="btn primary only-wide" data-act="newtour">+ ${T('tour')}</button><button class="btn primary fab only-phone" data-act="newtour" aria-label="${T('add_tour')}">+</button>` : ''}<span class="only-wide">${helpBtn()}</span></div>${helpBox('calendar')}
@@ -778,6 +785,7 @@
         <div class="glist crew">${[['guide', d.guide_id], ['driver', d.driver_id]].filter(x => x[1]).map(([r, id]) => `<div class="grow" style="--k:${esc((person(id) || {}).color || '#66737f')}"><span class="row nw">${avatar(id)}<span class="grow-l" style="flex-direction:column;align-items:flex-start;gap:0"><b>${esc(pname(id))}</b><span class="muted small">${esc([T('role_' + r), ...titlesOf(id)].join(' · '))}</span></span>${staffBtns(person(id))}</span></div>`).join('') || `<div class="grow"><span class="tag t-warn">${T('unassigned')}</span></div>`}</div>
         <h3>${T('guests_title')} (${d.bookings.length})</h3>${canCheck && d.bookings.some(b => b.attendance) ? `<div class="muted small num">${T('att_sum', { a: d.bookings.filter(b => b.attendance === 'arrived').length, n: d.bookings.length, x: d.bookings.filter(b => b.attendance === 'noshow').length })}</div>` : ''}
         ${d.bookings.length ? `<div class="glist">${d.bookings.map(b => guestRow(b, d.bookings.some(x => x.pickup_addr))).join('')}</div>` : guestsHidden(d) ? `<div class="empty">${T('pv_hidden', { n: pv().guideDays })}</div>` : `<div class="empty">${T('no_guests')}${isAdmin() ? ` <button class="btn sm" data-act="touredit">${T('add_guests')}</button>` : ''}</div>`}
+        ${mine && d.date <= today() && live(d) ? `<button class="btn exptour" data-act="expnew" data-tour="${d.id}" data-date="${d.date}">${msi('receipt_long')} ${T('ex_tour')}</button>` : ''}
         <details class="sect"><summary>${T('more')}</summary><div class="f">
           <div class="bar"><button class="btn sm" data-act="share" data-title="${esc(d.title)}" data-v="${esc(tourText(d))}">${ico('share')}${T('share')}</button><a class="btn sm" href="${esc(gcalLink(d))}" target="_blank" rel="noopener">${ico('cal')}${T('cal_short')}</a><button class="btn sm" data-act="copy" data-v="${esc(tourText(d))}">${ico('copy')}${T('copy')}</button>${tipUrl(d) && (mine || isAdmin()) ? `<button class="btn sm" data-act="tipqr" data-id="${d.id}">${T('tip_btn')}</button>` : ''}</div>
           <div class="muted small num">${esc([T('kind_' + d.kind), paxText(d), d.language, cn.duration, cn.note, endOf(d) !== d.date ? T('multiday', { n: tourDays(d).length }) : ''].filter(Boolean).join(' · '))}</div>
@@ -844,7 +852,7 @@
       const done = db.tours.filter(t => live(t) && involves(t, p.id) && t.title === d.title && t.date < today()).length; if (done) { sc += Math.min(done, 20) / 2; why.push(T('fit_done', { n: done })); }
       if (role === 'guide' && cat && (p.skills || []).length) { if ((p.skills || []).includes(String(cat.id))) { sc += 3; why.push(T('fit_skill')); } else { sc -= 4; warn.push(T('fit_noskill')); } }
       if (role === 'guide' && lng && lng !== 'EN') { if (String(p.languages || '').toUpperCase().includes(lng)) { sc += 4; why.push(lng); } else { sc -= 6; warn.push(T('fit_nolang', { l: lng })); } } else if (role === 'guide' && lng && String(p.languages || '').toUpperCase().includes(lng)) why.push(lng);
-      const w = weekOf(p); if (w && w.length === 7 && !w[wdx]) { sc -= 3; warn.push(T('fit_notday')); }
+      const av = availOf(p, d.date), w = weekOf(p, d.date); if (w && w.length === 7 && !w[wdx]) { sc -= av ? 8 : 3; warn.push(T(av ? 'fit_notfree' : 'fit_notday')); } else if (av) { sc += 1; why.push(T('fit_free')); }
       const load = db.tours.filter(t => live(t) && involves(t, p.id) && t.date >= wk && t.date <= wkEnd && t.id !== d.id).length; sc -= load * 0.7; why.push(T('fit_week', { n: load }));
       const mo = d.date.slice(0, 7), bal = monthDays(mo); if (bal.avg[role] !== undefined) { const md = bal.days[p.id] || 0; sc -= (md - bal.avg[role]) * 0.4; why.push(T('fit_month', { n: md, avg: Math.round(bal.avg[role]) })); }
       if (role === 'driver' && /4x4|kazbegi|gareji|tusheti|truso|juta|khevsureti/i.test(d.title) && p.vehicle === 'delica') { sc += 3; why.push('Delica'); }
@@ -990,6 +998,7 @@
   // ---------- change requests: guides and drivers suggest, the admin approves ----------
   function creqText(q) {
     const p = q.patch || {}, parts = [];
+    if (p.guide_id === q.user_id && !q.swap_with) parts.push(T('xc_take_guide')); if (p.driver_id === q.user_id && !q.swap_with) parts.push(T('xc_take_driver'));
     if (q.swap_with) parts.push(`${T('swap_to')} ${pname(q.swap_with)} (${q.agreed ? T('swap_agreed') : T('swap_waiting')})`);
     if (q.cant) parts.push(T('creq_cant_short'));
     if (p.status === 'cancelled') parts.push(T('creq_cancel'));
@@ -1404,8 +1413,8 @@
     if (!isAdmin() && sug.length) h += `<div class="card"><b>${T('sug_title')}</b><span class="muted small">${T('sug_text')}</span><div class="bar">${sug.map(d => `<button class="btn sm" data-act="offnew" data-date="${d}">${esc(fmtDay(d))}</button>`).join('')}</div></div>`;
     if (isAdmin()) h += `<h3>${T('to_approve')} (${pending.length})</h3><div class="list">${pending.length ? pending.map(o => offRow(o, true)).join('') : `<div class="empty">${T('nothing_pending')}</div>`}</div>`;
     h += `<div class="cols"><div class="list"><h3>${T('my_requests')}</h3>${mine.length ? mine.map(o => offRow(o, isAdmin())).join('') : `<div class="empty">${T('no_requests')}</div>`}</div>
-      <div class="list"><h3>${T('team_off')}</h3>${upcoming.length ? upcoming.map(o => `<div class="card"><div class="row">${avatar(o.user_id)}<b>${esc(pname(o.user_id))}</b>${offTag(o)}<span class="num">${esc(fmtRange(o.date_from, o.date_to))}</span></div></div>`).join('') : `<div class="empty">${T('nobody_off')}</div>`}
-      <h3>${T('holidays')}</h3>${hol.length ? hol.map(x => `<div class="card"><div class="row"><span class="tag ${x.kind === 'event' ? 't-group' : 't-hol'}">${esc(x.name)}</span><span class="num">${esc(fmtRange(x.date_from, x.date_to))}</span></div>${x.notes ? `<div class="muted small">${esc(x.notes)}</div>` : ''}</div>`).join('') : `<div class="empty">${T('no_holidays')}</div>`}</div></div>`;
+      <div class="list"><h3>${T('team_off')}</h3>${upcoming.length ? upcoming.map(o => `<div class="card lrow">${avatar(o.user_id)}<span class="lmain"><b>${esc(pname(o.user_id))}</b>${offTag(o)}</span><span class="num ldate">${esc(fmtRange(o.date_from, o.date_to))}</span></div>`).join('') : `<div class="empty">${T('nobody_off')}</div>`}
+      <h3>${T('holidays')}</h3>${hol.length ? hol.map(x => `<div class="card lrow nohead"><span class="lmain"><span class="tag ${x.kind === 'event' ? 't-group' : 't-hol'}">${esc(x.name)}</span></span><span class="num ldate">${esc(fmtRange(x.date_from, x.date_to))}</span>${x.notes ? `<div class="muted small">${esc(x.notes)}</div>` : ''}</div>`).join('') : `<div class="empty">${T('no_holidays')}</div>`}</div></div>`;
     return h;
   }
   function offModalHtml(m) {
@@ -1461,13 +1470,24 @@
       <div class="mslist mt">${list.map(c => `<label><input type="checkbox" data-ch="mytour" data-v="${c.id}" ${sel.has(String(c.id)) ? 'checked' : ''}><span>${esc(c.title)}</span></label>`).join('')}</div>
       <div class="actions"><button class="btn primary" data-act="mytoursok">${T(state.myTours ? 'mt_send' : 'mt_right')}</button></div></div>`;
   }
+  // Tour exchange: upcoming tours that still need a guide (for guides) or a driver (for drivers). "I can do it" asks the office; pressed by mistake = take it back.
+  function openTours() {
+    const m = me(); if (!m || isAdmin()) return []; const role = m.role === 'driver' ? 'driver' : 'guide', td = today(), to = addDays(td, 30);
+    return db.tours.filter(t => live(t) && t.date >= td && t.date <= to && !involves(t, m.id) && (role === 'guide' ? !t.guide_id : (!t.driver_id && kmOf(t.title) > 0)) && !offOn(m.id, t.date))
+      .sort((x, y) => (x.date + (x.start_time || '')).localeCompare(y.date + (y.start_time || ''))).map(t => ({ t, role, mine: db.change_requests.find(q => q.tour_id === t.id && q.user_id === m.id && q.status === 'pending') }));
+  }
+  const xcBanner = () => { const n = openTours().filter(x => !x.mine).length; return n ? `<button class="banner small setupban" data-act="view" data-v="tasks"><span>${T('xc_banner', { n })}</span><b>${T('xc_see')} ›</b></button>` : ''; };
+  function exchangeHtml() {
+    const list = openTours(); if (!list.length) return '';
+    return `<div class="card f xcard"><b>${T('xc_title', { n: list.length })}</b><span class="muted">${T('xc_text')}</span>${list.slice(0, 12).map(({ t, role, mine }) => `<div class="xrow"><button class="grow-l arow" data-act="tour" data-id="${t.id}">${emblem(t)}<span><b class="num">${esc(fmt(t.date, { weekday: 'short', day: 'numeric', month: 'short' }))} ${esc(t.start_time || '')}</b> ${esc(aliasOf(t.title))}</span></button>${mine ? `<span class="xasked"><span class="tag t-off">${T('xc_asked')}</span><button class="lnk" data-act="xcback" data-id="${mine.id}">${T('xc_back')}</button></span>` : `<button class="btn sm primary" data-act="xctake" data-id="${t.id}" data-role="${role}">${T('xc_can')}</button>`}</div>`).join('')}</div>`;
+  }
   function tasksHtml() {
     const f = state.taskFilter;
     const list = db.tasks.filter(k => (isAdmin() && !state.mine) || (k.assignees || []).includes(me().id)).filter(k => f === 'all' || k.status === f).sort((a, b) => (a.due_date || '9').localeCompare(b.due_date || '9'));
     return `<div class="bar"><h2>${T('tasks')}</h2><span class="spacer"></span>
       <div class="seg">${['open', 'done', 'all'].map(x => `<button data-act="taskfilter" data-v="${x}" aria-pressed="${f === x}">${T('f_' + x)}</button>`).join('')}</div>
       ${isAdmin() ? `<div class="seg"><button data-act="mine" data-v="0" aria-pressed="${!state.mine}">${T('team')}</button><button data-act="mine" data-v="1" aria-pressed="${!!state.mine}">${T('mine')}</button></div><button class="btn primary" data-act="tasknew">+ ${T('task')}</button>` : ''}${helpBtn()}</div>${helpBox('tasks')}
-      ${setupCard()}<div class="list">${list.length ? list.map(taskCard).join('') : setupSteps().some(x => !x.done) ? '' : `<div class="empty">${T('no_tasks')}</div>`}</div>`;
+      ${setupCard()}${exchangeHtml()}<div class="list">${list.length ? list.map(taskCard).join('') : setupSteps().some(x => !x.done) ? '' : `<div class="empty">${T('no_tasks')}</div>`}</div>`;
   }
   function taskModalHtml(m) {
     const d = m.draft;
@@ -1613,6 +1633,15 @@
         ${Object.keys(s.why).length ? `<b class="small">${T('ts_cx_why')}</b>${share(s.why)}` : ''}</div>
       <div class="cols"><div class="card f"><b>${T('ts_sources')}</b>${share(s.src) || `<span class="muted small">—</span>`}</div><div class="card f"><b>${T('ts_kinds')}</b>${share(Object.fromEntries(Object.entries(s.kinds).map(([k, v]) => [T('kind_' + k), v]))) || '—'}<b>${T('ts_langs')}</b>${share(s.lang) || '—'}</div></div>`;
   }
+  // Who can work which days next week (set on Sunday evening), how many filled it in, and a reminder for the others.
+  function availHtml(wk) {
+    const ppl = crew().filter(p => p.role !== 'admin'), days = [0, 1, 2, 3, 4, 5, 6].map(i => addDays(wk, i)), set = ppl.filter(p => availOf(p, wk)), miss = ppl.filter(p => !availOf(p, wk));
+    const cell = (p, d, i) => { const o = offOn(p.id, d); if (o) return `<td class="avc off">${T(o.type === 'sick' ? 'sick' : 'dayoff')}</td>`; const x = weekOf(p, wk)[i], busy = toursOnDay(d).some(t => involves(t, p.id)); return `<td class="avc ${x ? 'on' : 'no'} ${availOf(p, wk) ? '' : 'usual'}">${x ? esc(x[0] && x[1] ? `${x[0].slice(0, 5)}–${x[1].slice(0, 5)}` : T('av_any')) : '—'}${busy ? ' ●' : ''}</td>`; };
+    return `<div class="bar"><div class="seg"><button data-act="availwk" data-d="-7">‹</button><button disabled>${esc(fmtRange(wk, addDays(wk, 6)))}</button><button data-act="availwk" data-d="7">›</button></div></div>
+      <div class="tsum"><b>${T('av_filled', { n: set.length, all: ppl.length })}</b>${miss.length ? `<span>${T('av_missing')}: ${miss.map(p => esc(p.name)).join(', ')}</span><div><button class="btn sm" data-act="availremind" data-wk="${wk}">${T('av_remind')}</button></div>` : ''}</div>
+      <p class="muted small">${T('av_legend')}</p>
+      <div class="tablewrap"><table class="avt"><tr><th>${T('name')}</th>${days.map(d => `<th class="n">${esc(fmt(d, { weekday: 'short', day: 'numeric' }))}</th>`).join('')}</tr>${ppl.map(p => `<tr><td><span class="row nw">${avatar(p.id)}${esc(p.name)}</span></td>${days.map((d, i) => cell(p, d, i)).join('')}</tr>`).join('')}</table></div>`;
+  }
   // Work balance: who works how much this month, so tours, rest and pay stay fair between guides and between drivers.
   const selfDrive = (t, p) => t.guide_id === p.id && (t.driver_id === p.id || (!t.driver_id && !!p.vehicle && kmOf(t.title) > 0));
   function balanceRows(mo) {
@@ -1650,12 +1679,13 @@
   }
   function adminHtml() {
     const tab = state.adminTab, r = rules(), y = state.year;
-    const groups = [['g_daily', ['requests', 'tours', 'email', 'clients']], ['g_team', ['team', 'balance', 'pay', 'plan', 'holidays']], ['g_numbers', ['stats', 'reports', 'achv', 'usage']], ['g_setup', ['catalog', 'rules', 'import', 'backup', 'privacy', 'log', 'problems']]], tabs = groups.flatMap(x => x[1]);
-    if (!tab) return `<div class="bar"><h2>${T('nav_admin')}</h2><span class="spacer"></span>${helpBtn()}</div>${helpBox('admin')}${backupDue() ? `<div class="banner small"><span>${lastBackup() ? T('bk_due', { date: fmtDay(lastBackup().slice(0, 10)) }) : T('bk_never')}</span><button class="btn sm primary" data-act="backup">${T('bk_download')}</button></div>` : ''}${groups.map(([gk, gt]) => `<h3>${T(gk)}</h3><div class="tiles">${gt.map(x => `<button class="card" data-act="admintab" data-v="${x}"><span class="ttl">${T('a_' + x)}${x === 'requests' && db.change_requests.some(q => q.status === 'pending') ? ` <span class="badge">${db.change_requests.filter(q => q.status === 'pending').length}</span>` : ''}${x === 'pay' && db.pay_disputes.some(q => q.status === 'open') ? ` <span class="badge">${db.pay_disputes.filter(q => q.status === 'open').length}</span>` : ''}</span><span class="muted small">${T('ad_' + x)}</span></button>`).join('')}</div>`).join('')}`;
+    const groups = [['g_daily', ['requests', 'tours', 'email', 'clients']], ['g_team', ['team', 'avail', 'balance', 'pay', 'plan', 'holidays']], ['g_numbers', ['stats', 'reports', 'achv', 'usage']], ['g_setup', ['catalog', 'rules', 'import', 'backup', 'privacy', 'log', 'problems']]], tabs = groups.flatMap(x => x[1]);
+    if (!tab) return `<div class="bar"><h2>${T('nav_admin')}</h2><span class="spacer"></span>${helpBtn()}</div>${helpBox('admin')}${S.mode === 'supabase' || window.__fsLookAsDemo ? `<div class="card f vapick"><b>${T('va_title')}</b><span class="muted small">${T('va_text')}</span><div class="bar"><select class="inp" id="va-who">${crew().filter(p => p.id !== S.me.id).map(p => opt(p.id, `${p.name} · ${T('role_' + p.role)}`, '')).join('')}</select><button class="btn primary" data-act="vastart">${T('va_go')}</button></div></div>` : ''}${backupDue() ? `<div class="banner small"><span>${lastBackup() ? T('bk_due', { date: fmtDay(lastBackup().slice(0, 10)) }) : T('bk_never')}</span><button class="btn sm primary" data-act="backup">${T('bk_download')}</button></div>` : ''}${groups.map(([gk, gt]) => `<h3>${T(gk)}</h3><div class="tiles">${gt.map(x => `<button class="card" data-act="admintab" data-v="${x}"><span class="ttl">${T('a_' + x)}${x === 'requests' && db.change_requests.some(q => q.status === 'pending') ? ` <span class="badge">${db.change_requests.filter(q => q.status === 'pending').length}</span>` : ''}${x === 'pay' && db.pay_disputes.some(q => q.status === 'open') ? ` <span class="badge">${db.pay_disputes.filter(q => q.status === 'open').length}</span>` : ''}</span><span class="muted small">${T('ad_' + x)}</span></button>`).join('')}</div>`).join('')}`;
     let h = `<div class="bar"><button class="btn sm" data-act="admintab" data-v="">‹ ${T('nav_admin')}</button><h2>${T('a_' + tab)}</h2><span class="spacer"></span>${helpBtn()}</div>${helpBox('admin')}`;
     if (tab === 'stats') return h + statsTabHtml(y);
     if (tab === 'achv') return h + achvTabHtml();
     if (tab === 'balance') return h + balanceHtml(state.balMonth || today().slice(0, 7));
+    if (tab === 'avail') return h + availHtml(state.availWk || addDays(monday(today()), 7));
     if (tab === 'problems') {
       if (!state.errs) { S.fetchErrors().then(r => { state.errs = r; render(); }).catch(e => { state.errs = []; toast(T('err_save') + ': ' + e.message); render(); }); return h + `<p class="muted">${T('loading')}</p>`; }
       const kinds = { error: T('pr_error'), save: T('pr_save'), offline: T('pr_offline'), report: T('pr_report') };
@@ -2093,6 +2123,28 @@
     const adj = db.pay_adjustments.filter(x => x.user_id === id && x.month === mo), base = rows.reduce((a, x) => a + x.pay, 0);
     return { rows, adj, base: Math.round(base * 100) / 100, total: Math.round((base + adj.reduce((a, x) => a + (Number(x.amount) || 0), 0)) * 100) / 100 };
   }
+  // Personal expenses (meal, fuel, car service, accommodation, parking, other): each person adds their own, the admin marks what was paid back.
+  const EXP_KINDS = ['meal', 'fuel', 'service', 'stay', 'parking', 'other'];
+  const EXP_ICON = { meal: 'restaurant', fuel: 'local_gas_station', service: 'build', stay: 'hotel', parking: 'local_parking', other: 'receipt_long' };
+  function expensesHtml(id, from, to) {
+    const xs = (db.expenses || []).filter(x => x.user_id === id && x.date >= from && x.date <= to).sort((a, b) => b.date.localeCompare(a.date)), base = rules().currency || 'GEL';
+    const sum = xs.reduce((n, x) => n + (Number(x.amount) || 0) * (rateOf(x.currency, x.date) || 0), 0), open = xs.filter(x => !x.paid_back).reduce((n, x) => n + (Number(x.amount) || 0) * (rateOf(x.currency, x.date) || 0), 0);
+    const by = {}; xs.forEach(x => { by[x.kind] = (by[x.kind] || 0) + (Number(x.amount) || 0) * (rateOf(x.currency, x.date) || 0); });
+    const mine = id === me().id, past = db.tours.filter(t => live(t) && involves(t, id) && t.date >= from && t.date <= to && t.date <= today()).length;
+    return `<div class="card f expcard"><div class="bar"><b>${T('ex_title')}</b><span class="spacer"></span>${mine ? `<button class="btn sm primary" data-act="expnew">+ ${T('ex_add')}</button>` : ''}</div>
+      ${xs.length ? `<div class="tsum num"><div>${T('ex_total')}: <b>${nf(Math.round(sum))} ${esc(base)}</b>${open && open !== sum ? ` · ${T('ex_open')}: <b>${nf(Math.round(open))} ${esc(base)}</b>` : ''}</div><div class="muted">${EXP_KINDS.filter(k => by[k]).map(k => `${T('ex_k_' + k)} ${nf(Math.round(by[k]))}`).join(' · ')}</div></div>
+      <div class="explist">${xs.map(x => `<div class="exrow">${msi(EXP_ICON[x.kind] || 'receipt_long')}<span class="grow-l"><b>${T('ex_k_' + x.kind)}</b> <span class="num">${esc(nf(Number(x.amount) || 0))} ${esc(x.currency)}</span><span class="muted small"> · ${esc(fmtDay(x.date))}${x.tour_id ? ' · ' + esc(aliasOf((db.tours.find(t => t.id === x.tour_id) || {}).title || '')) : ''}${x.note ? ' · ' + esc(x.note) : ''}</span></span>${x.paid_back ? `<span class="tag t-ok">${T('ex_paid')}</span>` : isAdmin() ? `<button class="btn sm" data-act="exppaid" data-id="${x.id}">${T('ex_markpaid')}</button>` : mine ? `<button class="lnk" data-act="expdel" data-id="${x.id}">${T('remove')}</button>` : ''}</div>`).join('')}</div>`
+        : `<span class="muted">${mine ? T(past ? 'ex_nudge' : 'ex_none', { n: past }) : T('ex_none_admin')}</span>`}</div>`;
+  }
+  function expModalHtml(m) {
+    const d = m.draft, mine = db.tours.filter(t => live(t) && involves(t, me().id) && t.date <= today() && t.date >= addDays(today(), -45)).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 25);
+    return `<div class="hdr"><h2>${T('ex_add')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>
+      <form class="f" data-form="expense"><div class="kinds">${EXP_KINDS.map(k => `<label class="kind"><input type="radio" name="kind" value="${k}" ${d.kind === k ? 'checked' : ''}>${msi(EXP_ICON[k])}<span>${T('ex_k_' + k)}</span></label>`).join('')}</div>
+        <div class="two"><label>${T('ex_amount')}<input name="amount" type="number" inputmode="decimal" min="0" step="any" required value="${esc(d.amount || '')}"></label><label>${T('currency')}<select name="currency">${CURRENCIES.map(c => opt(c, c, d.currency || rules().currency || 'GEL')).join('')}</select></label></div>
+        <div class="two"><label>${T('date')}<input name="date" type="date" required value="${esc(d.date || today())}"></label><label>${T('tour')}<select name="tour_id"><option value="">—</option>${mine.map(t => opt(t.id, `${fmt(t.date, { day: 'numeric', month: 'short' })} ${aliasOf(t.title)}`, d.tour_id || '')).join('')}</select></label></div>
+        <label>${T('notes')}<input name="note" value="${esc(d.note || '')}" placeholder="${T('ex_note_ph')}"></label>
+        <div class="actions"><button type="button" class="btn" data-act="close">${T('cancel')}</button><button class="btn primary">${T('save')}</button></div></form>`;
+  }
   function statementHtml(id, mo, modal) {
     const st = statement(id, mo), cur = rules().currency || 'GEL', pd = db.payout_details.find(x => x.id === id);
     const text = [`${pname(id)} · ${mo}`, ...st.rows.map(x => `${x.t.date} ${x.t.title}: ${x.pay} ${cur}`), `${T('total')}: ${st.total} ${cur}`].join('\n');
@@ -2100,6 +2152,7 @@
       <div class="stats"><div class="stat"><b>${st.rows.length}</b>${T('tours_n')}</div><div class="stat"><b>${st.total}</b>${esc(cur)}</div></div>
       <div class="tablewrap"><table><tr><th>${T('date')}</th><th>${T('title')}</th><th class="n">${esc(cur)}</th></tr>${st.rows.map(x => `<tr><td class="num">${esc(dateText(x.t))}</td><td style="white-space:normal">${esc(x.t.title)} ${disputeTag(disputeOf(x.t.id, id))}${id === me().id && !isAdmin() ? ` <button class="lnk" data-act="dispute" data-id="${x.t.id}">${T('dp_btn')}</button>` : ''}</td><td class="n">${x.pay}</td></tr>`).join('') || `<tr><td colspan="3" class="muted">${T('no_tours')}</td></tr>`}${st.adj.map(x => `<tr><td><span class="tag t-warn">${T('correction')}</span></td><td style="white-space:normal">${esc(x.note || '')}${isAdmin() ? ` <button class="btn sm" data-act="adjdel" data-id="${x.id}">${T('remove')}</button>` : ''}</td><td class="n">${Number(x.amount) > 0 ? '+' : ''}${esc(x.amount)}</td></tr>`).join('')}${st.adj.length ? `<tr><td colspan="2"><b>${T('total')}</b></td><td class="n"><b>${st.total}</b></td></tr>` : ''}</table></div>
       ${rules().payNote ? `<p class="muted small">${esc(rules().payNote)}</p>` : ''}
+      ${modal ? expensesHtml(id, mo + '-01', monthEnd(mo)) : ''}
       ${modal && isAdmin() ? `<form class="bar" data-form="adjust"><input type="hidden" name="user_id" value="${id}"><input type="hidden" name="month" value="${mo}"><input class="inp" id="adj-amount" name="amount" type="number" step="any" placeholder="${T('adj_amount')}" required style="max-width:130px"><input class="inp" id="adj-note" name="note" placeholder="${T('adj_note')}" required style="flex:1;min-width:140px"><button class="btn">+ ${T('correction')}</button></form>` : ''}
       ${pd && (pd.account || pd.bank_name) ? `<div class="card"><b>${T('payout')}</b><div class="small">${esc([pd.holder, pd.bank_name].filter(Boolean).join(' · '))}</div>${pd.account ? `<div class="row"><span class="num">${esc(pd.account)}</span><button class="btn sm" data-act="copy" data-v="${esc(pd.account)}">${T('copy')}</button></div>` : ''}</div>` : ''}
       <div class="actions"><button class="btn" data-act="copy" data-v="${esc(text)}">${T('copy')}</button>${modal && isAdmin() && id !== me().id ? `<button class="btn primary" data-act="sendstatement" data-id="${id}" data-m="${mo}">${T('send_statement')}</button>` : ''}</div>`;
@@ -2145,7 +2198,7 @@
     const m = me(), perm = ('Notification' in window) ? Notification.permission : 'unsupported', tab = state.meTab, mo = state.listMonth || today().slice(0, 7);
     const pd = db.payout_details.find(x => x.id === m.id) || {};
     let h = `<div class="bar"><h2>${T('nav_me')}</h2><span class="spacer"></span>${helpBtn()}</div>${helpBox('me')}<div class="seg">${['profile', 'settings', 'month', 'stats', 'badges'].map(x => `<button data-act="metab" data-v="${x}" aria-pressed="${tab === x}">${T('me_' + x)}</button>`).join('')}</div>`;
-    if (tab === 'month') { const pr = payRange(); return h + rangeBar() + (pr.month ? statementHtml(m.id, pr.month, false) : payRangeHtml(m.id, pr.from, pr.to, false)) + adviceHtml(m.id); }
+    if (tab === 'month') { const pr = payRange(); return h + rangeBar() + (pr.month ? statementHtml(m.id, pr.month, false) : payRangeHtml(m.id, pr.from, pr.to, false)) + expensesHtml(m.id, pr.from, pr.to) + adviceHtml(m.id); }
     if (tab === 'stats') return h + statsHtml(isAdmin() ? (state.statUser || m.id) : m.id);
     if (tab === 'badges') return h + badgesHtml(m.id);
     if (tab === 'settings') return h + settingsHtml(m, perm);
@@ -2237,7 +2290,7 @@
       
       <button class="iconbtn ${state.refreshing ? 'spin' : ''}" data-act="refresh" aria-label="${T('refresh')}" title="${esc(upd)}">${ico('refresh')}</button>
       <button class="iconbtn" data-act="bell" aria-label="${T('notifications')}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>${unread ? `<span class="badge">${unread}</span>` : ''}</button><div class="subtop">${syncRow()}${testChip()}</div></header>
-      ${maintHtml() || ''}<main data-key="v-${state.view}-${state.view === 'admin' ? (state.adminTab || '') : state.view === 'me' ? state.meTab : ''}">${demo}${body}</main><nav class="tabs" aria-label="Main">${nav}</nav>`;
+      ${maintHtml() || ''}${state.viewAs ? `<div class="vabar"><span>${T('va_now', { name: esc(me().name) })}</span><button class="btn sm" data-act="vaexit">${T('va_exit')}</button></div>` : ''}<main data-key="v-${state.view}-${state.view === 'admin' ? (state.adminTab || '') : state.view === 'me' ? state.meTab : ''}">${demo}${body}</main><nav class="tabs" aria-label="Main">${nav}</nav>`;
     const t1 = performance.now(); morph(app, shell + '<div id="modal"></div><div id="toasts"></div>');
     const hd = app.querySelector('header.top'); if (hd) document.documentElement.style.setProperty('--toph', hd.offsetHeight + 'px'); const sp = app.querySelector('.strip'); if (sp && sp.offsetHeight) document.documentElement.style.setProperty('--striph', sp.offsetHeight + 'px');
     window.__rt = { build: Math.round(t1 - t0), patch: Math.round(performance.now() - t1) }; syncNotice(); watchConn();
@@ -2286,7 +2339,7 @@
     const el = $('#modal'); if (!el) return; const m = state.modal;
     if (m && !modalHist) { modalHist = true; navPush(); } else if (!m && modalHist) { modalHist = false; navPop(); }
     if (!m) { el.innerHTML = ''; modalKey = ''; return; }
-    const inner = m.type === 'tnames' ? tnamesHtml(m) : m.type === 'tour' ? tourModalHtml(m) : m.type === 'off' ? offModalHtml(m) : m.type === 'task' ? taskModalHtml(m) : m.type === 'client' ? clientModalHtml(m) : m.type === 'offer' ? offerModalHtml(m) : m.type === 'guest' ? guestSheetHtml(m) : m.type === 'creq' ? creqModalHtml(m) : m.type === 'cancel' ? cancelModalHtml(m) : m.type === 'person' ? personModalHtml(m) : m.type === 'invite' ? inviteModalHtml(m) : m.type === 'tip' ? tipModalHtml(m) : m.type === 'share' ? shareModalHtml(m) : m.type === 'test' ? testModalHtml() : m.type === 'display' ? `<div class="hdr"><h2>${T('ds_title')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div><div class="f">${displayHtml()}</div>` : m.type === 'move' ? moveModalHtml(m) : m.type === 'celebrate' ? celebrateHtml(m) : m.type === 'cat' ? catModalHtml(m) : m.type === 'dispute' ? disputeModalHtml(m) : m.type === 'prange' ? payRangeHtml(m.id, payRange().from, payRange().to, true) : m.type === 'badge' ? badgeModalHtml(m) : m.type === 'summary' ? summaryHtml(m) : m.type === 'statement' ? statementHtml(m.id, m.month, true) : m.type === 'confirm' ? `<div class="hdr"><h2>${esc(m.text)}</h2></div><div class="actions"><button class="btn" data-act="close">${T('close')}</button><button class="btn danger" data-act="confirmyes">${esc(m.yes)}</button></div>` : bellHtml();
+    const inner = m.type === 'exp' ? expModalHtml(m) : m.type === 'tnames' ? tnamesHtml(m) : m.type === 'tour' ? tourModalHtml(m) : m.type === 'off' ? offModalHtml(m) : m.type === 'task' ? taskModalHtml(m) : m.type === 'client' ? clientModalHtml(m) : m.type === 'offer' ? offerModalHtml(m) : m.type === 'guest' ? guestSheetHtml(m) : m.type === 'creq' ? creqModalHtml(m) : m.type === 'cancel' ? cancelModalHtml(m) : m.type === 'person' ? personModalHtml(m) : m.type === 'invite' ? inviteModalHtml(m) : m.type === 'tip' ? tipModalHtml(m) : m.type === 'share' ? shareModalHtml(m) : m.type === 'test' ? testModalHtml() : m.type === 'display' ? `<div class="hdr"><h2>${T('ds_title')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div><div class="f">${displayHtml()}</div>` : m.type === 'move' ? moveModalHtml(m) : m.type === 'celebrate' ? celebrateHtml(m) : m.type === 'cat' ? catModalHtml(m) : m.type === 'dispute' ? disputeModalHtml(m) : m.type === 'prange' ? payRangeHtml(m.id, payRange().from, payRange().to, true) : m.type === 'badge' ? badgeModalHtml(m) : m.type === 'summary' ? summaryHtml(m) : m.type === 'statement' ? statementHtml(m.id, m.month, true) : m.type === 'confirm' ? `<div class="hdr"><h2>${esc(m.text)}</h2></div><div class="actions"><button class="btn" data-act="close">${T('close')}</button><button class="btn danger" data-act="confirmyes">${esc(m.yes)}</button></div>` : bellHtml();
     const key = m.type + ':' + (m.id || (m.draft && m.draft.id) || '') + ':' + (m.edit ? 'e' : '');
     morph(el, `<div class="overlay" data-act="backdrop"><div class="sheet" role="dialog" aria-modal="true">${inner}</div></div>`);
     if (key !== modalKey) { const sh = el.querySelector('.sheet'); if (sh) sh.scrollTop = 0; modalKey = key; }
@@ -2359,6 +2412,14 @@
     },
     // The phone's own share sheet (WhatsApp, Telegram, Messages, ...); WhatsApp link where the browser has none.
     reload() { location.reload(); },
+    vastart() { const v = ($('#va-who') || {}).value; if (!v) return; state.viewAs = v; state.view = 'calendar'; state.adminTab = null; state.mine = true; render(); window.scrollTo(0, 0); },
+    vaexit() { state.viewAs = null; state.view = 'admin'; state.mine = false; render(); window.scrollTo(0, 0); },
+    expnew(el) { state.modal = { type: 'exp', draft: { kind: 'meal', date: (el && el.dataset.date) || today(), tour_id: (el && el.dataset.tour) || '', currency: rules().currency || 'GEL' } }; renderModal(); },
+    expdel(el) { return run(() => S.remove('expenses', el.dataset.id), T('saved')); },
+    exppaid(el) { const x = (db.expenses || []).find(y => y.id === el.dataset.id); if (x) return run(() => S.save('expenses', { ...x, paid_back: true }), T('saved')); },
+    xctake(el) { const t = db.tours.find(x => x.id === el.dataset.id); if (!t) return; const role = el.dataset.role === 'driver' ? 'driver_id' : 'guide_id';
+      return run(async () => { await S.save('change_requests', { id: S.uid(), tour_id: t.id, user_id: me().id, patch: { [role]: me().id }, cant: false, swap_with: null, agreed: false, message: null, status: 'pending', created_at: new Date().toISOString(), decided_by: null }); await notify(admins(), 'creq_new', { name: me().name, title: t.title, date: t.date }); }, T('xc_sent')); },
+    xcback(el) { const q = db.change_requests.find(x => x.id === el.dataset.id); if (q) return run(() => S.remove('change_requests', q.id), T('xc_backed')); },
     async install() { if (!installEvt) return; installEvt.prompt(); try { await installEvt.userChoice; } catch (e) { /* closed */ } installEvt = null; render(); },
     instlater() { try { localStorage.setItem('fs-install-later', String(Date.now() + 7 * 86400000)); } catch (e) { /* private mode */ } render(); },
     mtskip() { state.mtSkip = true; render(); },
@@ -2392,6 +2453,8 @@
       const f = $('#pflag-' + i); if (f) f.textContent = phoneFlag(normPhone(b.phone)); const box = $('#gsug-' + i); if (box) box.innerHTML = '';
       toast(T('linked_guest', { name: cl.name }));
     },
+    availwk(el) { state.availWk = addDays(state.availWk || addDays(monday(today()), 7), Number(el.dataset.d)); render(); },
+    availremind(el) { const wk = el.dataset.wk, ids = crew().filter(p => p.role !== 'admin' && !availOf(p, wk)).map(p => p.id); run(() => notify(ids, 'avail_remind', { date: wk }), T('av_sent', { n: ids.length })); },
     balm(el) { const mo = state.balMonth || today().slice(0, 7), d = new Date(Number(mo.slice(0, 4)), Number(mo.slice(5, 7)) - 1 + Number(el.dataset.d), 1); state.balMonth = iso(d).slice(0, 7); render(); },
     avcolor(el) { state.avColor = el.dataset.v; state.avOpen = true; render(); },
     avpick(el) { state.avOpen = false; run(() => S.save('profiles', { ...stripEmail(me()), avatar: el.dataset.v || null }), T('saved')); },
@@ -2533,6 +2596,18 @@
     async creq() { await saveCreq(); renderModal(); },
     async mail(fd) { state.mail = parseOrderEmail(String(fd.get('text') || '')); },
     async adjust(fd) { await S.save('pay_adjustments', { id: S.uid(), user_id: fd.get('user_id'), month: fd.get('month'), amount: Number(fd.get('amount')) || 0, note: fd.get('note') || '', created_by: me().id, created_at: new Date().toISOString() }); await notify([fd.get('user_id')], 'adjusted', { title: fd.get('month'), time: fd.get('note') || '' }); logAct(`Pay correction for ${pname(fd.get('user_id'))}, ${fd.get('month')}: ${fd.get('amount')}`); renderModal(); },
+    async expense(fd) {
+      const amount = Number(fd.get('amount')); if (!(amount > 0)) { toast(T('ex_amount_bad')); return; }
+      await S.save('expenses', { id: S.uid(), user_id: me().id, tour_id: fd.get('tour_id') || null, date: fd.get('date') || today(), kind: fd.get('kind') || 'other', amount, currency: fd.get('currency') || 'GEL', note: String(fd.get('note') || '').trim() || null, paid_back: false, created_at: new Date().toISOString() });
+      state.modal = null; renderModal(); toast(T('ex_saved'));
+    },
+    async avail(fd, form) {
+      const f = form || document.querySelector('form[data-form=avail]'), wk = f.dataset.wk, m = me(), d = (m.display && typeof m.display === 'object') ? m.display : {}, av = { ...(d.avail || {}) };
+      av[wk] = { w: weekFrom(fd), at: new Date().toISOString() }; Object.keys(av).forEach(x => { if (x < addDays(monday(today()), -56)) delete av[x]; });
+      await S.save('profiles', { ...stripEmail(m), display: { ...d, avail: av } });
+      const k = db.tasks.find(x => x.id === f.dataset.task); if (k && k.status === 'open') await S.save('tasks', { ...k, status: 'done', done_by: m.id, done_at: new Date().toISOString() });
+      toast(T('wk_done'));
+    },
     async worksched(fd) { await S.save('profiles', { ...stripEmail(me()), ...weekFields(weekFrom(fd)) }); toast(T('saved')); },
     async pdate(fd) { await S.save('personal_dates', { id: S.uid(), user_id: me().id, title: fd.get('title'), date: fd.get('date'), yearly: !!fd.get('yearly') }); },
     async payout(fd) { state.payEdit = false; await S.save('payout_details', { id: me().id, bank_name: fd.get('bank_name') || null, holder: fd.get('holder') || null, account: fd.get('account') || null }); toast(T('saved')); },
@@ -2590,7 +2665,7 @@
   });
   document.addEventListener('submit', ev => {
     const f = ev.target.closest('[data-form]'); if (!f) return; ev.preventDefault();
-    const fn = forms[f.dataset.form]; if (fn) busyWhile(ev.submitter || f.querySelector('button.primary, button:not([type=button])'), run(() => fn(new FormData(f))));
+    const fn = forms[f.dataset.form]; if (fn) busyWhile(ev.submitter || f.querySelector('button.primary, button:not([type=button])'), run(() => fn(new FormData(f), f)));
   });
   document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && state.modal) closeModal(); });
   window.addEventListener('hashchange', () => { const v = location.hash.slice(1); if (['calendar', 'timeoff', 'tasks', 'admin', 'me'].includes(v) && v !== state.view) { state.view = v; render(); } });

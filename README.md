@@ -233,3 +233,13 @@ Database: run `supabase/update.sql` once in Supabase > SQL Editor (safe to run a
 - **Personal promo codes**: set per guide in Team > person; added to every tour offer that person sends and shown on their Me page. Offers link to the right tour page on friendly.ge also when the tour name differs from the website name.
 - **Review links**: Google Maps, TripAdvisor and Trustindex (Rules), plus GetYourGuide / Viator for guests who booked there; the guest page offers each.
 - **Like a native app**: the phone Back button closes the open window first and leaves a Back office page; a thin moving bar at the top while saving or sending; pressed buttons show a spinner and cannot be pressed twice; windows slide up; "A new version is ready – Update now" banner. Text size settings moved from the top bar to Me.
+
+## 3.8
+- **Settings apart from Profile** (Me > Settings): text size, colours, contrast, **colour of buttons** (orange, sky, mint, lilac, rose, sun), language, notifications, install, privacy, sign out. Profile keeps photo, details, Telegram, bank, hours, dates, contacts, tours I do.
+- **Add to Home Screen** notice on phones in a browser: Android gets an Install button, iPhone the three Safari steps; "Later" hides it for a week.
+- iPhone sheets get the grab handle, Android buttons darken when pressed; small phones (320–360 px) get tighter spacing; older browsers without colour mixing keep borders.
+- **Tour exchange** (Tasks, and a line on the calendar): tours in the next 30 days that need a guide (or a driver, for tours with a car). "I can do it" sends a request to the office; "Take back" if pressed by mistake. The admin approves in Requests as before. Handing your own tour to a colleague stays in the tour: Suggest a change > Hand over.
+- **Working hours for next week**: the Sunday evening task now has the hours for next week; they win over the usual hours and count in "Who fits this tour". Back office > Team > **Who can work** shows next week for everyone, how many filled it in, and sends a reminder to the rest.
+- **Personal expenses** (Me > My pay, and "Add a cost of this tour" on a past tour): meal, fuel, car service, accommodation, parking, other. Totals per period in the main currency; the admin sees them in the person's statement and marks them paid back. A friendly nudge when tours have no costs noted. Needs `supabase/update.sql`.
+- **Look at the app as…** (Back office): the admin sees exactly what one guide or driver sees; nothing can be saved while looking.
+- Time off lists aligned: picture, name and label, date on the right.
