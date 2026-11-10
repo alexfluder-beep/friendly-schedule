@@ -18,6 +18,7 @@ create table if not exists public.profiles (
   languages text,              -- tour languages this guide can lead, e.g. "EN, RU"
   telegram text,               -- Telegram username without @, shown as a one-tap button to colleagues
   badges_seen text[],          -- badges already celebrated, so the welcome badge shows once per account
+  display jsonb,               -- the person's text size, colours and contrast, so they follow them to another phone
   active boolean not null default false,
   telegram_id bigint unique,   -- set by the crew bot when the person sends it /link with the code below
   link_code text,              -- one-time code the person creates in the app (Me > Telegram bot)

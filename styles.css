@@ -2,7 +2,7 @@
    Paper look: near-white paper, ink text, hairlines, tonal cards, one orange action colour. Calm motion only.
    Layout: sticky top bar, one working view, bottom tab bar on phones. Team week grid on wide screens, day agenda on narrow. */
 :root{
-  --bg:#f7f5ef;--surface:#ffffff;--surface2:#f1efe8;--line:#d9d9d0;--ink:#20251f;--muted:#646a61;
+  --bg:#f7f5ef;--surface:#ffffff;--surface2:#f1efe8;--line:#d9d9d0;--ink:#20251f;--muted:#565b53;
   --accent:#f0901e;--accent-ink:#20251f;--accent-soft:#f6ecd6;
   --private:#314b3c;--group:#5b4bb0;--custom:#8a5a00;--transfer:#22618c;
   --ok:#1c7439;--warn:#8f6000;--danger:#b3261e;--off:#1f6f8b;--sick:#a8325f;--holiday:#8a6700;
@@ -493,3 +493,14 @@ td.up{color:var(--ok)}td.down{color:var(--warn)}
 .mslist input{width:20px;height:20px;accent-color:var(--accent);flex:none}
 .mslist label:has(input:checked){background:color-mix(in srgb,var(--accent) 12%,var(--surface));font-weight:600}
 .nfcard{gap:8px}
+
+/* v3.3: bigger text and strong contrast, per person */
+html[data-fs="xl"]{zoom:1.3}
+.iconbtn.aa{font-weight:700;font-size:.95rem;letter-spacing:-.02em}
+.seg.wrap{flex-wrap:wrap}
+:root[data-contrast="high"]{--bg:#ffffff;--surface:#ffffff;--surface2:#f2f2f2;--line:#8c8c8c;--ink:#000000;--muted:#262626;--accent-soft:#ffe2b8;--warn:#6b4700;--ok:#0d5a27;--off:#0b4f66;--dayoff:#0b4f66}
+:root[data-contrast="high"] body{font-weight:500}
+:root[data-contrast="high"] b,:root[data-contrast="high"] h2,:root[data-contrast="high"] h3,:root[data-contrast="high"] .ttl{font-weight:800}
+:root[data-contrast="high"] .card,:root[data-contrast="high"] .acard,:root[data-contrast="high"] .inp,:root[data-contrast="high"] input,:root[data-contrast="high"] select,:root[data-contrast="high"] textarea{border-color:#5c5c5c}
+:root[data-contrast="high"][data-theme="dark"]{--bg:#000;--surface:#0d0d0d;--surface2:#1a1a1a;--line:#8c8c8c;--ink:#fff;--muted:#e6e6e6;--accent-soft:#3a2a10}
+@media (prefers-color-scheme:dark){:root[data-contrast="high"]:not([data-theme="light"]){--bg:#000;--surface:#0d0d0d;--surface2:#1a1a1a;--line:#8c8c8c;--ink:#fff;--muted:#e6e6e6;--accent-soft:#3a2a10}}

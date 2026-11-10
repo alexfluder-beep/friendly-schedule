@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.2';
+  const APP_VERSION = '3.3';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -1944,8 +1944,7 @@
     return h + `<div class="cols"><div class="card f">
       <div class="row">${avatar(m.id, true)}<div><b>${esc(m.name)}</b> <span class="tag t-muted">${T('role_' + m.role)}</span>${m.email ? `<div class="muted small">${esc(m.email)}</div>` : ''}</div></div>
       <label>${T('photo')}<input type="file" id="me-photo" accept="image/*" data-ch="avatar"></label>
-      <div class="f"><b>${T('ds_title')}</b><span class="muted small">${T('ds_size')}</span><div class="seg">${[['s', T('ds_small')], ['', T('ds_normal')], ['l', T('ds_big')]].map(([k, l]) => `<button data-act="fsize" data-v="${k}" aria-pressed="${(document.documentElement.dataset.fs || '') === k}">${l}</button>`).join('')}</div>
-        <span class="muted small">${T('ds_theme')}</span><div class="seg">${[['', T('ds_system')], ['light', T('ds_light')], ['dark', T('ds_dark')]].map(([k, l]) => `<button data-act="theme" data-v="${k}" aria-pressed="${(document.documentElement.dataset.theme || '') === k}">${l}</button>`).join('')}</div></div>
+      <div class="f"><b>${T('ds_title')}</b>${displayHtml()}</div>
       <label>${T('language')}<select id="me-lang" data-ch="lang">${opt('en', 'English', lang())}${opt('ru', 'Русский', lang())}${opt('ka', 'ქართული', lang())}</select></label>
       ${notifCardHtml(perm)}<div class="checks col">${Object.keys(NOTE_GROUPS).map(g => `<label><input type="checkbox" id="mute-${g}" data-ch="mutepref" data-g="${g}" ${(m.mute || []).includes(g) ? '' : 'checked'}>${T('note_' + g)}</label>`).join('')}</div></div>
       <form class="f" data-form="mytg"><b>Telegram</b><span class="muted small">${T('tg_mine_text')}</span><div class="bar"><input class="inp" id="me-tg" name="telegram" value="${esc(m.telegram ? '@' + m.telegram : '')}" placeholder="@username" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1;min-width:150px"><button class="btn">${T('save')}</button></div></form>
@@ -2019,6 +2018,7 @@
     const demo = S.mode === 'demo' ? `<div class="banner slim"><b>${T('demo_title')}</b><span class="small only-wide">${T('demo_text')}</span><label class="small" for="demo-as">${T('demo_as')}</label><select id="demo-as" data-ch="demoas">${db.profiles.filter(p => p.active !== false).map(p => opt(p.id, `${p.name} · ${T('role_' + p.role)}`, me().id)).join('')}</select></div>` : '';
     const upd = S.syncedAt ? T('updated_at', { time: new Intl.DateTimeFormat(LOCALES[lang()], { hour: '2-digit', minute: '2-digit' }).format(new Date(S.syncedAt)) }) : T('refresh');
     const shell = `<header class="top"><div class="brand"><i></i>Friendly Schedule</div><nav class="nav" aria-label="Main">${nav}</nav><span class="spacer only-phone"></span>
+      <button class="iconbtn aa" data-act="displaybtn" aria-label="${T('ds_title')}" title="${T('ds_title')}">Aa</button>
       <button class="iconbtn ${state.refreshing ? 'spin' : ''}" data-act="refresh" aria-label="${T('refresh')}" title="${esc(upd)}">${ico('refresh')}</button>
       <button class="iconbtn" data-act="bell" aria-label="${T('notifications')}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>${unread ? `<span class="badge">${unread}</span>` : ''}</button><div class="subtop">${syncRow()}${testChip()}</div></header>
       ${maintHtml() || ''}<main data-key="v-${state.view}-${state.view === 'admin' ? (state.adminTab || '') : state.view === 'me' ? state.meTab : ''}">${demo}${body}</main><nav class="tabs" aria-label="Main">${nav}</nav>`;
@@ -2060,7 +2060,7 @@
   function renderModal() {
     const el = $('#modal'); if (!el) return; const m = state.modal;
     if (!m) { el.innerHTML = ''; modalKey = ''; return; }
-    const inner = m.type === 'tour' ? tourModalHtml(m) : m.type === 'off' ? offModalHtml(m) : m.type === 'task' ? taskModalHtml(m) : m.type === 'client' ? clientModalHtml(m) : m.type === 'offer' ? offerModalHtml(m) : m.type === 'guest' ? guestSheetHtml(m) : m.type === 'creq' ? creqModalHtml(m) : m.type === 'cancel' ? cancelModalHtml(m) : m.type === 'person' ? personModalHtml(m) : m.type === 'invite' ? inviteModalHtml(m) : m.type === 'tip' ? tipModalHtml(m) : m.type === 'share' ? shareModalHtml(m) : m.type === 'test' ? testModalHtml() : m.type === 'move' ? moveModalHtml(m) : m.type === 'celebrate' ? celebrateHtml(m) : m.type === 'cat' ? catModalHtml(m) : m.type === 'dispute' ? disputeModalHtml(m) : m.type === 'prange' ? payRangeHtml(m.id, payRange().from, payRange().to, true) : m.type === 'badge' ? badgeModalHtml(m) : m.type === 'summary' ? summaryHtml(m) : m.type === 'statement' ? statementHtml(m.id, m.month, true) : m.type === 'confirm' ? `<div class="hdr"><h2>${esc(m.text)}</h2></div><div class="actions"><button class="btn" data-act="close">${T('close')}</button><button class="btn danger" data-act="confirmyes">${esc(m.yes)}</button></div>` : bellHtml();
+    const inner = m.type === 'tour' ? tourModalHtml(m) : m.type === 'off' ? offModalHtml(m) : m.type === 'task' ? taskModalHtml(m) : m.type === 'client' ? clientModalHtml(m) : m.type === 'offer' ? offerModalHtml(m) : m.type === 'guest' ? guestSheetHtml(m) : m.type === 'creq' ? creqModalHtml(m) : m.type === 'cancel' ? cancelModalHtml(m) : m.type === 'person' ? personModalHtml(m) : m.type === 'invite' ? inviteModalHtml(m) : m.type === 'tip' ? tipModalHtml(m) : m.type === 'share' ? shareModalHtml(m) : m.type === 'test' ? testModalHtml() : m.type === 'display' ? `<div class="hdr"><h2>${T('ds_title')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div><div class="f">${displayHtml()}</div>` : m.type === 'move' ? moveModalHtml(m) : m.type === 'celebrate' ? celebrateHtml(m) : m.type === 'cat' ? catModalHtml(m) : m.type === 'dispute' ? disputeModalHtml(m) : m.type === 'prange' ? payRangeHtml(m.id, payRange().from, payRange().to, true) : m.type === 'badge' ? badgeModalHtml(m) : m.type === 'summary' ? summaryHtml(m) : m.type === 'statement' ? statementHtml(m.id, m.month, true) : m.type === 'confirm' ? `<div class="hdr"><h2>${esc(m.text)}</h2></div><div class="actions"><button class="btn" data-act="close">${T('close')}</button><button class="btn danger" data-act="confirmyes">${esc(m.yes)}</button></div>` : bellHtml();
     const key = m.type + ':' + (m.id || (m.draft && m.draft.id) || '') + ':' + (m.edit ? 'e' : '');
     morph(el, `<div class="overlay" data-act="backdrop"><div class="sheet" role="dialog" aria-modal="true">${inner}</div></div>`);
     if (key !== modalKey) { const sh = el.querySelector('.sheet'); if (sh) sh.scrollTop = 0; modalKey = key; }
@@ -2173,8 +2173,8 @@
       state.mergeAsk = null;
       run(async () => { await S.save('clients', merged); await S.mergeClients(target.id, others.map(o => o.id)); logAct(`Merged guests into ${target.name}: ${others.map(o => o.name).join(', ')}`); }, T('dup_done', { name: target.name }));
     },
-    fsize(el) { try { localStorage.setItem('fs-fsize', el.dataset.v); } catch (e) { /* private mode */ } applyDisplay(); render(); },
-    theme(el) { try { localStorage.setItem('fs-theme', el.dataset.v); } catch (e) { /* private mode */ } applyDisplay(); render(); },
+    dset(el) { setDisplay(el.dataset.k, el.dataset.v); render(); if (state.modal && state.modal.type === 'display') renderModal(); },
+    displaybtn() { state.modal = { type: 'display' }; renderModal(); },
     payshow() { state.payEdit = !state.payEdit; render(); },
     pbread() { const v = ($('#pb-text') || {}).value || ''; if (!v.trim()) return; if (/New order of/i.test(v) && /Booked At/i.test(v) && !/getyourguide|viator/i.test(v)) { state.pb = null; run(() => forms.mail({ get: () => v })); return; } state.pb = parseBooking(v); render(); },
     pbclear() { state.pb = null; render(); },
@@ -2270,7 +2270,7 @@
   };
   const stripEmail = p => { const { email, ...rest } = p; return rest; };
   const forms = {
-    async signin(fd) { await S.signIn(fd.get('email'), fd.get('password')); state.mine = !isAdmin(); state.mode = 'week'; state.view = 'calendar'; checkBadges(); weekCheck(); },
+    async signin(fd) { await S.signIn(fd.get('email'), fd.get('password')); displayFromAccount(); state.mine = !isAdmin(); state.mode = 'week'; state.view = 'calendar'; checkBadges(); weekCheck(); },
     async signup(fd) { const inside = await S.signUp(fd.get('name'), fd.get('email'), fd.get('password')); if (!inside) { state.auth = 'signin'; state.authMsg = T('check_email'); } },
     async reset(fd) { await S.resetPassword(fd.get('email')); state.auth = 'signin'; state.authMsg = T('reset_sent'); },
     async newpass(fd) { await S.setPassword(fd.get('password')); state.auth = 'signin'; state.authMsg = T('saved'); location.reload(); },
@@ -2434,12 +2434,24 @@
     if (me() && me().active) checkBadges();
   });
   S.authEvent = ev => { if (ev === 'PASSWORD_RECOVERY') { state.auth = 'newpass'; render(); } };
-  function applyDisplay() { try { const r = document.documentElement, fs = localStorage.getItem('fs-fsize') || '', th = localStorage.getItem('fs-theme') || ''; if (fs) r.dataset.fs = fs; else delete r.dataset.fs; if (th) r.dataset.theme = th; else delete r.dataset.theme; } catch (e) { /* private mode */ } }
+  // Text size, colours and contrast: kept on this phone and on the account, so they follow the person to another phone.
+  const DKEYS = { fs: 'fs-fsize', theme: 'fs-theme', contrast: 'fs-contrast' };
+  const dget = k => { try { return localStorage.getItem(DKEYS[k]) || ''; } catch (e) { return ''; } };
+  function applyDisplay() { const r = document.documentElement; Object.keys(DKEYS).forEach(k => { const v = dget(k); if (v) r.dataset[k] = v; else delete r.dataset[k]; }); }
+  function setDisplay(k, v, keepAccount) { try { localStorage.setItem(DKEYS[k], v); localStorage.setItem('fs-display-set', '1'); } catch (e) { /* private mode */ } applyDisplay(); if (!keepAccount && me() && S.mode === 'supabase') { const d = { fs: dget('fs'), theme: dget('theme'), contrast: dget('contrast') }; S.save('profiles', { ...stripEmail(me()), display: d }).catch(() => { /* stays on this phone */ }); } }
+  function displayFromAccount() { try { if (localStorage.getItem('fs-display-set')) return; } catch (e) { return; } const d = me() && me().display; if (d && typeof d === 'object') { Object.keys(DKEYS).forEach(k => { if (d[k]) setDisplay(k, d[k], true); }); } }
+  function displayHtml() {
+    const seg = (k, opts) => `<div class="seg wrap">${opts.map(([v, l]) => `<button data-act="dset" data-k="${k}" data-v="${v}" aria-pressed="${dget(k) === v}">${l}</button>`).join('')}</div>`;
+    return `<span class="muted small">${T('ds_size')}</span>${seg('fs', [['s', T('ds_small')], ['', T('ds_normal')], ['l', T('ds_big')], ['xl', T('ds_xl')]])}
+      <span class="muted small">${T('ds_theme')}</span>${seg('theme', [['', T('ds_system')], ['light', T('ds_light')], ['dark', T('ds_dark')]])}
+      <span class="muted small">${T('ds_contrast')}</span>${seg('contrast', [['', T('ds_c_normal')], ['high', T('ds_c_high')]])}<span class="muted small">${T('ds_hint')}</span>`;
+  }
   applyDisplay();
   (async () => {
     const v = location.hash.slice(1); if (['calendar', 'timeoff', 'tasks', 'admin', 'me'].includes(v)) state.view = v;
     try { await S.init(); } catch (e) { console.error(e); logErr('offline', `${errCode(e)} App could not start: ${(e && e.message) || e}`, navigator.onLine ? 'phone was online' : 'phone had no internet'); $('#app').innerHTML = `<main><div class="banner f"><b>${esc(T('err_connect'))}</b><span class="small">${esc(errCode(e) + ': ' + T('ec_' + errCode(e)))}</span><span class="small">${esc(T('err_retry'))}</span><button class="btn primary" onclick="location.reload()">${esc(T('refresh'))}</button></div></main>`; setTimeout(() => { if (navigator.onLine) location.reload(); }, 20000); return; }
     if (me() && !isAdmin()) state.mine = true;
+    displayFromAccount();
     render(); if (state.view === 'calendar') toToday();
     // Test period: explain once how to report a mistake. A new badge goes first; then this waits for the next opening.
     setTimeout(() => { try { if (testOn() && me() && me().active && !window.__noCelebrate && !state.modal && localStorage.getItem('fs-test-seen') !== '1') { localStorage.setItem('fs-test-seen', '1'); acts.testinfo(); } } catch (e) { /* private mode */ } }, 2500);

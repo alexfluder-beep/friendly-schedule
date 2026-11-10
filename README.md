@@ -199,3 +199,8 @@ Database: run `supabase/update-2.8.sql` once in Supabase > SQL Editor (safe to r
 - **Options** (wine tasting, front seat, pick-up...) are one drop-down field: it shows what is chosen and a count; tap to open a tick list with search (when there are many options), Clear and Done.
 - **Guest contacts import** fixed for big files (the 13,000-row Setmore Customers export): rows of the same guest are joined, "CANCELED", "PACK" and similar words are taken out of names, platform proxy emails are skipped, phone/email from the second columns are used, and a batch never holds the same guest twice (that caused "ON CONFLICT DO UPDATE command cannot affect row a second time"). Importing the same file again only fills in missing details.
 - **Phone notifications** card on Me: on/off for this phone, test, turn off, clear help for blocked notifications and iPhone Home Screen.
+
+## Versions 3.2 and 3.3
+- **Website orders** pasted from TrekkSoft ("2 x Tour (24 November, 2026, 10:30)" with Guest 1, Guest 2 blocks) are read: lead guest, phone, number of people, other guests in the notes, price added up.
+- **Display for each person**: text size Small / Normal / Big / Very big, colours Like the phone / Light / Dark, contrast Normal / Strong (black text, darker lines, bolder). Saved on the account (needs `supabase/update-3.3.sql`) and on the phone. The **Aa** button in the top bar opens it from any screen. Grey secondary text is a little darker for everyone.
+- Database: run `supabase/update-3.3.sql` (only this file if 3.0/3.1 were already applied).
