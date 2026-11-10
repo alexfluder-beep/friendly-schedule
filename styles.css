@@ -560,3 +560,53 @@ details.sect summary{font-size:var(--t-h3)}
 .tnrow span:first-of-type{flex:1;min-width:0;overflow-wrap:anywhere}
 .tnrow:has(input:checked){font-weight:600}
 .tnsticky{position:sticky;bottom:0;background:var(--surface);padding-top:10px}
+/* 3.6 Tour pictures, avatar pictures, and cards that look different by type */
+.msi{width:1.15em;height:1.15em;flex:none;vertical-align:-.2em}
+.emb.ic{min-width:22px;padding:0 3px}.emb.ic .msi{width:14px;height:14px;vertical-align:middle}
+.emb.big.ic{width:36px;height:36px;min-width:36px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center}.emb.big.ic .msi{width:22px;height:22px}
+.acard .ttl{display:flex;gap:10px;align-items:flex-start}
+.acard .ttl .emb.big.ic{margin-top:-2px}
+.acard .kindrow{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:var(--t-body);color:var(--muted)}
+.acard .kind{display:inline-flex;align-items:center;gap:4px;font-weight:600}
+.acard .kind .msi{width:18px;height:18px}
+.acard .kind.k-group{color:var(--group)}.acard .kind.k-private{color:var(--private)}.acard .kind.k-transfer{color:var(--transfer)}.acard .kind.k-custom{color:var(--custom)}
+/* day off and sick day: no tour colour, dashed outline, beach / sick icon */
+.acard.off{background:transparent;border:2px dashed color-mix(in srgb,var(--dayoff) 55%,var(--line));box-shadow:none}
+.acard.off .ttl{color:var(--dayoff);align-items:center;font-size:var(--t-body)}
+.acard.off .ttl .msi{width:22px;height:22px}
+.dayhd .tag .msi{width:14px;height:14px;margin-right:2px}
+.dayhd .t-hol,.dayhd .t-pub{font-size:var(--t-sm);padding:4px 10px}
+.avlib{display:inline-flex;align-items:center;justify-content:center;color:#fff}.avlib .msi{width:62%;height:62%}
+.avpick summary{font-size:var(--t-body)}
+.avcols{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0}
+.avcol{width:36px;height:36px;border-radius:50%;border:3px solid transparent;padding:0}
+.avcol[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 2px var(--surface)}
+.avgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:10px;margin-bottom:8px}
+.avopt{aspect-ratio:1;border-radius:50%;border:3px solid transparent;color:#fff;display:flex;align-items:center;justify-content:center;padding:0}
+.avopt .msi{width:60%;height:60%}
+.avopt[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 2px var(--surface)}
+/* the week strip covers what scrolls under it, also on iPhones where the top bar height is not a whole pixel */
+@media (max-width:760px){.strip::before{content:"";position:absolute;left:-16px;right:-16px;top:-14px;height:14px;background:var(--bg)}}
+/* Work balance */
+tr.bl-over td{background:color-mix(in srgb,var(--warn) 10%,var(--surface))}
+tr.bl-under td{background:color-mix(in srgb,var(--ok) 8%,var(--surface))}
+.blnote{font-weight:600;color:var(--warn)}tr.bl-under .blnote{color:var(--ok)}
+/* month chart: room for the numbers, no clipping, 3-letter months */
+.card.f .bars.two{height:auto;align-items:end}
+.bars.two .barcol{height:auto;overflow:visible;gap:4px}
+.bars.two .bv{font-size:var(--t-micro);line-height:1;min-height:12px;white-space:nowrap;color:var(--muted)}
+.bars.two .bm{font-size:var(--t-cap);white-space:nowrap}
+td.wrapcell{white-space:normal;min-width:180px;max-width:260px}
+/* Year highlights */
+.yh{display:flex;flex-direction:column}
+.yhrow{display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 12px;padding:10px 0;border-bottom:1px solid var(--line);font-size:var(--t-body)}
+.yhrow:last-child{border-bottom:0}
+.yhrow b{text-align:right}
+/* day headings stop just under the sticky week strip, whatever its height (text size, weather pills) */
+@media (max-width:760px){.dayhd{scroll-margin-top:calc(var(--toph,57px) + var(--striph,96px) + env(safe-area-inset-top,0px) + 4px)}}
+/* tour window header: picture at the top of a 2-line title, not floating in the middle */
+.sheet .hdr{align-items:flex-start}
+.sheet .hdr h2{flex:1;min-width:0;padding-top:4px}
+.sheet .hdr .emb.big{margin-top:2px}
+input[type=file]{font-size:var(--t-body);color:var(--muted)}
+input[type=file]::file-selector-button{min-height:44px;margin-right:12px;padding:6px 18px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--ink);font:inherit;font-weight:600;cursor:pointer}

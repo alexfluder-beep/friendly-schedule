@@ -1,6 +1,6 @@
 // Service worker: keeps the app shell available offline and shows push notifications.
-const CACHE = 'fs-shell-v25';
-const SHELL = ['./', 'index.html', 'styles.css', 'config.js', 'catalog.js', 'i18n.js', 'store.js', 'app.js', 'vendor/qrcode.js', 'vendor/supabase.js', 'vendor/591.supabase.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
+const CACHE = 'fs-shell-v26';
+const SHELL = ['./', 'index.html', 'styles.css', 'config.js', 'catalog.js', 'icons.js', 'i18n.js', 'store.js', 'app.js', 'vendor/qrcode.js', 'vendor/supabase.js', 'vendor/591.supabase.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 // Network first, so updates arrive straight away; cached copy only when offline.

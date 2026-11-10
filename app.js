@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.5';
+  const APP_VERSION = '3.6';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -114,7 +114,19 @@
     const code = (c.code || (words.length > 1 ? [...words[0]][0] + [...words[1]][0] : (words[0] || title || '?').slice(0, 2))).toUpperCase().slice(0, 3);
     return memo[k] = { color: c.color || TOUR_COLORS[h % TOUR_COLORS.length], code };
   }
-  const emblem = (t, big) => { const s = tourStyle(t.title); return `<span class="emb${big ? ' big' : ''}" style="background:${esc(s.color)}" aria-hidden="true">${esc(s.code)}</span>`; };
+  // Material Symbols icons (icons.js): fill, 960 grid.
+  const msi = (k, cls) => (window.MSI && window.MSI[k] ? `<svg class="msi${cls ? ' ' + cls : ''}" viewBox="0 -960 960 960" aria-hidden="true"><path fill="currentColor" d="${window.MSI[k]}"/></svg>` : '');
+  // A picture for each kind of tour, so a guide knows the tour at a glance: mountains, wine, city walk, church, transfer...
+  const TOUR_ICONS = [[/airport|аэропорт|flight/i, 'flight'], [/transfer|трансфер|taxi/i, 'airport_shuttle'], [/brutal|soviet|architect|бруталь|советск/i, 'apartment'], [/walk|ussr|tiflis|пешеход|прогулк/i, 'directions_walk'],
+    [/stalin|gori\b|museum|музей|сталин/i, 'museum'], [/vardzia|uplistsikhe|chiatura|katskhi|rabati|cave|вардзи|уплисцихе|чиатур/i, 'castle'], [/sevan|lake|севан|озеро/i, 'water'], [/armenia|yerevan|армени|ереван/i, 'flag'],
+    [/kazbegi|kazbek|truso|gudauri|tusheti|svaneti|gareji|rainbow|mountain|казбег|гареджи|тушети|сванети|гудаури|горы/i, 'landscape'], [/borjomi|sabaduri|forest|боржоми|сабадури|лес/i, 'forest'],
+    [/mtskheta|jvari|church|monaster|мцхета|джвари|монаст/i, 'church'], [/kakheti|signagi|sighnaghi|bodbe|telavi|kvareli|wine|кахети|сигнахи|телави|вин/i, 'wine_bar'], [/car|4x4|4wd|джип/i, 'directions_car']];
+  const tourIcon = title => { const c = catFind(title) || {}; if (c.icon) return c.icon; const x = TOUR_ICONS.find(([re]) => re.test(String(title || ''))); return x ? x[1] : ''; };
+  const emblem = (t, big) => { const s = tourStyle(t.title), ic = tourIcon(t.title); return `<span class="emb${big ? ' big' : ''}${ic ? ' ic' : ''}" style="background:${esc(s.color)}" aria-hidden="true">${ic ? msi(ic) : esc(s.code)}</span>`; };
+  // Pictures people can choose instead of a photo (Me > Choose a picture).
+  const AV_ICONS = ['hiking', 'directions_car', 'landscape', 'forest', 'wine_bar', 'coffee', 'pets', 'sailing', 'photo_camera', 'music_note', 'sports_soccer', 'sunny', 'star', 'favorite', 'eco', 'local_florist', 'cottage', 'cake', 'rocket_launch', 'sentiment_satisfied'];
+  const AV_COLORS = ['#2f6b48', '#1d3b66', '#22618c', '#5b4bb0', '#a8325f', '#b8441c', '#8a5a00', '#4a3526'];
+  const avLib = v => { const m = /^ms:([a-z_]+):(#[0-9a-f]{6})$/i.exec(v || ''); return m && AV_ICONS.includes(m[1]) ? { icon: m[1], color: m[2] } : null; };
   // Country of a phone number from its dialling code. It shows where the number is registered, not the guest's nationality.
   const DIAL = { 1: 'US', 20: 'EG', 27: 'ZA', 30: 'GR', 31: 'NL', 32: 'BE', 33: 'FR', 34: 'ES', 36: 'HU', 39: 'IT', 40: 'RO', 41: 'CH', 43: 'AT', 44: 'GB', 45: 'DK', 46: 'SE', 47: 'NO', 48: 'PL', 49: 'DE', 52: 'MX', 54: 'AR', 55: 'BR', 60: 'MY', 61: 'AU', 62: 'ID', 63: 'PH', 64: 'NZ', 65: 'SG', 66: 'TH', 7: 'RU', 76: 'KZ', 77: 'KZ', 81: 'JP', 82: 'KR', 84: 'VN', 86: 'CN', 90: 'TR', 91: 'IN', 92: 'PK', 94: 'LK', 98: 'IR', 351: 'PT', 352: 'LU', 353: 'IE', 354: 'IS', 356: 'MT', 357: 'CY', 358: 'FI', 359: 'BG', 370: 'LT', 371: 'LV', 372: 'EE', 373: 'MD', 374: 'AM', 375: 'BY', 380: 'UA', 381: 'RS', 385: 'HR', 386: 'SI', 420: 'CZ', 421: 'SK', 852: 'HK', 886: 'TW', 961: 'LB', 962: 'JO', 964: 'IQ', 965: 'KW', 966: 'SA', 968: 'OM', 971: 'AE', 972: 'IL', 973: 'BH', 974: 'QA', 992: 'TJ', 993: 'TM', 994: 'AZ', 995: 'GE', 996: 'KG', 998: 'UZ' };
   function phoneCountry(phone) {
@@ -279,6 +291,7 @@
     if (t.capacity > 0 && t.pax > t.capacity) w.push({ lv: 'danger', tx: T('w_over', { pax: t.pax, cap: t.capacity }) });
     if (t.driver_id && t.pax > r.carSeats) w.push({ lv: 'danger', tx: T('w_car', { pax: t.pax, seats: r.carSeats }) });
     if (!t.guide_id && !t.driver_id) w.push({ lv: 'warn', tx: T('w_unassigned') });
+    if (t.guide_id && !t.driver_id && kmOf(t.title) > 0 && !(person(t.guide_id) || {}).vehicle) w.push({ lv: 'warn', tx: T('w_nocar', { name: pname(t.guide_id) }) });
     const ce = catFind(t.title), mth = Number(t.date.slice(5, 7));
     if (ce && /summer only/i.test(ce.note || '') && (mth < 5 || mth > 10)) w.push({ lv: 'warn', tx: T('w_season') });
     const bks = t.bookings || tourBookings(t.id);
@@ -418,7 +431,7 @@
     $('#toasts').appendChild(el); setTimeout(() => el.remove(), 3500);
   }
   const initials = n => ((n || '').replace(/\(.*?\)/g, ' ').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(x => [...x][0]).join('') || '?').toUpperCase();
-  const avatar = (id, big) => { const p = person(id); if (!p) return ''; const c = big ? 'avatar big' : 'avatar'; return p.avatar ? `<img class="${c}" src="${esc(p.avatar)}" alt="${esc(p.name)}" title="${esc(p.name)}">` : `<span class="${c} ${!big && IC[p.role] ? 'role' : ''}" style="background:${esc(p.color || '#66737f')}" title="${esc(p.name + ' · ' + T('role_' + p.role))}">${!big && IC[p.role] ? ico(p.role) : esc(initials(p.name))}</span>`; };
+  const avatar = (id, big) => { const p = person(id); if (!p) return ''; const c = big ? 'avatar big' : 'avatar', lib = avLib(p.avatar); if (lib) return `<span class="${c} avlib" style="background:${esc(lib.color)}" title="${esc(p.name)}">${msi(lib.icon)}</span>`; return p.avatar ? `<img class="${c}" src="${esc(p.avatar)}" alt="${esc(p.name)}" title="${esc(p.name)}">` : `<span class="${c} ${!big && IC[p.role] ? 'role' : ''}" style="background:${esc(p.color || '#66737f')}" title="${esc(p.name + ' · ' + T('role_' + p.role))}">${!big && IC[p.role] ? ico(p.role) : esc(initials(p.name))}</span>`; };
   const acText = t => (t.children > 0 ? T('ad_ch', { a: t.adults || 0, c: t.children }) : (t.adults || t.pax || 0) === 1 ? T('ad_one') : T('ad_only', { a: t.adults || t.pax || 0 }));
   const dateText = t => (endOf(t) !== t.date ? fmtRange(t.date, endOf(t)) : fmtDay(t.date));
   const payFor = (t, role) => { const o = t[role + '_pay']; if (o !== null && o !== undefined && o !== '') return Number(o) || 0; const pt = (rules().payTable || {})[t.title]; if (pt && (Number(pt[role + '_base']) || Number(pt[role + '_guest']))) return ((Number(pt[role + '_base']) || 0) + (Number(pt[role + '_guest']) || 0) * (t.pax || 0)) * tourDays(t).length; return (Number((rules().pay || {})[role + '_' + t.kind]) || 0) * tourDays(t).length; };
@@ -477,13 +490,13 @@
     const dts = toursOnDay(d).filter(t => (!state.mine || involves(t, me().id))).sort((x, y) => (x.start_time || '').localeCompare(y.start_time || ''));
     const offs = db.time_off.filter(o => o.status !== 'declined' && o.date_from <= d && o.date_to >= d && (!state.mine || o.user_id === me().id));
     const cxs = cancelledOnDay(d).filter(t => !state.mine || involves(t, me().id));
-    return `<div class="dayhd" id="day-${d}" data-drop="${d}"><b class="${d === td ? 'tdy' : ''}">${esc(fmt(d, { weekday: 'long', day: 'numeric', month: 'long' }))}</b>${ho ? `<span class="tag t-hol">${esc(ho.name)}</span>` : ''}${pubHolOn(d) && !ho ? `<span class="tag t-pub" title="${esc(T('ph_info'))}">${esc(T(pubHolOn(d)))}</span>` : ''}${ev ? `<span class="tag t-group">${esc(ev.name)}</span>` : ''}<span class="spacer"></span>${dts.length ? `<button class="lnk" data-act="summary" data-date="${d}">${T('day_summary')}</button>` : ''}${!isAdmin() && d > td && !offOn(me().id, d) ? `<button class="lnk" data-act="offnew" data-date="${d}">${T('ask_dayoff')}</button>` : ''}</div>
-      ${dts.map(agendaCard).join('')}${cxs.map(agendaCard).join('')}${offs.map(o => `<div class="acard off"><span class="ttl">${T(o.type === 'sick' ? 'sick' : o.type === 'half' ? 'halfday' : 'dayoff')}${o.status === 'pending' ? ' · ' + T('pending') : ''}</span><span class="row">${avatar(o.user_id)}<span>${esc(pname(o.user_id))}</span></span></div>`).join('')}
+    return `<div class="dayhd" id="day-${d}" data-drop="${d}"><b class="${d === td ? 'tdy' : ''}">${esc(fmt(d, { weekday: 'long', day: 'numeric', month: 'long' }))}</b>${ho ? `<span class="tag t-hol">${msi('celebration')}${esc(ho.name)}</span>` : ''}${pubHolOn(d) && !ho ? `<span class="tag t-pub" title="${esc(T('ph_info'))}">${msi('flag')}${esc(T(pubHolOn(d)))}</span>` : ''}${ev ? `<span class="tag t-group">${esc(ev.name)}</span>` : ''}<span class="spacer"></span>${dts.length ? `<button class="lnk" data-act="summary" data-date="${d}">${T('day_summary')}</button>` : ''}${!isAdmin() && d > td && !offOn(me().id, d) ? `<button class="lnk" data-act="offnew" data-date="${d}">${T('ask_dayoff')}</button>` : ''}</div>
+      ${dts.map(agendaCard).join('')}${cxs.map(agendaCard).join('')}${offs.map(o => `<div class="acard off"><span class="ttl">${msi(o.type === 'sick' ? 'sick' : 'beach_access')}${T(o.type === 'sick' ? 'sick' : o.type === 'half' ? 'halfday' : 'dayoff')}${o.status === 'pending' ? ' · ' + T('pending') : ''}</span><span class="row">${avatar(o.user_id)}<span>${esc(pname(o.user_id))}</span></span></div>`).join('')}
       ${!dts.length && !offs.length && !cxs.length ? `<div class="muted small nothing" data-drop="${d}">${T('no_tours')}</div>` : ''}`;
   }
   function agendaCard(t) {
     const off = !live(t), w = off ? [] : tourWarnings(t), ppl = [t.guide_id, t.driver_id].filter(Boolean);
-    return `<button class="acard ${off ? 'cancelled' : ''}" data-key="t${t.id}" style="--k:${esc(tourStyle(t.title).color)}" data-act="tour" data-id="${t.id}"${isAdmin() && !off ? ` data-drag="${t.id}"` : ''} data-drop="${t.date}"><span class="ttl">${t.start_time ? `<span class="num st">${esc(t.start_time)}</span> ` : ''}<span class="tname">${esc(t.title)}</span> <span class="num cnt">(${paxText(t)})</span>${w.length ? ` <span class="chk">${T('chk')}</span>` : ''}${off ? ` <span class="tag t-danger">${T('cancelled')}</span>` : ''}${!off && staysN(tourBookings(t.id)) ? ` <span class="tag t-stay num">${T('stay_n', { n: staysN(tourBookings(t.id)) })}</span>` : ''}</span>${endOf(t) !== t.date ? `<span class="num muted small">${esc(fmtRange(t.date, endOf(t)))}</span>` : ''}${wxLine(t)}<span class="row">${ppl.length ? ppl.map(id => `<span class="p">${avatar(id)}${esc(pname(id))}</span>`).join('') : `<span class="tag t-warn">${T('unassigned')}</span>`}</span></button>`;
+    return `<button class="acard ${off ? 'cancelled' : ''}" data-key="t${t.id}" style="--k:${esc(tourStyle(t.title).color)}" data-act="tour" data-id="${t.id}"${isAdmin() && !off ? ` data-drag="${t.id}"` : ''} data-drop="${t.date}"><span class="ttl">${emblem(t, true)}<span>${t.start_time ? `<span class="num st">${esc(t.start_time)}</span> ` : ''}<span class="tname">${esc(t.title)}</span></span></span><span class="kindrow"><span class="kind k-${esc(t.kind || 'private')}">${msi(t.kind === 'group' ? 'groups' : t.kind === 'transfer' ? 'airport_shuttle' : 'person')}${T('kind_' + (t.kind || 'private'))}</span><span class="num cnt">${paxText(t)}</span>${w.length ? ` <span class="chk">${T('chk')}</span>` : ''}${off ? ` <span class="tag t-danger">${T('cancelled')}</span>` : ''}${!off && staysN(tourBookings(t.id)) ? ` <span class="tag t-stay num">${T('stay_n', { n: staysN(tourBookings(t.id)) })}</span>` : ''}</span>${endOf(t) !== t.date ? `<span class="num muted small">${esc(fmtRange(t.date, endOf(t)))}</span>` : ''}${wxLine(t)}<span class="row">${ppl.length ? ppl.map(id => `<span class="p">${avatar(id)}${esc(pname(id))}</span>`).join('') : `<span class="tag t-warn">${T('unassigned')}</span>`}</span></button>`;
   }
   // ---------- Sunday evening: every guide and driver checks next week's schedule ----------
   const taskTitle = k => (k.kind === 'week_check' ? T('wk_title') : k.title);
@@ -525,10 +538,11 @@
   // Phone, country, returning guest and VIP are on the guest's own sheet (tap the name).
   function guestRow(b, needAddr) {
     const due = b.payment && b.payment !== 'prepaid' ? `${T('pay_' + b.payment)}${b.amount_due ? ' ' + b.amount_due + ' ' + (b.currency || guestCur()) : ''}` : '';
-    const marks = (b.marks || []).map(markLabel), bits = [...(b.lang && !/^EN/i.test(b.lang) ? [langName(String(b.lang).toUpperCase())] : []), ...(isFree(b) ? [T('free_guest')] : []), ...marks], more = bits.length > 2 ? bits.length - 2 : 0;
+    const lg = b.lang || ({ RUS: 'RU', GER: 'DE', FRA: 'FR' })[(String(b.guest).match(/\b(RUS|GER|FRA)\b/) || [])[1]] || '';
+    const marks = (b.marks || []).map(markLabel), bits = [...(lg && !/^EN/i.test(lg) ? [langName(String(lg).toUpperCase())] : []), ...(isFree(b) ? [T('free_guest')] : []), ...marks], more = bits.length > 2 ? bits.length - 2 : 0;
     const trouble = (clientRating(b.client_id) || {}).rating === 'trouble';
     const sum = [`<span class="num">${esc(acText(b))}</span>`, due ? `<b class="due num">${esc(due)}</b>` : '', ...bits.slice(0, 2).map(esc), more ? `+${more}` : ''].filter(Boolean).join(' · ');
-    return `<div class="grow"><span class="row nw"><button class="gbtn" data-act="guest" data-id="${b.id}"><span class="avatar ini">${esc(initials(cleanName(b.guest) || b.guest))}</span><span class="grow-l gtxt"><span class="gname">${esc(b.guest)}</span><span class="gsum">${sum}</span></span></button>${b.attendance ? `<span class="tag ${b.attendance === 'arrived' ? 't-ok' : 't-danger'}">${T('att_' + b.attendance)}</span>` : ''}${b.phone ? `<span class="cbtns">${ib('wa', 'WhatsApp', waLink(b.phone))}${ib('call', T('call'), 'tel:' + b.phone)}</span>` : ''}</span>${needAddr && b.pickup_addr ? `<span class="gaddr">${ico('pin')}<span>${esc(b.pickup_addr)}</span></span>` : ''}${trouble ? `<span class="row">${ratingTag(b.client_id)}</span>` : ''}</div>`;
+    return `<div class="grow"><span class="row nw"><button class="gbtn" data-act="guest" data-id="${b.id}"><span class="avatar ini">${esc(initials(cleanName(b.guest) || b.guest))}</span><span class="grow-l gtxt"><span class="gname">${esc(cleanName(b.guest) || b.guest)}</span><span class="gsum">${sum}</span></span></button>${b.attendance ? `<span class="tag ${b.attendance === 'arrived' ? 't-ok' : 't-danger'}">${T('att_' + b.attendance)}</span>` : ''}${b.phone ? `<span class="cbtns">${ib('wa', 'WhatsApp', waLink(b.phone))}${ib('call', T('call'), 'tel:' + b.phone)}</span>` : ''}</span>${needAddr && b.pickup_addr ? `<span class="gaddr">${ico('pin')}<span>${esc(b.pickup_addr)}</span></span>` : ''}${trouble ? `<span class="row">${ratingTag(b.client_id)}</span>` : ''}</div>`;
   }
   function guestRowsHtml(t) {
     const bks = tourBookings(t.id); if (!bks.length) return `<div class="empty">${guestsHidden(t) ? T('pv_hidden', { n: pv().guideDays }) : T('no_guests')}</div>`;
@@ -565,17 +579,21 @@
   }
   // Exchange rates to the pay currency (Rules), so money in USD, EUR and GEL can be added up.
   const rateOf = cur => { const base = rules().currency || 'GEL'; if (!cur || cur === base) return 1; const m = String(rules().rates || 'USD 2.70, EUR 2.95').match(new RegExp(cur + '\\s*[=:]?\\s*([\\d.]+)', 'i')); return m ? Number(m[1]) : 0; };
+  // Platform commission: the price in a GetYourGuide or Viator email is what the guest paid; the platform keeps its share.
+  // Back office > Rules > Platform commission, e.g. "GetYourGuide 25, Viator 20".
+  const commOf = b => { const src = srcName(sourceOf(b) || b.source); if (!src) return 0; const m = String(rules().commission ?? 'GetYourGuide 25').match(new RegExp(src.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*[=:]?\\s*([\\d.]+)', 'i')); return m ? Math.min(90, Number(m[1]) || 0) : 0; };
+  const netOf = b => (Number(b.price) || 0) * (1 - commOf(b) / 100);
   function periodStats(from, to) {
     const ts = db.tours.filter(t => live(t) && t.date >= from && t.date <= to), ids = new Set(ts.map(t => t.id)), cur = rules().currency || 'GEL';
     let rev = 0, noPrice = 0, noRate = new Set(); const bks = db.bookings.filter(b => ids.has(b.tour_id));
-    bks.forEach(b => { const p = Number(b.price) || 0; if (!p) { noPrice++; return; } const r = rateOf(b.currency || guestCur()); if (!r) { noRate.add(b.currency); return; } rev += p * r; });
+    let comm = 0; bks.forEach(b => { const p = Number(b.price) || 0; if (!p) { noPrice++; return; } const r = rateOf(b.currency || guestCur()); if (!r) { noRate.add(b.currency); return; } rev += p * r; comm += (p - netOf(b)) * r; });
     const pay = ts.reduce((n, t) => n + (t.guide_id ? payFor(t, 'guide') : 0) + (t.driver_id ? payFor(t, 'driver') : 0), 0), cost = ts.reduce((n, t) => n + costOf(t.id).total, 0);
-    return { tours: ts.length, guests: ts.reduce((n, t) => n + (Number(t.pax) || 0), 0), bookings: bks.length, rev, pay, cost, profit: rev - pay - cost, noPrice, noRate: [...noRate], cur, unassigned: ts.filter(t => !t.guide_id).length };
+    return { tours: ts.length, guests: ts.reduce((n, t) => n + (Number(t.pax) || 0), 0), bookings: bks.length, rev, comm, pay, cost, profit: rev - comm - pay - cost, noPrice, noRate: [...noRate], cur, unassigned: ts.filter(t => !t.guide_id).length };
   }
   function periodStatsHtml(from, to) {
     const s = periodStats(from, to), m = v => `${nf(v)} ${esc(s.cur)}`;
     return `<details class="wstats"><summary><span class="num"><b>${s.tours}</b> ${T('tours_n').toLowerCase()} · <b>${s.guests}</b> ${T('guests').toLowerCase()}${s.rev ? ` · ${T('wf_profit')} <b class="${s.profit < 0 ? 'neg' : ''}">${m(s.profit)}</b>` : ''}</span>${s.unassigned ? `<span class="tag t-warn">${T('wf_unassigned', { n: s.unassigned })}</span>` : ''}</summary>
-      <dl class="fields"><dt>${T('wf_revenue')}</dt><dd class="num">${m(s.rev)}</dd><dt>${T('wf_pay')}</dt><dd class="num">− ${m(s.pay)}</dd><dt>${T('wf_costs')}</dt><dd class="num">− ${m(s.cost)}</dd><dt><b>${T('wf_profit')}</b></dt><dd class="num"><b>${m(s.profit)}</b></dd></dl>
+      <dl class="fields"><dt>${T('wf_revenue')}</dt><dd class="num">${m(s.rev)}</dd>${s.comm ? `<dt>${T('wf_comm')}</dt><dd class="num">− ${m(Math.round(s.comm))}</dd>` : ''}<dt>${T('wf_pay')}</dt><dd class="num">− ${m(s.pay)}</dd><dt>${T('wf_costs')}</dt><dd class="num">− ${m(s.cost)}</dd><dt><b>${T('wf_profit')}</b></dt><dd class="num"><b>${m(s.profit)}</b></dd></dl>
       <span class="muted small">${T('wf_note', { n: s.noPrice, b: s.bookings })}${s.noRate.length ? ' ' + T('wf_norate', { c: s.noRate.join(', ') }) : ''}</span></details>`;
   }
   function calendarHtml() {
@@ -648,6 +666,7 @@
     const row = (icon, label, attrs) => `<${attrs.href ? 'a' : 'button'} class="arow" ${Object.entries(attrs).map(([k, v]) => `${k}="${esc(v)}"`).join(' ')}>${icon ? ico(icon) : '<span style="width:16px"></span>'}<span>${esc(label)}</span></${attrs.href ? 'a' : 'button'}>`;
     return `<div class="hdr"><span class="avatar big ini">${esc(initials(cleanName(b.guest) || b.guest))}</span><h2>${esc(b.guest)}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>
       <div class="muted small">${esc([acText(b), phoneFlag(b.phone), b.lang && T('guest_lang') + ' ' + b.lang, sourceOf(b), b.ref, b.notes].filter(Boolean).join(' · '))}</div>${isVip(b.client_id) ? (v => `<div class="banner small">${vipTag(b.client_id)}<span>${T('vip_text', { n: v.total, y: v.years || 1, a: v.addons || 0 })}</span></div>`)(guestStats(b.client_id)) : ''}${isFree(b) ? `<div class="banner small">${freeTag(b)}<span>${T('free_text')}</span>${tipUrl(t) ? `<button class="btn sm" data-act="tipqr" data-id="${t.id}">${T('tip_btn')}</button>` : ''}</div>` : ''}
+      ${isAdmin() && Number(b.price) ? `<div class="small num">${T('bk_price')}: <b>${esc(b.price)} ${esc(b.currency || guestCur())}</b>${commOf(b) ? ` · ${T('net_after', { src: srcName(sourceOf(b) || b.source), p: commOf(b), v: Math.round(netOf(b) * 100) / 100, c: b.currency || guestCur() })}` : ''}</div>` : ''}
       ${!can && live(t) && t.date > today() && (involves(t, me().id) || isAdmin()) ? `<div class="muted small">${T('att_later', { date: fmtDay(t.date) })}</div>` : ''}
       ${can ? `<div class="att"><button class="${b.attendance === 'arrived' ? 'on ok' : ''}" data-act="attend" data-id="${b.id}" data-s="arrived" aria-pressed="${b.attendance === 'arrived'}">${T('att_arrived')}</button><button class="${b.attendance === 'noshow' ? 'on no' : ''}" data-act="attend" data-id="${b.id}" data-s="noshow" aria-pressed="${b.attendance === 'noshow'}">${T('att_noshow')}</button></div>` : ''}
       <div class="alist">${b.client_id ? row('', T('open_client') + ' ›', { 'data-act': 'client', 'data-id': b.client_id }) : ''}
@@ -747,6 +766,14 @@
       <div class="actions"><button type="button" class="btn" data-act="close">${T('close')}</button><button class="btn primary">${T('save')}</button></div></form>`;
   }
   // Who fits this tour: free that day, knows the tour, speaks the language, not overworked this week.
+  // Work days of everyone in a month and the average per role (guides, drivers), for fair suggestions.
+  function monthDays(mo) {
+    const k = 'md' + mo; if (memo[k]) return memo[k]; const from = mo + '-01', to = monthEnd(mo), days = {}, sets = {};
+    db.tours.forEach(t => { if (!live(t) || endOf(t) < from || t.date > to) return; [t.guide_id, t.driver_id].filter(Boolean).forEach(id => { const st = sets[id] = sets[id] || new Set(); tourDays(t).forEach(x => { if (x >= from && x <= to) st.add(x); }); }); });
+    Object.keys(sets).forEach(id => { days[id] = sets[id].size; }); const avg = {};
+    ['guide', 'driver'].forEach(r => { const ps = staff().filter(p => (r === 'driver' ? p.role === 'driver' : p.role === 'guide')); if (ps.length) avg[r] = ps.reduce((n, p) => n + (days[p.id] || 0), 0) / ps.length; });
+    return memo[k] = { days, avg };
+  }
   function fitList(d, role) {
     if (!d.date || !d.title) return [];
     const cat = catFind(d.title), lng = String(d.language || '').toUpperCase().slice(0, 2), wk = monday(d.date), wkEnd = addDays(wk, 6), wdx = (D(d.date).getDay() + 6) % 7;
@@ -760,6 +787,7 @@
       if (role === 'guide' && lng && lng !== 'EN') { if (String(p.languages || '').toUpperCase().includes(lng)) { sc += 4; why.push(lng); } else { sc -= 6; warn.push(T('fit_nolang', { l: lng })); } } else if (role === 'guide' && lng && String(p.languages || '').toUpperCase().includes(lng)) why.push(lng);
       const w = weekOf(p); if (w && w.length === 7 && !w[wdx]) { sc -= 3; warn.push(T('fit_notday')); }
       const load = db.tours.filter(t => live(t) && involves(t, p.id) && t.date >= wk && t.date <= wkEnd && t.id !== d.id).length; sc -= load * 0.7; why.push(T('fit_week', { n: load }));
+      const mo = d.date.slice(0, 7), bal = monthDays(mo); if (bal.avg[role] !== undefined) { const md = bal.days[p.id] || 0; sc -= (md - bal.avg[role]) * 0.4; why.push(T('fit_month', { n: md, avg: Math.round(bal.avg[role]) })); }
       if (role === 'driver' && /4x4|kazbegi|gareji|tusheti|truso|juta|khevsureti/i.test(d.title) && p.vehicle === 'delica') { sc += 3; why.push('Delica'); }
       return { p, sc, why, warn };
     }).filter(Boolean).sort((x, y) => y.sc - x.sc).slice(0, 3);
@@ -1463,6 +1491,31 @@
     const total = mon.reduce((s, x) => s + x, 0), totalP = monP.reduce((s, x) => s + x, 0);
     return { top, days, mon, monP, total, totalP, tours: ts.length, toursP: prev.length, src, kinds, lang, cx: cxT.length, cxG, why, nsN, nsAll, nsSrc };
   }
+  // The year in a few lines: best guests, busiest days, most profitable tour, busiest and best paid people. Money is after platform commission, in the main currency.
+  function yearHighlights(y) {
+    const Y = String(y), ts = db.tours.filter(t => live(t) && t.date.slice(0, 4) === Y), tk = {}; ts.forEach(t => { tk[t.id] = t; });
+    const net = b => (Number(b.price) ? netOf(b) * (rateOf(b.currency || guestCur()) || 0) : 0), bks = db.bookings.filter(b => tk[b.tour_id]);
+    const top = (o, f) => Object.entries(o).sort((p, q) => f(q[1]) - f(p[1]))[0];
+    const cl = {}; bks.forEach(b => { if (!b.client_id) return; const c = cl[b.client_id] = cl[b.client_id] || { n: 0, m: 0 }; c.n++; c.m += net(b); });
+    const loyal = top(cl, c => c.n * 1e9 + c.m), spend = top(cl, c => c.m), cname = id => esc((db.clients.find(c => c.id === id) || {}).name || T('guest'));
+    const day = {}, wk = {}; ts.forEach(t => { const g = Number(t.pax) || 0; day[t.date] = (day[t.date] || 0) + g; const w = monday(t.date); wk[w] = (wk[w] || 0) + g; });
+    const bDay = top(day, v => v), bWk = top(wk, v => v), big = bks.slice().sort((p, q) => (Number(q.pax) || 0) - (Number(p.pax) || 0))[0];
+    const tour = {}; ts.forEach(t => { const k = statKey(t.title), x = tour[k] = tour[k] || { title: aliasOf(t.title), rev: 0, cost: 0 }; x.cost += payFor(t, 'guide') * (t.guide_id ? 1 : 0) + payFor(t, 'driver') * (t.driver_id ? 1 : 0) + costOf(t.id).total; });
+    bks.forEach(b => { const x = tour[statKey(tk[b.tour_id].title)]; if (x) x.rev += net(b); });
+    const prof = top(tour, x => x.rev - x.cost), ppl = {};
+    ts.forEach(t => [['guide', t.guide_id], ['driver', t.driver_id]].forEach(([r, id]) => { if (!id) return; const x = ppl[id] = ppl[id] || { days: new Set(), pay: 0, rev: 0 }; tourDays(t).forEach(d => x.days.add(d)); x.pay += payFor(t, r); }));
+    bks.forEach(b => { const t = tk[b.tour_id], x = t.guide_id && ppl[t.guide_id]; if (x) x.rev += net(b); });
+    const pick = (role, f) => top(Object.fromEntries(Object.entries(ppl).filter(([id]) => (person(id) || {}).role === role || (role === 'guide' && (person(id) || {}).role === 'admin'))), f);
+    const cur = esc(rules().currency || 'GEL'), m = v => `${nf(Math.round(v))} ${cur}`, line = (k, v) => (v ? `<div class="yhrow"><span class="muted">${T(k)}</span><b>${v}</b></div>` : '');
+    const busyG = pick('guide', x => x.days.size), busyD = pick('driver', x => x.days.size), richG = pick('guide', x => x.pay), richD = pick('driver', x => x.pay), profG = pick('guide', x => x.rev);
+    const who = (e, f) => (e ? `${esc(pname(e[0]))} · ${f(e[1])}` : '');
+    const html = [line('yh_loyal', loyal && loyal[1].n > 1 ? `${cname(loyal[0])} · ${T('yh_times', { n: loyal[1].n })}` : ''), line('yh_spend', spend && spend[1].m > 0 ? `${cname(spend[0])} · ${m(spend[1].m)}` : ''),
+      line('yh_day', bDay ? `${esc(fmtDay(bDay[0]))} · ${T('yh_guests', { n: bDay[1] })}` : ''), line('yh_week', bWk ? `${esc(fmtRange(bWk[0], addDays(bWk[0], 6)))} · ${T('yh_guests', { n: bWk[1] })}` : ''),
+      line('yh_group', big && Number(big.pax) > 1 ? `${esc(big.guest)} · ${T('yh_guests', { n: big.pax })} · ${esc(aliasOf(tk[big.tour_id].title))}` : ''), line('yh_tour', prof && prof[1].rev > 0 ? `${esc(prof[1].title)} · ${m(prof[1].rev - prof[1].cost)}` : ''),
+      line('yh_prof_guide', profG && profG[1].rev > 0 ? who(profG, x => m(x.rev)) : ''), line('yh_busy_guide', who(busyG, x => T('yh_days', { n: x.days.size }))), line('yh_busy_driver', who(busyD, x => T('yh_days', { n: x.days.size }))),
+      line('yh_rich_guide', richG && richG[1].pay > 0 ? who(richG, x => m(x.pay)) : ''), line('yh_rich_driver', richD && richD[1].pay > 0 ? who(richD, x => m(x.pay)) : '')].join('');
+    return html ? `<div class="card f"><b>${T('yh_title', { y })}</b><div class="yh">${html}</div><span class="muted small">${T('yh_note')}</span></div>` : '';
+  }
   function statsTabHtml(y) {
     const s = tourStats(y), wn = w => fmt(addDays('2024-01-01', w), { weekday: 'long' }), mx = Math.max(1, ...s.mon, ...s.monP), wmx = Math.max(1, ...s.days.map(d => d.guests));
     const pct = (a, b) => (b ? `${a >= b ? '+' : '−'}${Math.round(Math.abs(a - b) / b * 100)}%` : '—'), busiest = s.days.slice().sort((p, q) => q.guests - p.guests)[0];
@@ -1470,7 +1523,8 @@
     const share = o => { const tot = Object.values(o).reduce((a, b) => a + b, 0) || 1; return Object.entries(o).sort((p, q) => q[1] - p[1]).map(([k, v]) => `<div class="row small"><span style="min-width:110px">${esc(k)}</span><span class="meter" style="flex:1"><i style="width:${Math.round(v / tot * 100)}%"></i></span><span class="num">${Math.round(v / tot * 100)}%</span></div>`).join(''); };
     return `<div class="bar"><div class="seg"><button data-act="year" data-d="-1">‹</button><button disabled>${y}</button><button data-act="year" data-d="1">›</button></div><span class="muted small">${T('ts_loaded', { date: S.loadedFrom ? fmtDay(S.loadedFrom) : '—' })}</span></div>
       <div class="stats"><div class="stat"><b>${nf(s.tours)}</b>${T('tours_n')} <span class="muted small num">${s.toursP ? pct(s.tours, s.toursP) : ''}</span></div><div class="stat"><b>${nf(s.total)}</b>${T('guests')} <span class="muted small num">${s.totalP ? pct(s.total, s.totalP) : ''}</span></div><div class="stat"><b>${s.tours ? (s.total / s.tours).toFixed(1) : '—'}</b>${T('ts_avg')}</div><div class="stat"><b>${busiest && busiest.guests ? esc(wn(busiest.w)) : '—'}</b>${T('ts_busiest')}</div></div>
-      <div class="card f"><b>${T('ts_months', { y, p: y - 1 })}</b><div class="bars two">${s.mon.map((v, m) => `<div class="barcol"><span class="num small">${v || ''}</span><span class="pair"><i class="prev" style="height:${Math.round(s.monP[m] / mx * 100)}%"></i><i style="height:${Math.round(v / mx * 100)}%"></i></span><span class="small">${esc(fmt(`2024-${p2(m + 1)}-01`, { month: 'short' }))}</span></div>`).join('')}</div><div class="row small"><span class="lg"><i class="sq" style="background:var(--accent)"></i>${y}</span><span class="lg"><i class="sq" style="background:var(--line)"></i>${y - 1}</span></div></div>
+      ${isAdmin() ? yearHighlights(y) : ''}
+      <div class="card f"><b>${T('ts_months', { y, p: y - 1 })}</b><div class="bars two">${s.mon.map((v, m) => `<div class="barcol" title="${v} / ${s.monP[m]}"><span class="num bv">${v ? (v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v) : ''}</span><span class="pair"><i class="prev" style="height:${Math.round(s.monP[m] / mx * 100)}%"></i><i style="height:${Math.round(v / mx * 100)}%"></i></span><span class="bm">${esc(fmt(`2024-${p2(m + 1)}-01`, { month: 'short' }).slice(0, 3))}</span></div>`).join('')}</div><div class="row small"><span class="lg"><i class="sq" style="background:var(--accent)"></i>${y}</span><span class="lg"><i class="sq" style="background:var(--line)"></i>${y - 1}</span></div></div>
       <div class="card f"><b>${T('ts_week')}</b>${s.days.map(d => `<div class="row small"><span style="min-width:110px">${esc(wn(d.w))}</span><span class="meter" style="flex:1"><i style="width:${Math.round(d.guests / wmx * 100)}%"></i></span><span class="num" style="min-width:40px;text-align:right">${d.guests}</span><span class="muted wkmost" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.top ? esc(T('ts_mostly', { t: d.top[0] })) : ''}</span></div>`).join('')}</div>
       <div class="card f"><div class="bar"><b>${T('ts_top')}</b><span class="spacer"></span>${isAdmin() ? `<button class="btn sm" data-act="tnames">${T('tn_btn')}</button>` : ''}</div><div class="tablewrap"><table><tr><th>${T('tour')}</th><th class="n">${T('tours_n')}</th><th class="n">${T('guests')}</th><th class="n">${T('ts_avg_s')}</th><th class="n">${y - 1}</th><th class="n">${T('ts_trend')}</th><th class="n">${T('ts_noshow')}</th><th class="n">${T('cancelled')}</th></tr>${trendUp.map(r => `<tr><td>${esc(r.title)}${r.spell.length > 1 ? `<div class="muted small">${T('ts_spell')}: ${esc(r.spell.filter(x => x !== r.title).join(', '))}</div>` : ''}</td><td class="n">${r.n}</td><td class="n">${r.guests}</td><td class="n">${(r.guests / r.n).toFixed(1)}</td><td class="n">${r.prev || '—'}</td><td class="n ${r.prev && r.guests < r.prev ? 'down' : r.prev ? 'up' : ''}">${pct(r.guests, r.prev)}</td><td class="n">${r.ns || ''}</td><td class="n">${r.cx || ''}</td></tr>`).join('') || `<tr><td colspan="8" class="muted">${T('no_tours')}</td></tr>`}</table></div></div>
       <div class="card f"><b>${T('ts_ns_title')}</b>
@@ -1479,21 +1533,49 @@
         ${Object.keys(s.why).length ? `<b class="small">${T('ts_cx_why')}</b>${share(s.why)}` : ''}</div>
       <div class="cols"><div class="card f"><b>${T('ts_sources')}</b>${share(s.src) || `<span class="muted small">—</span>`}</div><div class="card f"><b>${T('ts_kinds')}</b>${share(Object.fromEntries(Object.entries(s.kinds).map(([k, v]) => [T('kind_' + k), v]))) || '—'}<b>${T('ts_langs')}</b>${share(s.lang) || '—'}</div></div>`;
   }
+  // Work balance: who works how much this month, so tours, rest and pay stay fair between guides and between drivers.
+  const selfDrive = (t, p) => t.guide_id === p.id && (t.driver_id === p.id || (!t.driver_id && !!p.vehicle && kmOf(t.title) > 0));
+  function balanceRows(mo) {
+    const from = mo + '-01', to = monthEnd(mo), td = today();
+    return crew().filter(p => p.role !== 'admin').map(p => {
+      const ts = db.tours.filter(t => live(t) && involves(t, p.id) && endOf(t) >= from && t.date <= to), days = new Set();
+      ts.forEach(t => tourDays(t).forEach(d => { if (d >= from && d <= to) days.add(d); }));
+      let streak = 0; days.forEach(d => { streak = Math.max(streak, streakAt(p.id, d)); });
+      let off = 0; db.time_off.forEach(o => { if (o.user_id !== p.id || o.status !== 'approved' || o.type === 'sick' || o.date_to < from || o.date_from > to) return; off += daysBetween(o.date_from > from ? o.date_from : from, o.date_to < to ? o.date_to : to) + 1; });
+      return { p, role: p.role === 'driver' ? 'driver' : 'guide', days: days.size, tours: ts.length, self: ts.filter(t => selfDrive(t, p)).length, streak, off, pay: payData(p.id, from, to).total, ahead: [...days].filter(d => d >= td).length };
+    });
+  }
+  function balanceHtml(mo) {
+    const rows = balanceRows(mo), r = rules(), cur = esc(r.currency || 'GEL'), pctOf = (v, a) => (a ? Math.round((v - a) / a * 100) : 0);
+    const part = role => {
+      const rs = rows.filter(x => x.role === role); if (!rs.length) return '';
+      const avg = k => rs.reduce((n, x) => n + x[k], 0) / rs.length, aDays = avg('days'), aPay = avg('pay');
+      const flag = x => { const dp = pctOf(x.days, aDays), pp = pctOf(x.pay, aPay); return dp >= 25 || pp >= 25 || x.streak > r.maxStreak ? 'over' : (aDays && dp <= -25) ? 'under' : ''; };
+      const next = rs.slice().sort((x, y) => x.days - y.days || x.pay - y.pay).slice(0, 2).map(x => x.p.name);
+      return `<div class="card f"><div class="bar"><b>${T(role === 'driver' ? 'bl_drivers' : 'bl_guides')}</b><span class="spacer"></span><span class="muted small num">${T('bl_avg', { d: aDays.toFixed(1), p: nf(Math.round(aPay)), c: cur })}</span></div>
+        <div class="tablewrap"><table><tr><th>${T('name')}</th><th class="n">${T('bl_days')}</th><th class="n">${T('tours_n')}</th>${role === 'guide' ? `<th class="n">${T('bl_self')}</th>` : ''}<th class="n">${T('bl_streak')}</th><th class="n">${T('bl_off')}</th><th class="n">${T('bl_pay')}</th><th class="n">${T('bl_vs')}</th></tr>
+        ${rs.sort((x, y) => y.days - x.days || y.pay - x.pay).map(x => { const f = flag(x), pp = pctOf(x.pay, aPay); return `<tr class="bl-${f}"><td><span class="row nw">${avatar(x.p.id)}<span>${esc(x.p.name)}</span></span>${f ? `<div class="small blnote">${T(f === 'over' ? 'bl_less' : 'bl_more')}</div>` : ''}</td><td class="n">${x.days}</td><td class="n">${x.tours}</td>${role === 'guide' ? `<td class="n">${x.self || ''}</td>` : ''}<td class="n ${x.streak > r.maxStreak ? 'down' : ''}">${x.streak || ''}</td><td class="n">${x.off || ''}</td><td class="n">${nf(Math.round(x.pay))}</td><td class="n">${aPay ? (pp > 0 ? '+' : '') + pp + '%' : '—'}</td></tr>`; }).join('')}</table></div>
+        <div class="tsum">${T('bl_next', { names: next.join(', ') })}</div></div>`;
+    };
+    return `<div class="bar"><div class="seg"><button data-act="balm" data-d="-1">‹</button><button disabled>${esc(fmt(mo + '-01', { month: 'long', year: 'numeric' }))}</button><button data-act="balm" data-d="1">›</button></div></div>
+      <p class="muted">${T('bl_text', { n: r.maxStreak })}</p>${part('guide')}${part('driver')}`;
+  }
   // Achievements of the whole team, for the admin.
   function achvTabHtml() {
-    const rows = crew().map(p => { const g = game(p.id), done = g.list.filter(b => b.done); return { p, g, done, titles: g.list.filter(b => b.track === 'titles' && b.done) }; }).sort((x, y) => y.g.xp - x.g.xp);
+    const rows = crew().filter(p => p.role !== 'admin').map(p => { const g = game(p.id), done = g.list.filter(b => b.done); return { p, g, done, titles: g.list.filter(b => b.track === 'titles' && b.done) }; }).sort((x, y) => y.g.xp - x.g.xp);
     const cnt = {}; rows.forEach(r => r.done.forEach(b => { cnt[b.k] = cnt[b.k] || { b, n: 0 }; cnt[b.k].n++; }));
     const common = Object.values(cnt).sort((x, y) => y.n - x.n);
-    return `<p class="muted small">${T('ac_text')}</p><div class="tablewrap"><table><tr><th>${T('name')}</th><th>${T('role')}</th><th class="n">${T('level')}</th><th class="n">XP</th><th class="n">${T('badges')}</th><th>${T('ac_titles')}</th><th>${T('ac_next')}</th></tr>${rows.map(r => { const nx = r.g.list.filter(b => !b.done && !b.hidden && b.have > 0 && b.track !== 'master').sort((x, y) => y.have / y.goal - x.have / x.goal)[0]; return `<tr><td>${avatar(r.p.id)} ${esc(r.p.name)}</td><td>${T('role_' + r.p.role)}</td><td class="n">${r.g.level}</td><td class="n">${nf(r.g.xp)}</td><td class="n">${r.done.length}/${r.g.list.length}</td><td style="white-space:normal">${r.titles.map(b => `<span class="tag t-group">${esc(bName(b))}</span>`).join(' ')}</td><td style="white-space:normal" class="small">${nx ? `${esc(bName(nx))} <span class="muted num">${nf(nx.have)}/${nf(nx.goal)}</span>` : ''}</td></tr>`; }).join('')}</table></div>
+    return `<p class="muted small">${T('ac_text')}</p><div class="tablewrap"><table><tr><th>${T('name')}</th><th>${T('role')}</th><th class="n">${T('level')}</th><th class="n">XP</th><th class="n">${T('badges')}</th><th>${T('ac_titles')}</th><th>${T('ac_next')}</th></tr>${rows.map(r => { const nx = r.g.list.filter(b => !b.done && !b.hidden && b.have > 0 && b.track !== 'master').sort((x, y) => y.have / y.goal - x.have / x.goal)[0]; return `<tr><td><span class="row nw">${avatar(r.p.id)}<span>${esc(r.p.name)}</span></span></td><td>${T('role_' + r.p.role)}</td><td class="n">${r.g.level}</td><td class="n">${nf(r.g.xp)}</td><td class="n">${r.done.length}/${r.g.list.length}</td><td class="wrapcell small">${esc(r.titles.map(bName).join(' · '))}</td><td style="white-space:normal" class="small">${nx ? `${esc(bName(nx))} <span class="muted num">${nf(nx.have)}/${nf(nx.goal)}</span>` : ''}</td></tr>`; }).join('')}</table></div>
       <div class="card f"><b>${T('ac_common')}</b>${common.slice(0, 12).map(x => `<div class="row small"><span style="flex:1">${esc(bName(x.b))}</span><span class="num">${x.n}/${rows.length}</span></div>`).join('') || `<span class="muted small">—</span>`}${common.length ? `<span class="muted small">${T('ac_rare')}: ${esc(common.slice(-5).map(x => bName(x.b)).join(', '))}</span>` : ''}</div>`;
   }
   function adminHtml() {
     const tab = state.adminTab, r = rules(), y = state.year;
-    const groups = [['g_daily', ['requests', 'tours', 'email', 'clients']], ['g_team', ['team', 'pay', 'plan', 'holidays']], ['g_numbers', ['stats', 'reports', 'achv', 'usage']], ['g_setup', ['catalog', 'rules', 'import', 'backup', 'privacy', 'log', 'problems']]], tabs = groups.flatMap(x => x[1]);
+    const groups = [['g_daily', ['requests', 'tours', 'email', 'clients']], ['g_team', ['team', 'balance', 'pay', 'plan', 'holidays']], ['g_numbers', ['stats', 'reports', 'achv', 'usage']], ['g_setup', ['catalog', 'rules', 'import', 'backup', 'privacy', 'log', 'problems']]], tabs = groups.flatMap(x => x[1]);
     if (!tab) return `<div class="bar"><h2>${T('nav_admin')}</h2><span class="spacer"></span>${helpBtn()}</div>${helpBox('admin')}${backupDue() ? `<div class="banner small"><span>${lastBackup() ? T('bk_due', { date: fmtDay(lastBackup().slice(0, 10)) }) : T('bk_never')}</span><button class="btn sm primary" data-act="backup">${T('bk_download')}</button></div>` : ''}${groups.map(([gk, gt]) => `<h3>${T(gk)}</h3><div class="tiles">${gt.map(x => `<button class="card" data-act="admintab" data-v="${x}"><span class="ttl">${T('a_' + x)}${x === 'requests' && db.change_requests.some(q => q.status === 'pending') ? ` <span class="badge">${db.change_requests.filter(q => q.status === 'pending').length}</span>` : ''}${x === 'pay' && db.pay_disputes.some(q => q.status === 'open') ? ` <span class="badge">${db.pay_disputes.filter(q => q.status === 'open').length}</span>` : ''}</span><span class="muted small">${T('ad_' + x)}</span></button>`).join('')}</div>`).join('')}`;
     let h = `<div class="bar"><button class="btn sm" data-act="admintab" data-v="">‹ ${T('nav_admin')}</button><h2>${T('a_' + tab)}</h2><span class="spacer"></span>${helpBtn()}</div>${helpBox('admin')}`;
     if (tab === 'stats') return h + statsTabHtml(y);
     if (tab === 'achv') return h + achvTabHtml();
+    if (tab === 'balance') return h + balanceHtml(state.balMonth || today().slice(0, 7));
     if (tab === 'problems') {
       if (!state.errs) { S.fetchErrors().then(r => { state.errs = r; render(); }).catch(e => { state.errs = []; toast(T('err_save') + ': ' + e.message); render(); }); return h + `<p class="muted">${T('loading')}</p>`; }
       const kinds = { error: T('pr_error'), save: T('pr_save'), offline: T('pr_offline'), report: T('pr_report') };
@@ -1597,7 +1679,7 @@
     }
     if (tab === 'rules') {
       const f = (k, label) => `<label>${label}<input id="r-${k}" name="${k}" type="number" min="0" value="${esc(r[k])}"></label>`;
-      h += `<form class="f" data-form="rules" style="max-width:560px">${f('maxStreak', T('r_streak'))}${f('carSeats', T('r_car'))}<div class="two">${f('seasonFrom', T('r_season_from'))}${f('seasonTo', T('r_season_to'))}</div>${f('maxSeasonBlock', T('r_block'))}${f('minNoticeDays', T('r_notice'))}${['reviewGoogle', 'reviewGyg', 'reviewViator'].map(k => `<label>${T('r_' + k)}<input id="r-${k}" name="${k}" type="url" value="${esc(r[k] || '')}"></label>`).join('')}<label>${T('r_tipUrl')}<input id="r-tipUrl" name="tipUrl" type="url" value="${esc(r.tipUrl || '')}" placeholder="https://"></label><label>${T('r_botUrl')}<input id="r-botUrl" name="botUrl" type="url" value="${esc(r.botUrl || '')}" placeholder="https://t.me/..."></label><label>${T('r_offerPromo')}<input id="r-offerPromo" name="offerPromo" value="${esc(r.offerPromo || '')}"></label><label>${T('r_guestcur')}<input id="r-guestCurrency" name="guestCurrency" value="${esc(r.guestCurrency || 'USD')}" style="max-width:120px"></label><label>${T('r_rates')}<input name="rates" value="${esc(rules().rates || 'USD 2.70, EUR 2.95')}"></label><span class="muted small">${T('r_rates_hint', { c: rules().currency || 'GEL' })}</span><label class="row" style="gap:8px"><input type="checkbox" name="pubHol" style="width:auto" ${rules().pubHol === false ? '' : 'checked'}>${T('ph_switch')}</label><label>${T('r_marks')}<input id="r-customMarks" name="customMarks" value="${esc(r.customMarks || '')}"></label><label class="row" style="gap:8px"><input type="checkbox" name="mtOn" style="width:auto" ${maint().on && !CFG.maintenance ? 'checked' : ''}>${T('mt_switch')}</label><label>${T('mt_msg')}<input name="mtText" value="${esc((maint().text) || '')}" placeholder="${T('mt_text')}"></label><label>${T('peaks_title')}<textarea id="r-peaks" name="peaks" rows="6" spellcheck="false">${esc(r.peaks ?? DEFAULT_PEAKS)}</textarea></label><span class="muted small">${T('peaks_text')}</span><div class="actions"><button class="btn primary">${T('save')}</button></div></form>`;
+      h += `<form class="f" data-form="rules" style="max-width:560px">${f('maxStreak', T('r_streak'))}${f('carSeats', T('r_car'))}<div class="two">${f('seasonFrom', T('r_season_from'))}${f('seasonTo', T('r_season_to'))}</div>${f('maxSeasonBlock', T('r_block'))}${f('minNoticeDays', T('r_notice'))}${['reviewGoogle', 'reviewGyg', 'reviewViator'].map(k => `<label>${T('r_' + k)}<input id="r-${k}" name="${k}" type="url" value="${esc(r[k] || '')}"></label>`).join('')}<label>${T('r_tipUrl')}<input id="r-tipUrl" name="tipUrl" type="url" value="${esc(r.tipUrl || '')}" placeholder="https://"></label><label>${T('r_botUrl')}<input id="r-botUrl" name="botUrl" type="url" value="${esc(r.botUrl || '')}" placeholder="https://t.me/..."></label><label>${T('r_offerPromo')}<input id="r-offerPromo" name="offerPromo" value="${esc(r.offerPromo || '')}"></label><label>${T('r_guestcur')}<input id="r-guestCurrency" name="guestCurrency" value="${esc(r.guestCurrency || 'USD')}" style="max-width:120px"></label><label>${T('r_rates')}<input name="rates" value="${esc(rules().rates || 'USD 2.70, EUR 2.95')}"></label><span class="muted small">${T('r_rates_hint', { c: rules().currency || 'GEL' })}</span><label>${T('r_comm')}<input name="commission" value="${esc(rules().commission ?? 'GetYourGuide 25')}"></label><span class="muted small">${T('r_comm_hint')}</span><label class="row" style="gap:8px"><input type="checkbox" name="pubHol" style="width:auto" ${rules().pubHol === false ? '' : 'checked'}>${T('ph_switch')}</label><label>${T('r_marks')}<input id="r-customMarks" name="customMarks" value="${esc(r.customMarks || '')}"></label><label class="row" style="gap:8px"><input type="checkbox" name="mtOn" style="width:auto" ${maint().on && !CFG.maintenance ? 'checked' : ''}>${T('mt_switch')}</label><label>${T('mt_msg')}<input name="mtText" value="${esc((maint().text) || '')}" placeholder="${T('mt_text')}"></label><label>${T('peaks_title')}<textarea id="r-peaks" name="peaks" rows="6" spellcheck="false">${esc(r.peaks ?? DEFAULT_PEAKS)}</textarea></label><span class="muted small">${T('peaks_text')}</span><div class="actions"><button class="btn primary">${T('save')}</button></div></form>`;
     }
     if (tab === 'reports') {
       const rows = report(y);
@@ -1987,6 +2069,7 @@
     return h + `<div class="cols"><div class="card f">
       <div class="row">${avatar(m.id, true)}<div><b>${esc(m.name)}</b> <span class="tag t-muted">${T('role_' + m.role)}</span>${m.email ? `<div class="muted small">${esc(m.email)}</div>` : ''}</div></div>
       <label>${T('photo')}<input type="file" id="me-photo" accept="image/*" data-ch="avatar"></label>
+      <details class="sect avpick" ${state.avOpen ? 'open' : ''}><summary>${T('av_choose')}</summary>${(() => { const cur = avLib(m.avatar) || { icon: '', color: state.avColor || m.color || AV_COLORS[0] }, col = state.avColor || cur.color; return `<div class="avcols">${AV_COLORS.map(c => `<button type="button" class="avcol" data-act="avcolor" data-v="${c}" style="background:${c}" aria-pressed="${c === col}" aria-label="${c}"></button>`).join('')}</div><div class="avgrid">${AV_ICONS.map(k => `<button type="button" class="avopt" data-act="avpick" data-v="ms:${k}:${col}" aria-pressed="${cur.icon === k}" style="background:${col}">${msi(k)}</button>`).join('')}</div>${m.avatar ? `<button type="button" class="lnk" data-act="avpick" data-v="">${T('av_none')}</button>` : ''}`; })()}</details>
       <div class="f"><b>${T('ds_title')}</b>${displayHtml()}</div>
       <label>${T('language')}<select id="me-lang" data-ch="lang">${opt('en', 'English', lang())}${opt('ru', 'Русский', lang())}${opt('ka', 'ქართული', lang())}</select></label>
       ${notifCardHtml(perm)}<div class="checks col">${Object.keys(NOTE_GROUPS).map(g => `<label><input type="checkbox" id="mute-${g}" data-ch="mutepref" data-g="${g}" ${(m.mute || []).includes(g) ? '' : 'checked'}>${T('note_' + g)}</label>`).join('')}</div></div>
@@ -2066,7 +2149,7 @@
       <button class="iconbtn" data-act="bell" aria-label="${T('notifications')}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>${unread ? `<span class="badge">${unread}</span>` : ''}</button><div class="subtop">${syncRow()}${testChip()}</div></header>
       ${maintHtml() || ''}<main data-key="v-${state.view}-${state.view === 'admin' ? (state.adminTab || '') : state.view === 'me' ? state.meTab : ''}">${demo}${body}</main><nav class="tabs" aria-label="Main">${nav}</nav>`;
     const t1 = performance.now(); morph(app, shell + '<div id="modal"></div><div id="toasts"></div>');
-    const hd = app.querySelector('header.top'); if (hd) document.documentElement.style.setProperty('--toph', hd.offsetHeight + 'px');
+    const hd = app.querySelector('header.top'); if (hd) document.documentElement.style.setProperty('--toph', hd.offsetHeight + 'px'); const sp = app.querySelector('.strip'); if (sp && sp.offsetHeight) document.documentElement.style.setProperty('--striph', sp.offsetHeight + 'px');
     window.__rt = { build: Math.round(t1 - t0), patch: Math.round(performance.now() - t1) }; syncNotice(); watchConn();
   }
   // ---------- one line that says how fresh the schedule is and whether my changes were delivered ----------
@@ -2207,6 +2290,9 @@
       const f = $('#pflag-' + i); if (f) f.textContent = phoneFlag(normPhone(b.phone)); const box = $('#gsug-' + i); if (box) box.innerHTML = '';
       toast(T('linked_guest', { name: cl.name }));
     },
+    balm(el) { const mo = state.balMonth || today().slice(0, 7), d = new Date(Number(mo.slice(0, 4)), Number(mo.slice(5, 7)) - 1 + Number(el.dataset.d), 1); state.balMonth = iso(d).slice(0, 7); render(); },
+    avcolor(el) { state.avColor = el.dataset.v; state.avOpen = true; render(); },
+    avpick(el) { state.avOpen = false; run(() => S.save('profiles', { ...stripEmail(me()), avatar: el.dataset.v || null }), T('saved')); },
     tnames() { state.modal = { type: 'tnames' }; renderModal(); },
     async tnjoin(el) {
       const box = el.closest('.tncard'), on = [...box.querySelectorAll('input:checked')].map(x => ({ t: x.value, n: Number(x.dataset.n) || 0 }));
@@ -2358,7 +2444,7 @@
     },
     async person(fd) { await savePerson(fd.has('wf0') ? weekFields(weekFrom(fd)) : {}); renderModal(); },
     async privacy(fd) { const v = { ...rules() }; v.privacy = { guideDays: Math.min(365, Math.max(1, Number(fd.get('guideDays')) || 14)), keepMonths: Math.min(120, Math.max(3, Number(fd.get('keepMonths')) || 24)), auto: !!fd.get('auto') }; await S.save('settings', { id: 'rules', value: v }); state.staleN = null; toast(T('saved')); },
-    async rules(fd) { const v = { ...rules() }; for (const k of Object.keys(DEFAULT_RULES)) v[k] = Number(fd.get(k)) || 0; v.customMarks = fd.get('customMarks') || ''; v.pubHol = !!fd.get('pubHol'); v.rates = String(fd.get('rates') || '').trim(); v.peaks = String(fd.get('peaks') || '').trim(); await S.save('settings', { id: 'maintenance', value: { on: !!fd.get('mtOn'), text: String(fd.get('mtText') || '').trim() } }); v.guestCurrency = (fd.get('guestCurrency') || 'USD').trim().toUpperCase(); for (const k of ['reviewGoogle', 'reviewGyg', 'reviewViator', 'offerPromo', 'tipUrl', 'botUrl']) v[k] = (fd.get(k) || '').trim(); await S.save('settings', { id: 'rules', value: v }); toast(T('saved')); },
+    async rules(fd) { const v = { ...rules() }; for (const k of Object.keys(DEFAULT_RULES)) v[k] = Number(fd.get(k)) || 0; v.customMarks = fd.get('customMarks') || ''; v.pubHol = !!fd.get('pubHol'); v.rates = String(fd.get('rates') || '').trim(); v.commission = String(fd.get('commission') || '').trim(); v.peaks = String(fd.get('peaks') || '').trim(); await S.save('settings', { id: 'maintenance', value: { on: !!fd.get('mtOn'), text: String(fd.get('mtText') || '').trim() } }); v.guestCurrency = (fd.get('guestCurrency') || 'USD').trim().toUpperCase(); for (const k of ['reviewGoogle', 'reviewGyg', 'reviewViator', 'offerPromo', 'tipUrl', 'botUrl']) v[k] = (fd.get(k) || '').trim(); await S.save('settings', { id: 'rules', value: v }); toast(T('saved')); },
     async pay(fd) { const v = { ...rules() }, p = {}; for (const k of ['guide_private', 'guide_group', 'guide_custom', 'driver_private', 'driver_group', 'driver_custom']) p[k] = Number(fd.get(k)) || 0; v.pay = p; v.currency = (fd.get('currency') || 'GEL').trim(); v.payNote = (fd.get('payNote') || '').trim(); await S.save('settings', { id: 'rules', value: v }); toast(T('saved')); }
   };
   document.addEventListener('click', ev => {
