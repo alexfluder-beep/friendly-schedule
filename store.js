@@ -178,7 +178,9 @@
     document.addEventListener('visibilitychange', () => { if (!document.hidden && (!store.syncedAt || Date.now() - new Date(store.syncedAt).getTime() > 45000)) pulse(); });
   }
   async function afterLogin(user) {
-    const { data: p } = await sb.from('profiles').select('*').eq('id', user.id).maybeSingle();
+    const { data: p, error: pe } = await sb.from('profiles').select('*').eq('id', user.id).maybeSingle();
+    // Shown on the waiting screen, so a set-up problem can be told apart from a person who simply has no access yet.
+    store.loginNote = pe ? 'Profile could not be read: ' + (pe.message || pe.code || 'error') : !p ? 'No profile row for this account' : !p.active ? `Profile found: role ${p.role}, not active` : '';
     me = p || { id: user.id, name: user.email, role: 'guide', active: false, lang: null };
     me.email = user.email;
     if (me.active) { await loadAll(); me = { ...(db.profiles.find(x => x.id === user.id) || me), email: user.email }; subscribe(); saveCache(); }

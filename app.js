@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '2.2';
+  const APP_VERSION = '2.3';
   const DEFAULT_RULES = { maxStreak: 6, carSeats: 6, seasonFrom: 6, seasonTo: 10, maxSeasonBlock: 5, minNoticeDays: 14 };
   const LOCALES = { en: 'en-GB', ru: 'ru-RU', ka: 'ka-GE' };
 
@@ -338,7 +338,7 @@
     const brand = `<div class="brand big"><i></i>Friendly Schedule</div><p class="muted small">${T('login_sub')}</p>`;
     const langSel = `<label>${T('language')}<select id="auth-lang" data-ch="prelang">${opt('en', 'English', lang())}${opt('ru', 'Русский', lang())}${opt('ka', 'ქართული', lang())}</select></label>`;
     const privacy = `<details class="sect"><summary>${T('privacy_link')}</summary><p class="muted small">${T('privacy_text', { n: pv().guideDays })}</p></details>`;
-    if (me() && !me().active) return `<main><div class="auth f">${brand}<div class="card"><h2>${T(me().left_at ? 'closed_title' : 'pending_title')}</h2><p class="muted">${T(me().left_at ? 'closed_text' : 'pending_text')}</p></div><button class="btn" data-act="signout">${T('signout')}</button></div></main>`;
+    if (me() && !me().active) return `<main><div class="auth f">${brand}<div class="card"><h2>${T(me().left_at ? 'closed_title' : 'pending_title')}</h2><p class="muted">${T(me().left_at ? 'closed_text' : 'pending_text')}</p>${S.loginNote ? `<p class="muted small">${esc(me().email || '')} · ${esc(S.loginNote)}</p>` : ''}</div><button class="btn primary" data-act="reload">${T('refresh')}</button><button class="btn" data-act="signout">${T('signout')}</button></div></main>`;
     if (a === 'newpass') return `<main><form class="auth f" data-form="newpass">${brand}<h2>${T('new_password')}</h2>${msg}<label>${T('password')}<input id="np-pass" name="password" type="password" minlength="8" required autocomplete="new-password"></label><button class="btn primary">${T('save')}</button></form></main>`;
     return `<main><form class="auth f" data-form="${a}">${brand}<h2>${T(a === 'signup' ? 'create_account' : a === 'reset' ? 'reset_password' : 'sign_in')}</h2>${msg}
       ${a === 'signup' ? `<p class="muted small">${T('signup_steps')}</p><label>${T('your_name')}<input id="au-name" name="name" required autocomplete="name"></label>` : ''}
@@ -1705,6 +1705,7 @@
       const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv' })); a.download = `tours-${mo}.csv`; document.body.appendChild(a); a.click(); a.remove();
     },
     // The phone's own share sheet (WhatsApp, Telegram, Messages, ...); WhatsApp link where the browser has none.
+    reload() { location.reload(); },
     testinfo() { state.modal = { type: 'test', back: state.modal }; renderModal(); },
     async share(el) {
       const text = el.dataset.v || '', title = el.dataset.title || 'Friendly Schedule';
