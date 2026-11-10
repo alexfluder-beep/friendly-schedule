@@ -12,16 +12,16 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Schedule">
 <style>:root{padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}[hidden]{display:none!important}</style>
+<link rel="preload" href="app.js" as="script">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <div id="app"><main><p class="muted">Loading…</p></main></div>
-<script src="vendor/qrcode.js"></script>
-<script src="config.js"></script>
-<script src="catalog.js"></script>
-<script src="icons.js"></script>
-<script src="i18n.js"></script>
-<script src="store.js"></script>
-<script src="app.js"></script>
+<script src="config.js" defer></script>
+<script src="catalog.js" defer></script>
+<script src="icons.js" defer></script>
+<script src="i18n.js" defer></script>
+<script src="store.js" defer></script>
+<script src="app.js" defer></script>
 </body>
 </html>

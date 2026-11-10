@@ -759,3 +759,23 @@ details.sect.avpick summary{font-size:var(--t-body);font-weight:500;color:var(--
 .f label.pdy{flex-direction:row;align-items:center;gap:8px;color:var(--ink);min-height:44px;cursor:pointer}
 .wrow .hm::placeholder{color:var(--line)}
 .ctlist .grow-l > span:first-child{white-space:normal;overflow-wrap:anywhere}
+
+/* 3.13 speed and motion: screens slide like a native app, scrolling never waits, long lists draw only what is on screen */
+.top{view-transition-name:fs-top}.tabs{view-transition-name:fs-tabs}
+::view-transition-group(root){animation-duration:.22s;animation-timing-function:cubic-bezier(.2,0,0,1)}
+::view-transition-old(root){animation:fs-out .16s cubic-bezier(.4,0,1,1) both}
+::view-transition-new(root){animation:fs-in .22s cubic-bezier(.2,0,0,1) both}
+html[data-dir="back"]::view-transition-old(root){animation-name:fs-out-b}
+html[data-dir="back"]::view-transition-new(root){animation-name:fs-in-b}
+@keyframes fs-out{to{opacity:0;transform:translateX(-24px)}}
+@keyframes fs-in{from{opacity:0;transform:translateX(24px)}}
+@keyframes fs-out-b{to{opacity:0;transform:translateX(24px)}}
+@keyframes fs-in-b{from{opacity:0;transform:translateX(-24px)}}
+@media (prefers-reduced-motion:reduce){::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}}
+.overlay,.sheet,.mslist{overscroll-behavior:contain}
+button,a,summary,label,select{touch-action:manipulation}
+.glist .grow,.nlist .nitem{content-visibility:auto;contain-intrinsic-size:auto 56px}
+.qrwait{width:min(260px,70vw);aspect-ratio:1;border:1px solid var(--line);border-radius:12px;background:var(--surface2)}
+.authlang{display:flex;align-items:center;justify-content:flex-end;gap:8px;color:var(--muted)}
+.authlang .msi{width:24px;height:24px}
+.authlang .seg button{min-width:48px;padding:8px 12px}

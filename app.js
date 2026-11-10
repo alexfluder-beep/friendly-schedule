@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.12';
+  const APP_VERSION = '3.14';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -24,7 +24,9 @@
   const p2 = n => String(n).padStart(2, '0');
   const iso = d => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
   const D = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
-  const addDays = (s, n) => { const d = D(s); d.setDate(d.getDate() + n); return iso(d); };
+  // Date maths and formatting run thousands of times per screen, so results are kept (they never change).
+  const dayCache = new Map(), fmtCache = new Map(), fmtObj = new Map();
+  const addDays = (s, n) => { const k = s + '|' + n; let v = dayCache.get(k); if (v === undefined) { if (dayCache.size > 40000) dayCache.clear(); const d = D(s); d.setDate(d.getDate() + n); v = iso(d); dayCache.set(k, v); } return v; };
   const monday = s => addDays(s, -((D(s).getDay() + 6) % 7));
   const today = () => iso(new Date());
   const daysBetween = (a, b) => Math.round((D(b) - D(a)) / 864e5);
@@ -33,12 +35,18 @@
     mo: ['იან', 'თებ', 'მარ', 'აპრ', 'მაი', 'ივნ', 'ივლ', 'აგვ', 'სექ', 'ოქტ', 'ნოე', 'დეკ'], mol: ['იანვარი', 'თებერვალი', 'მარტი', 'აპრილი', 'მაისი', 'ივნისი', 'ივლისი', 'აგვისტო', 'სექტემბერი', 'ოქტომბერი', 'ნოემბერი', 'დეკემბერი'] };
   let kaNative = null;
   const fmt = (s, o) => {
+    const ck = lang() + '|' + s + '|' + JSON.stringify(o); const hit = fmtCache.get(ck); if (hit !== undefined) return hit;
+    if (fmtCache.size > 20000) fmtCache.clear();
+    const v = fmtRaw(s, o); fmtCache.set(ck, v); return v;
+  };
+  const fmtRaw = (s, o) => {
     const d = D(s);
     if (lang() === 'ka') {
       if (kaNative === null) { try { kaNative = Intl.DateTimeFormat.supportedLocalesOf(['ka-GE']).length > 0; } catch (e) { kaNative = false; } }
       if (!kaNative) return [o.weekday ? (o.weekday === 'long' ? KA.wdl : KA.wd)[d.getDay()] + (o.day ? ',' : '') : '', o.day ? d.getDate() : '', o.month ? (o.month === 'long' ? KA.mol : KA.mo)[d.getMonth()] : '', o.year ? d.getFullYear() : ''].filter(x => x !== '').join(' ');
     }
-    return new Intl.DateTimeFormat(LOCALES[lang()], o).format(d);
+    const fk = lang() + '|' + JSON.stringify(o); let f = fmtObj.get(fk); if (!f) { f = new Intl.DateTimeFormat(LOCALES[lang()], o); fmtObj.set(fk, f); }
+    return f.format(d);
   };
   const fmtDay = s => fmt(s, s.slice(0, 4) === String(new Date().getFullYear()) ? { weekday: 'short', day: 'numeric', month: 'short' } : { day: 'numeric', month: 'short', year: 'numeric' });
   const fmtRange = (a, b) => a === b ? fmtDay(a) : `${fmt(a, { day: 'numeric', month: 'short' })} – ${fmt(b, { day: 'numeric', month: 'short', year: 'numeric' })}`;
@@ -290,6 +298,10 @@
     return memo[k] = set;
   }
   function streakAt(id, date) {
+    const mk = 'st' + id + date; if (memo[mk] !== undefined) return memo[mk];
+    return memo[mk] = streakCalc(id, date);
+  }
+  function streakCalc(id, date) {
     const days = workDays(id); if (!days.has(date)) return 0;
     let n = 1; for (let d = addDays(date, -1); days.has(d); d = addDays(d, -1)) n++;
     for (let d = addDays(date, 1); days.has(d); d = addDays(d, 1)) n++; return n;
@@ -437,7 +449,11 @@
   window.addEventListener('unhandledrejection', ev => { const r = ev.reason || {}; if (r.viewOnly) { ev.preventDefault(); return; } logErr('error', r.message || String(r), r.stack || ''); });
   // When the connection drops for more than 30 seconds, write down for how long.
   let offSince = null;
-  function watchConn() { if (S.mode === 'demo') return; if (S.offline && !offSince) offSince = Date.now(); else if (!S.offline && offSince) { const sec = Math.round((Date.now() - offSince) / 1000), from = new Date(offSince); offSince = null; if (sec >= 30) logErr('offline', `No connection for ${sec >= 120 ? Math.round(sec / 60) + ' min' : sec + ' s'}, from ${from.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`, navigator.onLine ? 'phone was online: database or network did not answer' : 'phone had no internet'); else flushErr(); } }
+  // A computer that went to sleep or a hidden tab is not a lost connection: such gaps are not written to the problem log.
+  let napped = false, lastTick = Date.now();
+  setInterval(() => { if (Date.now() - lastTick > 20000 && offSince) napped = true; lastTick = Date.now(); }, 5000);
+  document.addEventListener('visibilitychange', () => { if (document.hidden && offSince) napped = true; });
+  function watchConn() { if (S.mode === 'demo') return; if (S.offline && !offSince) { offSince = Date.now(); napped = !!document.hidden; } else if (!S.offline && offSince) { const sec = Math.round((Date.now() - offSince) / 1000), from = new Date(offSince), slept = napped; offSince = null; napped = false; if (sec >= 30 && !slept) logErr('offline', `No connection for ${sec >= 120 ? Math.round(sec / 60) + ' min' : sec + ' s'}, from ${from.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`, navigator.onLine ? 'phone was online: database or network did not answer' : 'phone had no internet'); else flushErr(); } }
   // Short codes for troubleshooting: the same code shows on screen, in the Problems list and in Back office > Problems > What the codes mean.
   function errCode(e) {
     const m = String((e && (e.message || e.code)) || e || '');
@@ -490,8 +506,9 @@
   // ---------- auth screens ----------
   function authHtml() {
     const a = state.auth, msg = state.authMsg ? `<div class="banner">${esc(state.authMsg)}</div>` : '', pw = state.showPw;
-    const brand = `<div class="brand big"><i></i>Friendly Schedule</div><p class="muted small">${T('login_sub')}</p>`;
-    const langSel = `<label>${T('language')}<select id="auth-lang" data-ch="prelang">${opt('en', 'English', lang())}${opt('ru', 'Русский', lang())}${opt('ka', 'ქართული', lang())}</select></label>`;
+    // Language first, at the top: a globe and three short buttons, so a guide who reads only Russian or Georgian finds it at once.
+    const langSel = `<div class="authlang" role="group" aria-label="${T('language')}">${msi('language')}<div class="seg">${[['en', 'EN', 'English'], ['ru', 'RU', 'Русский'], ['ka', 'KA', 'ქართული']].map(([k, l, n]) => `<button type="button" data-act="prelangb" data-v="${k}" aria-pressed="${lang() === k}" lang="${k}" title="${n}" aria-label="${n}">${l}</button>`).join('')}</div></div>`;
+    const brand = langSel + `<div class="brand big"><i></i>Friendly Schedule</div><p class="muted small">${T('login_sub')}</p>`;
     const privacy = `<details class="sect"><summary>${T('privacy_link')}</summary><p class="muted small">${T('privacy_text', { n: pv().guideDays })}</p></details>`;
     if (me() && !me().active) return `<main><div class="auth f">${brand}<div class="card"><h2>${T(me().left_at ? 'closed_title' : 'pending_title')}</h2><p class="muted">${T(me().left_at ? 'closed_text' : 'pending_text')}</p>${S.loginNote ? `<p class="muted small">${esc(me().email || '')} · ${esc(S.loginNote)}</p>` : ''}</div><button class="btn primary" data-act="reload">${T('refresh')}</button><button class="btn" data-act="signout">${T('signout')}</button></div></main>`;
     if (a === 'newpass') return `<main><form class="auth f" data-form="newpass">${brand}<h2>${T('new_password')}</h2>${msg}<label>${T('password')}<input id="np-pass" name="password" type="password" minlength="8" required autocomplete="new-password"></label><button class="btn primary">${T('save')}</button></form></main>`;
@@ -501,7 +518,7 @@
       ${a !== 'reset' ? `<label>${T('password')}<span class="pwrow"><input id="au-pass" name="password" type="${pw ? 'text' : 'password'}" minlength="8" required autocomplete="${a === 'signup' ? 'new-password' : 'current-password'}"><button type="button" class="btn sm" data-act="showpw" aria-pressed="${!!pw}">${T(pw ? 'hide_pw' : 'show_pw')}</button></span></label>` : ''}
       <button class="btn primary big">${T(a === 'signup' ? 'create_account' : a === 'reset' ? 'send_reset' : 'sign_in')}</button>
       <div class="bar">${a !== 'signin' ? `<button type="button" class="lnk" data-act="auth" data-to="signin">${T('sign_in')}</button>` : ''}${a !== 'signup' ? `<button type="button" class="lnk" data-act="auth" data-to="signup">${T('create_account')}</button>` : ''}${a !== 'reset' ? `<button type="button" class="lnk" data-act="auth" data-to="reset">${T('forgot')}</button>` : ''}</div>
-      ${S.mode === 'demo' ? `<div class="banner small">${T('demo_login')}</div>` : ''}${langSel}${privacy}</form></main>`;
+      ${S.mode === 'demo' ? `<div class="banner small">${T('demo_login')}</div>` : ''}${privacy}</form></main>`;
   }
 
   const helpBtn = () => `<button class="iconbtn" data-act="help" aria-label="${T('help')}" aria-pressed="${!!state.help}">?</button>`;
@@ -1260,7 +1277,13 @@
 
 
   // ---------- tips: the guide's Keepz link as a QR code guests can scan ----------
+  // The QR library is fetched only the first time a QR code is shown, so it does not slow down opening the app.
+  let qrLoading = null;
   function qrSvg(text) {
+    if (!window.qrcode) {
+      if (!qrLoading) qrLoading = new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'vendor/qrcode.js'; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); }).then(() => { render(); if (state.modal) renderModal(); }).catch(() => { qrLoading = null; });
+      return '<div class="qr qrwait" aria-busy="true"></div>';
+    }
     try { const q = window.qrcode(0, 'M'); q.addData(text); q.make(); const n = q.getModuleCount(); let p = '';
       for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) p += `M${c + 2} ${r + 2}h1v1h-1z`;
       return `<svg class="qr" viewBox="0 0 ${n + 4} ${n + 4}" role="img" aria-label="QR"><rect width="100%" height="100%" fill="#fff"/><path d="${p}" fill="#000"/></svg>`;
@@ -1698,9 +1721,17 @@
       if (!state.errs) { S.fetchErrors().then(r => { state.errs = r; render(); }).catch(e => { state.errs = []; toast(T('err_save') + ': ' + e.message); render(); }); return h + `<p class="muted">${T('loading')}</p>`; }
       const kinds = { error: T('pr_error'), save: T('pr_save'), offline: T('pr_offline'), report: T('pr_report') };
       const when = x => new Intl.DateTimeFormat(LOCALES[lang()], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(x));
-      return h + `<p class="muted small">${T('pr_text')}</p><details class="sect"><summary>${T('ec_title')}</summary><dl class="fields">${ERR_CODES.map(k => `<dt>${k}</dt><dd>${esc(T('ec_' + k))}</dd>`).join('')}</dl></details><div class="bar"><button class="btn sm" data-act="errreload">${T('refresh')}</button>${state.errs.length ? `<button class="btn sm" data-act="errclear">${T('pr_clear')}</button>` : ''}</div>
+      // Filter by person and hide plain connection gaps, so real problems from guides' phones are easy to spot.
+      const who = [...new Set(state.errs.map(x => x.user_id).filter(Boolean))], wk = Date.now() - 7 * 864e5;
+      const errsAll = state.errs, shown = errsAll.filter(x => (!state.errWho || x.user_id === state.errWho) && (!state.errNoOff || x.kind !== 'offline'));
+      const week = errsAll.filter(x => new Date(x.at).getTime() > wk && x.kind !== 'offline');
+      const filt = `<div class="bar"><select class="inp" id="err-who" data-ch="errwho" style="max-width:240px"><option value="">${T('pr_all')} (${errsAll.length})</option>${who.map(id => `<option value="${id}" ${state.errWho === id ? 'selected' : ''}>${esc(pname(id))} (${errsAll.filter(x => x.user_id === id).length})</option>`).join('')}</select><label class="pdy small"><input type="checkbox" id="err-nooff" data-ch="errnooff" ${state.errNoOff ? 'checked' : ''}>${T('pr_nooff')}</label></div><p class="small">${T('pr_week', { n: week.length, p: new Set(week.map(x => x.user_id)).size })}</p>`;
+      state.errs = shown;
+      try {
+      return h + `<p class="muted small">${T('pr_text')}</p><details class="sect"><summary>${T('ec_title')}</summary><dl class="fields">${ERR_CODES.map(k => `<dt>${k}</dt><dd>${esc(T('ec_' + k))}</dd>`).join('')}</dl></details><div class="bar"><button class="btn sm" data-act="errreload">${T('refresh')}</button>${state.errs.length ? `<button class="btn sm" data-act="errclear">${T('pr_clear')}</button>` : ''}</div>${filt}
         <div class="list">${state.errs.map(x => `<details class="card f"><summary class="row nw"><span class="tag ${x.kind === 'offline' ? 't-muted' : x.kind === 'report' ? 't-group' : 't-warn'}">${esc(kinds[x.kind] || x.kind)}</span><span class="grow-l small">${esc(x.message)}</span><span class="muted small num">${esc(when(x.at))}</span></summary>
           <div class="muted small">${esc([x.user_id ? pname(x.user_id) : '', x.page, x.device, x.version && 'v' + x.version].filter(Boolean).join(' · '))}</div>${x.detail ? `<pre class="pre small">${esc(x.detail)}</pre>` : ''}</details>`).join('') || `<div class="empty">${T('pr_none')}</div>`}</div>`;
+      } finally { state.errs = errsAll; }
     }
     const cur = r.currency || 'GEL';
     if (tab === 'tours') {
@@ -2307,7 +2338,17 @@
       else if (o.type !== 'file' && o !== document.activeElement && (controlled || !dirty.has(o)) && o.value !== n.value) o.value = n.value;
     } else if (tag === 'SELECT' && o !== document.activeElement && o.value !== n.value) o.value = n.value;
   }
-  function morph(root, html) { const tpl = document.createElement('template'); tpl.innerHTML = html; morphKids(root, tpl.content, root.childNodes.length > 0); }
+  let quietMorph = false;   // during a screen change the whole screen slides, so single items do not fade in as well
+  function morph(root, html) { const tpl = document.createElement('template'); tpl.innerHTML = html; morphKids(root, tpl.content, root.childNodes.length > 0 && !quietMorph); }
+  // Moving between screens: a short slide, like a native app (left or right by the order of the tabs). Phones without View Transitions just switch.
+  const VIEW_ORDER = ['calendar', 'timeoff', 'tasks', 'clients', 'admin', 'me'];
+  function slideTo(a, b, go) {   // a, b: positions of the old and new screen
+    const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!document.startViewTransition || reduce || a === b) { go(); return; }
+    document.documentElement.dataset.dir = b > a ? 'fwd' : 'back';
+    quietMorph = true;
+    try { const vt = document.startViewTransition(() => { try { go(); } finally { quietMorph = false; } }); vt.finished.finally(() => { delete document.documentElement.dataset.dir; }); } catch (e) { quietMorph = false; go(); }
+  }
   document.addEventListener('input', ev => { const el = ev.target; if (el && el.nodeType === 1) dirty.add(el); }, true);
   // A quiet Save button lights up in the action colour only once something in its form has changed.
   const qsaveOn = () => document.querySelectorAll('form .qsave').forEach(b => { const f = b.closest('form'); b.classList.toggle('primary', [...f.elements].some(x => dirty.has(x))); });
@@ -2392,7 +2433,9 @@
 
   // ---------- events ----------
   const acts = {
-    view(el) { state.view = el.dataset.v; if (state.view === 'clients') { state.view = 'admin'; state.adminTab = 'clients'; state.q = ''; } else if (state.view === 'admin') state.adminTab = null; try { history.replaceState(null, '', '#' + state.view); } catch (e) { location.hash = state.view; } render(); window.scrollTo(0, 0); },
+    prelangb(el) { S.ls.set('fs-lang', el.dataset.v); render(); },
+    view(el) { const from = state.view === 'admin' && state.adminTab === 'clients' ? 'clients' : state.view; slideTo(VIEW_ORDER.indexOf(from), VIEW_ORDER.indexOf(el.dataset.v), () => acts.viewNow(el)); },
+    viewNow(el) { state.view = el.dataset.v; if (state.view === 'clients') { state.view = 'admin'; state.adminTab = 'clients'; state.q = ''; } else if (state.view === 'admin') state.adminTab = null; try { history.replaceState(null, '', '#' + state.view); } catch (e) { location.hash = state.view; } render(); window.scrollTo(0, 0); },
     nav(el) { const n = Number(el.dataset.d); if (state.mode === 'week') state.date = addDays(state.date, 7 * n); else { const d = D(state.date); d.setDate(1); d.setMonth(d.getMonth() + n); state.date = iso(d); } render(); document.querySelectorAll('main .mgrid, main .gridwrap, main .list').forEach(e => { e.classList.remove('sl-n', 'sl-p'); void e.offsetWidth; e.classList.add(n > 0 ? 'sl-n' : 'sl-p'); }); },
     today() { state.date = today(); render(); toToday(); },
     mode(el) { state.mode = el.dataset.m; render(); },
@@ -2424,7 +2467,7 @@
       try { navigator.clipboard.writeText(v).then(ok, old); } catch (e) { old(); }
     },
     score(el) { const tid = el.dataset.id, old = myScore(tid, me().id); run(() => S.save('tour_ratings', { id: old ? old.id : S.uid(), tour_id: tid, user_id: me().id, score: Number(el.dataset.s), created_at: new Date().toISOString() })).then(renderModal); },
-    metab(el) { state.meTab = el.dataset.v; render(); if (state.meTab === 'badges') { S.repeatGuests(me().id).then(n => { if (n !== state.repeatN) { state.repeatN = n; render(); } }).catch(() => {}); S.myCounts(me().id).then(c => { if (JSON.stringify(c) !== JSON.stringify(state.counts || null)) { state.counts = c; render(); } }).catch(() => {}); } },
+    metab(el) { const tabs = ['profile', 'settings', 'month', 'stats', 'badges'], a = tabs.indexOf(state.meTab || 'profile'), b = tabs.indexOf(el.dataset.v); slideTo(a, b, () => { state.meTab = el.dataset.v; render(); }); if (el.dataset.v === 'badges') { S.repeatGuests(me().id).then(n => { if (n !== state.repeatN) { state.repeatN = n; render(); } }).catch(() => {}); S.myCounts(me().id).then(c => { if (JSON.stringify(c) !== JSON.stringify(state.counts || null)) { state.counts = c; render(); } }).catch(() => {}); } },
     payrange(el) { (state.pay = state.pay || {}).mode = el.dataset.v; render(); },
     paymonth(el) { state.pay = { ...(state.pay || {}), mode: 'month' }; state.listMonth = el.dataset.m; if (state.modal && state.modal.type === 'prange') state.modal = { type: 'statement', id: state.modal.id, month: el.dataset.m }; render(); renderModal(); },
     prange(el) { state.modal = { type: 'prange', id: el.dataset.id }; renderModal(); },
@@ -2599,6 +2642,8 @@
     signout() { run(async () => { await S.signOut(); state.auth = 'signin'; }); }
   };
   const changes = {
+    errwho(el) { state.errWho = el.value; render(); },
+    errnooff(el) { state.errNoOff = el.checked; render(); },
     gckind(el) { const s2 = state.gcOff || (state.gcOff = new Set()); el.checked ? s2.delete(el.dataset.v) : s2.add(el.dataset.v); render(); },
     mytour(el) { const m = me(), list = catalog().filter(c => c.id), base = (m.skills || []).length ? m.skills : list.map(c => String(c.id)), st = state.myTours || new Set(base); el.checked ? st.add(el.dataset.v) : st.delete(el.dataset.v); state.myTours = st; render(); },
     jump(el) { if (el.value) { state.date = el.value; render(); } },
@@ -2761,6 +2806,7 @@
     return true;
   }
   function dragStop(x, y) {
+    document.removeEventListener('touchmove', dragTouchMove);
     if (!dg) return; const d = dg; dg = null; clearTimeout(d.tm);
     if (!d.on) return;
     d.ghost.remove(); d.el.classList.remove('dragsrc'); document.documentElement.classList.remove('dragging'); document.querySelectorAll('.dropon').forEach(e => e.classList.remove('dropon')); dragEnd = Date.now();
@@ -2773,8 +2819,9 @@
   document.addEventListener('mousedown', ev => { if (ev.button === 0) dragDown(ev.target, ev.clientX, ev.clientY, false); });
   document.addEventListener('mousemove', ev => { if (dg && dragMove(ev.clientX, ev.clientY)) ev.preventDefault(); });
   document.addEventListener('mouseup', ev => dragStop(ev.clientX, ev.clientY));
-  document.addEventListener('touchstart', ev => { if (ev.touches.length === 1) dragDown(ev.target, ev.touches[0].clientX, ev.touches[0].clientY, true); else dragStop(); }, { passive: true });
-  document.addEventListener('touchmove', ev => { if (!dg) return; const p = ev.touches[0]; if (dragMove(p.clientX, p.clientY) && ev.cancelable) ev.preventDefault(); }, { passive: false });
+  // The blocking touchmove listener is only attached while a tour is being dragged, so normal scrolling never waits for JavaScript.
+  const dragTouchMove = ev => { if (!dg) { document.removeEventListener('touchmove', dragTouchMove); return; } const p = ev.touches[0]; if (dragMove(p.clientX, p.clientY) && ev.cancelable) ev.preventDefault(); };
+  document.addEventListener('touchstart', ev => { if (ev.touches.length === 1) { dragDown(ev.target, ev.touches[0].clientX, ev.touches[0].clientY, true); if (dg) document.addEventListener('touchmove', dragTouchMove, { passive: false }); } else dragStop(); }, { passive: true });
   document.addEventListener('touchend', ev => { if (!dg) return; const on = dg.on, p = ev.changedTouches[0]; dragStop(p.clientX, p.clientY); if (on && ev.cancelable) ev.preventDefault(); });
   document.addEventListener('touchcancel', () => dragStop());
   document.addEventListener('click', ev => { document.querySelectorAll('details.msel[open]').forEach(d => { if (!d.contains(ev.target)) d.open = false; }); });
@@ -2791,7 +2838,7 @@
   // ---------- pinned week strip: the marked day follows what is on screen ----------
   let scrollTick = false;
   window.addEventListener('scroll', () => {
-    if (scrollTick) return; scrollTick = true;
+    if (scrollTick || state.view !== 'calendar') return; scrollTick = true;
     requestAnimationFrame(() => {
       scrollTick = false; const strip = document.querySelector('.strip'); if (!strip || state.view !== 'calendar' || state.mode !== 'week' || getComputedStyle(strip).position !== 'sticky') return;
       const line = strip.getBoundingClientRect().bottom + 12; let cur = null;

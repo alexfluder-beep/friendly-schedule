@@ -228,7 +228,9 @@
       window.addEventListener('offline', () => { store.offline = true; emit(null, null, 'STATE', true); });
       if (!navigator.onLine && await useCache()) return;
       try {
-        const { data: { session } } = await sb.auth.getSession();
+        const { data: { session }, error } = await sb.auth.getSession();
+        // A token that could not be refreshed because of a weak connection is not a sign-out: work from the saved copy and try again later.
+        if (!session && error && await useCache()) return;
         if (session) { await afterLogin(session.user); if (outbox.length) await store.sync(); }
       } catch (e) { if (!(isNetErr(e) && await useCache())) throw e; }
     },
@@ -236,7 +238,8 @@
     async sync() {
       if (mode !== 'supabase' || store.syncing) return; store.syncing = true;
       try {
-        const { data: { session } } = await sb.auth.getSession();
+        const { data: { session }, error } = await sb.auth.getSession();
+        if (!session && error) throw error;   // could not reach the server to renew the sign-in: stay signed in, offline
         if (!session) { store.offline = false; me = null; emit(null, null, 'STATE', true); return; }
         while (outbox.length) { try { await sendOp(outbox[0]); } catch (e) { if (isNetErr(e)) throw e; console.error('sync skipped', outbox[0], e.message); store.failed = (store.failed || 0) + 1; } outbox.shift(); store.pending = outbox.length; }
         await idb.set('outbox', outbox);

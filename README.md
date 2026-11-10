@@ -262,3 +262,19 @@ Design clean-up of **Me > Profile** (method: unslop by @heydamir, CC BY 4.0). No
 
 ## 3.12
 - Getting started (Tasks) has a fourth step: **Connect Telegram**. With the bot link set in Back office > Rules it is done once the person links the bot (/link code), otherwise once the Telegram username is saved. Tapping it opens the right place in Me.
+
+## 3.13 – 3.14
+Speed and feel (checked on a phone with the CPU slowed 4×, 5,000 guests and 600 tours):
+- Changing week is about 30% faster: dates and their names are worked out once and kept, the work-streak check is kept per screen.
+- Scrolling never waits for the app: the "hold to drag a tour" listener only switches on while a tour is being dragged.
+- The QR library (for tips) loads only the first time a QR code is shown; the other scripts load in parallel (`defer`).
+- Screens slide sideways when you change tab (and between Me tabs), like a native app. Off when the phone asks for less motion, and on browsers without the feature.
+- Long guest and notice lists draw only what is on screen; pop-up sheets no longer scroll the page behind them.
+
+Fewer sign-outs and a cleaner problem log:
+- When the sign-in cannot be renewed because the internet is weak, the app stays signed in and works from the saved copy instead of showing the login screen.
+- A computer that went to sleep or a hidden tab no longer adds "No connection" entries.
+- Back office > Problems: filter by person, hide connection gaps, and a line "Last 7 days: N problems from N people".
+- Login screen: a globe with EN / RU / KA at the top.
+
+Art (tools/art): `make_art.py` makes avatar and badge pictures with Gemini once, on the bot server; see tools/art/README.md.

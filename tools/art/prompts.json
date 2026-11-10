@@ -1,0 +1,505 @@
+{
+ "style": {
+  "avatar": "Round avatar icon, flat vector illustration, warm paper background colour #f7f5ef, limited palette of deep green #314b3c, rust orange #b8441c, plum #5b4bb0, ink #20251f, soft sand #e9e8dc. Simple bold shapes, gentle grain, centred subject that still reads at 40 px, no text, no letters, no logo, no border, no gradient glow, square 1:1 image.",
+  "badge": "Collectible badge emblem, round medal shape, flat vector illustration in a warm Georgian travel style, palette deep green #314b3c, rust orange #b8441c, plum #5b4bb0, mustard #f0b03f, ink #20251f on warm paper #f7f5ef. One clear symbol in the middle that reads at 64 px, a little playful, no text, no letters, no numbers, no logo, no glow, square 1:1 image."
+ },
+ "avatars": [
+  {
+   "id": "delica",
+   "subject": "a white 4x4 Mitsubishi Delica van on a mountain road"
+  },
+  {
+   "id": "gergeti",
+   "subject": "Gergeti Trinity church on a green hill under Mount Kazbek"
+  },
+  {
+   "id": "wine",
+   "subject": "a clay qvevri jar and a glass of amber wine"
+  },
+  {
+   "id": "khinkali",
+   "subject": "three khinkali dumplings on a plate"
+  },
+  {
+   "id": "churchkhela",
+   "subject": "strings of churchkhela hanging to dry"
+  },
+  {
+   "id": "tbilisi",
+   "subject": "old Tbilisi balconies with carved wooden railings"
+  },
+  {
+   "id": "narikala",
+   "subject": "Narikala fortress walls on a hill at sunset"
+  },
+  {
+   "id": "mtskheta",
+   "subject": "Jvari monastery above the meeting of two rivers"
+  },
+  {
+   "id": "gareji",
+   "subject": "striped rainbow desert hills of Gareji"
+  },
+  {
+   "id": "vardzia",
+   "subject": "cave town carved into a cliff"
+  },
+  {
+   "id": "svaneti",
+   "subject": "Svan stone towers with snowy peaks"
+  },
+  {
+   "id": "tusheti",
+   "subject": "a winding dirt road in the Tusheti mountains"
+  },
+  {
+   "id": "sabaduri",
+   "subject": "a snowy forest road with tall trees"
+  },
+  {
+   "id": "ararat",
+   "subject": "Mount Ararat with a small Armenian monastery"
+  },
+  {
+   "id": "sighnaghi",
+   "subject": "a red-roofed hill town with old walls and a valley"
+  },
+  {
+   "id": "sulfur",
+   "subject": "domed brick sulfur baths"
+  },
+  {
+   "id": "cable",
+   "subject": "a red cable car over a river city"
+  },
+  {
+   "id": "horse",
+   "subject": "a horse in an alpine meadow"
+  },
+  {
+   "id": "eagle",
+   "subject": "a mountain eagle soaring"
+  },
+  {
+   "id": "dog",
+   "subject": "a friendly Caucasian shepherd dog"
+  },
+  {
+   "id": "backpack",
+   "subject": "a hiking backpack and boots"
+  },
+  {
+   "id": "map",
+   "subject": "a folded paper map with a route line"
+  },
+  {
+   "id": "compass",
+   "subject": "a brass compass"
+  },
+  {
+   "id": "camera",
+   "subject": "a vintage camera"
+  },
+  {
+   "id": "coffee",
+   "subject": "a small cup of Turkish coffee and a cezve"
+  },
+  {
+   "id": "grapes",
+   "subject": "a bunch of dark Saperavi grapes"
+  },
+  {
+   "id": "pomegranate",
+   "subject": "a pomegranate cut open"
+  },
+  {
+   "id": "sun",
+   "subject": "a warm sun over hills"
+  },
+  {
+   "id": "snowflake",
+   "subject": "a large snowflake over a ski slope"
+  },
+  {
+   "id": "star",
+   "subject": "a night sky with stars over a tent"
+  }
+ ],
+ "badges": [
+  {
+   "id": "accountant",
+   "name": "Accountant",
+   "idea": "Ask about the pay for a tour once"
+  },
+  {
+   "id": "armenia1",
+   "name": "Border crosser",
+   "idea": "Your first tour to Armenia"
+  },
+  {
+   "id": "armenia10",
+   "name": "Barev!",
+   "idea": "10 tours to Armenia"
+  },
+  {
+   "id": "bears",
+   "name": "Friend of the bears",
+   "idea": "10 Sabaduri tours"
+  },
+  {
+   "id": "churchkhela",
+   "name": "Churchkhela dealer",
+   "idea": "10 tours to Kakheti"
+  },
+  {
+   "id": "d100",
+   "name": "100 drives",
+   "idea": "Drive 100 tours"
+  },
+  {
+   "id": "delica1",
+   "name": "Delica pilot",
+   "idea": "Drive 1,000 km in the Delica"
+  },
+  {
+   "id": "delica10",
+   "name": "Delica legend",
+   "idea": "Drive 10,000 km in the Delica"
+  },
+  {
+   "id": "diplomat",
+   "name": "Diplomat",
+   "idea": "Finish a tour with a guest marked as a trouble maker"
+  },
+  {
+   "id": "double",
+   "name": "Double shift",
+   "idea": "Two tours in one day, 5 times"
+  },
+  {
+   "id": "early",
+   "name": "Early bird",
+   "idea": "10 tours starting before 08:00"
+  },
+  {
+   "id": "earth",
+   "name": "Around the Earth",
+   "idea": "Drive 40,075 km: once around the equator"
+  },
+  {
+   "id": "explorer",
+   "name": "Explorer",
+   "idea": "Work on 5 different tours"
+  },
+  {
+   "id": "familiar",
+   "name": "Familiar faces",
+   "idea": "Meet 5 guests who came back for another tour with you"
+  },
+  {
+   "id": "first",
+   "name": "First tour",
+   "idea": "Lead or drive your first tour"
+  },
+  {
+   "id": "firstoff",
+   "name": "First day off",
+   "idea": "You asked for your first day off. Rest is part of the job."
+  },
+  {
+   "id": "full",
+   "name": "Full house",
+   "idea": "10 group tours with every seat taken"
+  },
+  {
+   "id": "g1000",
+   "name": "1000 guests",
+   "idea": "Host 1000 guests"
+  },
+  {
+   "id": "g500",
+   "name": "500 guests",
+   "idea": "Host 500 guests"
+  },
+  {
+   "id": "geo3",
+   "name": "Three regions",
+   "idea": "Work in 3 regions of Georgia"
+  },
+  {
+   "id": "geo6",
+   "name": "Half the country",
+   "idea": "Work in 6 regions of Georgia"
+  },
+  {
+   "id": "geoall",
+   "name": "All of Georgia",
+   "idea": "Work in all 11 regions"
+  },
+  {
+   "id": "goat",
+   "name": "Hairpin hero",
+   "idea": "10 tours to Kazbegi, Tusheti, Svaneti or other mountain roads"
+  },
+  {
+   "id": "gold",
+   "name": "Gold digger",
+   "idea": "Earn 10,000 from tours"
+  },
+  {
+   "id": "iron",
+   "name": "Iron streak",
+   "idea": "Work 6 days in a row. Then take a day off."
+  },
+  {
+   "id": "khinkali",
+   "name": "Khinkali eater",
+   "idea": "20 tours along the Military Road, where the khinkali stop is"
+  },
+  {
+   "id": "kids200",
+   "name": "School trip",
+   "idea": "200 children on your tours"
+  },
+  {
+   "id": "kids50",
+   "name": "Kindergarten",
+   "idea": "50 children on your tours"
+  },
+  {
+   "id": "km1000",
+   "name": "First thousand",
+   "idea": "Drive 1,000 km on tours"
+  },
+  {
+   "id": "km10000",
+   "name": "Road veteran",
+   "idea": "Drive 10,000 km on tours"
+  },
+  {
+   "id": "late",
+   "name": "Late wake-up",
+   "idea": "10 tours that start at noon or later"
+  },
+  {
+   "id": "lazy",
+   "name": "Sofa champion",
+   "idea": "More than 10 days in a row without a tour. Everybody needs a break."
+  },
+  {
+   "id": "month20",
+   "name": "Big month",
+   "idea": "20 tours in one month"
+  },
+  {
+   "id": "moon",
+   "name": "To the Moon",
+   "idea": "Drive 384,400 km: the distance to the Moon"
+  },
+  {
+   "id": "mountain",
+   "name": "Long road",
+   "idea": "Complete a multi-day tour"
+  },
+  {
+   "id": "newdest",
+   "name": "Fresh routes",
+   "idea": "3 tours that were new to you within 90 days"
+  },
+  {
+   "id": "night",
+   "name": "Night owl",
+   "idea": "5 tours that end after 21:00"
+  },
+  {
+   "id": "nights30",
+   "name": "Road is home",
+   "idea": "30 nights on multi-day tours"
+  },
+  {
+   "id": "nights5",
+   "name": "Away from home",
+   "idea": "5 nights on multi-day tours"
+  },
+  {
+   "id": "noshow5",
+   "name": "Lost guests",
+   "idea": "Mark 5 no-shows. You waited, they did not come."
+  },
+  {
+   "id": "offroad",
+   "name": "Off-road",
+   "idea": "20 mountain tours in the Delica"
+  },
+  {
+   "id": "pioneer",
+   "name": "Pioneer",
+   "idea": "Be on one of the first three runs of a brand-new tour"
+  },
+  {
+   "id": "pioneer5",
+   "name": "Trailblazer",
+   "idea": "Be on the first runs of 5 new tours"
+  },
+  {
+   "id": "planner",
+   "name": "Planner",
+   "idea": "Ask for a day off well in advance, 5 times"
+  },
+  {
+   "id": "polyglot",
+   "name": "Polyglot",
+   "idea": "Tours in 2 languages"
+  },
+  {
+   "id": "rest10",
+   "name": "Knows how to rest",
+   "idea": "10 approved days off"
+  },
+  {
+   "id": "rested",
+   "name": "Well rested",
+   "idea": "A day off in each of the last 3 months"
+  },
+  {
+   "id": "reviewer",
+   "name": "Honest scorer",
+   "idea": "Score 20 of your tours"
+  },
+  {
+   "id": "ritual",
+   "name": "Sunday ritual",
+   "idea": "Check your week on Sunday evening 10 times"
+  },
+  {
+   "id": "routes10",
+   "name": "Route master",
+   "idea": "Lead 10 different tours"
+  },
+  {
+   "id": "season80",
+   "name": "Season hero",
+   "idea": "80 tours in one high season"
+  },
+  {
+   "id": "seasons",
+   "name": "All seasons",
+   "idea": "Work in every month of the year"
+  },
+  {
+   "id": "seller",
+   "name": "Matchmaker",
+   "idea": "Offer another tour to guests 10 times"
+  },
+  {
+   "id": "sharpeye",
+   "name": "Sharp eye",
+   "idea": "3 pay questions where you were right"
+  },
+  {
+   "id": "smart",
+   "name": "Smart stop",
+   "idea": "25 tours through Gudauri. You know which supermarket is on the way."
+  },
+  {
+   "id": "solo10",
+   "name": "One-person crew",
+   "idea": "Guide and drive 10 tours yourself"
+  },
+  {
+   "id": "solo50",
+   "name": "Does it all",
+   "idea": "Guide and drive 50 tours yourself"
+  },
+  {
+   "id": "steel",
+   "name": "Nerves of steel",
+   "idea": "5 tours with a guest marked as a trouble maker"
+  },
+  {
+   "id": "t100",
+   "name": "100 tours",
+   "idea": "Complete 100 tours"
+  },
+  {
+   "id": "t250",
+   "name": "250 tours",
+   "idea": "Complete 250 tours"
+  },
+  {
+   "id": "t50",
+   "name": "50 tours",
+   "idea": "Complete 50 tours"
+  },
+  {
+   "id": "team",
+   "name": "Team player",
+   "idea": "Finish 10 tasks"
+  },
+  {
+   "id": "walk100",
+   "name": "Iron boots",
+   "idea": "Walk 100 km with guests"
+  },
+  {
+   "id": "walk42",
+   "name": "Marathon",
+   "idea": "Walk 42 km with guests on walking tours"
+  },
+  {
+   "id": "week5",
+   "name": "Busy week",
+   "idea": "5 tours in one week"
+  },
+  {
+   "id": "weekend",
+   "name": "Weekend warrior",
+   "idea": "20 tours on Saturday or Sunday"
+  },
+  {
+   "id": "welcome",
+   "name": "Welcome aboard",
+   "idea": "You opened Friendly Schedule for the first time. Glad you are with us."
+  },
+  {
+   "id": "wine",
+   "name": "Wine expert",
+   "idea": "20 tours to Kakheti or wine tours"
+  },
+  {
+   "id": "year150",
+   "name": "Year on the road",
+   "idea": "150 tours in one year"
+  },
+  {
+   "id": "newyear",
+   "name": "New Year shift",
+   "idea": "Worked on 31 December or 1–2 January"
+  },
+  {
+   "id": "snow",
+   "name": "Snow leopard",
+   "idea": "A mountain tour in winter"
+  },
+  {
+   "id": "comeback",
+   "name": "Comeback",
+   "idea": "A tour after more than 30 days away"
+  },
+  {
+   "id": "hattrick",
+   "name": "Hat-trick",
+   "idea": "Three tours in one day"
+  },
+  {
+   "id": "fri13",
+   "name": "Not superstitious",
+   "idea": "Worked on Friday the 13th"
+  },
+  {
+   "id": "sunrise",
+   "name": "Before the sun",
+   "idea": "A tour that starts before 06:00"
+  }
+ ]
+}
