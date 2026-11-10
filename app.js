@@ -359,6 +359,17 @@
   }
   // ---------- notification settings for this phone ----------
   const isIOS = () => /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  // Add to Home Screen: Android Chrome offers its own Install window (beforeinstallprompt); on iPhone Safari we show the two steps.
+  let installEvt = null; window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; try { render(); } catch (x) { /* not ready yet */ } });
+  window.addEventListener('appinstalled', () => { installEvt = null; try { render(); } catch (x) { /* fine */ } });
+  const isAndroid = () => /Android/i.test(navigator.userAgent);
+  const installHidden = () => { try { return Number(localStorage.getItem('fs-install-later') || 0) > Date.now(); } catch (e) { return false; } };
+  function installCardHtml(full) {
+    if (standalone()) return full ? `<div class="card f"><b>${T('install_title')}</b><span class="tag t-ok">${T('inst_done')}</span></div>` : '';
+    if (!full && installHidden()) return '';
+    const how = installEvt ? `<button class="btn primary" data-act="install">${T('inst_btn')}</button>` : isIOS() ? `<ol class="insteps"><li>${T('inst_ios1')}</li><li>${T('inst_ios2')}</li><li>${T('inst_ios3')}</li></ol>` : isAndroid() ? `<ol class="insteps"><li>${T('inst_and1')}</li><li>${T('inst_and2')}</li></ol>` : `<span class="muted">${T('install_text')}</span>`;
+    return `<div class="card f instcard"><b>${T('install_title')}</b><span class="muted">${T('inst_why')}</span>${how}${full ? '' : `<div class="bar"><span class="spacer"></span><button class="lnk" data-act="instlater">${T('inst_later')}</button></div>`}</div>`;
+  }
   const standalone = () => window.matchMedia && window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
   function notifCardHtml(perm) {
     const ready = !!CFG.vapidPublicKey && S.mode === 'supabase', sub = state.pushSub;
@@ -646,7 +657,7 @@
     const people = crew().filter(p => !state.mine || p.id === me().id);
     const title = state.mode === 'week' ? (days[0].slice(0, 7) === days[6].slice(0, 7) ? `${D(days[0]).getDate()}–${fmt(days[6], { day: 'numeric', month: 'short', year: 'numeric' })}` : `${fmt(days[0], { day: 'numeric', month: 'short' })} – ${fmt(days[6], { day: 'numeric', month: 'short', year: 'numeric' })}`) : fmt(state.date, { month: 'long', year: 'numeric' });
     if (!isAdmin() && state.mine && state.mode === 'week') return guideHomeHtml(days, title);
-    let h = `${state.newVersion ? `<button class="banner small setupban" data-act="reload"><span>${T('nv_text')}</span><b>${T('nv_btn')} ›</b></button>` : ''}${setupCard(true)}${nextHtml()}<div class="bar">
+    let h = `${state.newVersion ? `<button class="banner small setupban" data-act="reload"><span>${T('nv_text')}</span><b>${T('nv_btn')} ›</b></button>` : ''}${setupCard(true)}${window.matchMedia('(max-width:760px)').matches ? installCardHtml(false) : ''}${nextHtml()}<div class="bar">
       <div class="seg"><button data-act="mode" data-m="week" aria-pressed="${state.mode === 'week'}">${T('week')}</button><button data-act="mode" data-m="month" aria-pressed="${state.mode === 'month'}">${T('month')}</button></div>
       <div class="seg"><button data-act="mine" data-v="0" aria-pressed="${!state.mine}">${T('team')}</button><button data-act="mine" data-v="1" aria-pressed="${!!state.mine}">${T('mine')}</button></div>
       <span class="spacer"></span><button class="btn only-wide" data-act="summary">${T('day_summary')}</button>${isAdmin() ? `<button class="btn primary only-wide" data-act="newtour">+ ${T('tour')}</button><button class="btn primary fab only-phone" data-act="newtour" aria-label="${T('add_tour')}">+</button>` : ''}<span class="only-wide">${helpBtn()}</span></div>${helpBox('calendar')}
@@ -2133,22 +2144,19 @@
   function meHtml() {
     const m = me(), perm = ('Notification' in window) ? Notification.permission : 'unsupported', tab = state.meTab, mo = state.listMonth || today().slice(0, 7);
     const pd = db.payout_details.find(x => x.id === m.id) || {};
-    let h = `<div class="bar"><h2>${T('nav_me')}</h2><span class="spacer"></span>${helpBtn()}</div>${helpBox('me')}<div class="seg">${['profile', 'month', 'stats', 'badges'].map(x => `<button data-act="metab" data-v="${x}" aria-pressed="${tab === x}">${T('me_' + x)}</button>`).join('')}</div>`;
+    let h = `<div class="bar"><h2>${T('nav_me')}</h2><span class="spacer"></span>${helpBtn()}</div>${helpBox('me')}<div class="seg">${['profile', 'settings', 'month', 'stats', 'badges'].map(x => `<button data-act="metab" data-v="${x}" aria-pressed="${tab === x}">${T('me_' + x)}</button>`).join('')}</div>`;
     if (tab === 'month') { const pr = payRange(); return h + rangeBar() + (pr.month ? statementHtml(m.id, pr.month, false) : payRangeHtml(m.id, pr.from, pr.to, false)) + adviceHtml(m.id); }
     if (tab === 'stats') return h + statsHtml(isAdmin() ? (state.statUser || m.id) : m.id);
     if (tab === 'badges') return h + badgesHtml(m.id);
+    if (tab === 'settings') return h + settingsHtml(m, perm);
     return h + `<div class="cols"><div class="card f">
       <div class="row">${avatar(m.id, true)}<div><b>${esc(m.name)}</b> <span class="tag t-muted">${T('role_' + m.role)}</span>${m.email ? `<div class="muted small">${esc(m.email)}</div>` : ''}</div></div>
       <label>${T('photo')}<input type="file" id="me-photo" accept="image/*" data-ch="avatar"></label>
       <details class="sect avpick" ${state.avOpen ? 'open' : ''}><summary>${T('av_choose')}</summary>${(() => { const cur = avLib(m.avatar) || { icon: '', color: state.avColor || m.color || AV_COLORS[0] }, col = state.avColor || cur.color; return `<div class="avcols">${AV_COLORS.map(c => `<button type="button" class="avcol" data-act="avcolor" data-v="${c}" style="background:${c}" aria-pressed="${c === col}" aria-label="${c}"></button>`).join('')}</div><div class="avgrid">${AV_ICONS.map(k => `<button type="button" class="avopt" data-act="avpick" data-v="ms:${k}:${col}" aria-pressed="${cur.icon === k}" style="background:${col}">${msi(k)}</button>`).join('')}</div>${m.avatar ? `<button type="button" class="lnk" data-act="avpick" data-v="">${T('av_none')}</button>` : ''}`; })()}</details>
       <form class="f" data-form="mydetails" id="me-details"><b>${T('md_title')}</b><div class="two"><label>${T('phone')}<input name="phone" type="tel" value="${esc(m.phone || '')}" placeholder="+995…" autocomplete="tel"></label><label>${T('md_langs')}<input name="languages" value="${esc(m.languages || '')}" placeholder="EN, RU, KA"></label></div>${(rules().promos || {})[m.id] ? `<div class="tsum">${T('promo_mine', { code: rules().promos[m.id] })}</div>` : ''}<div class="actions"><button class="btn primary">${T('save')}</button></div></form>
-      <div class="f"><b>${T('ds_title')}</b>${displayHtml()}</div>
-      <label>${T('language')}<select id="me-lang" data-ch="lang">${opt('en', 'English', lang())}${opt('ru', 'Русский', lang())}${opt('ka', 'ქართული', lang())}</select></label>
-      ${notifCardHtml(perm)}<div class="checks col">${Object.keys(NOTE_GROUPS).map(g => `<label><input type="checkbox" id="mute-${g}" data-ch="mutepref" data-g="${g}" ${(m.mute || []).includes(g) ? '' : 'checked'}>${T('note_' + g)}</label>`).join('')}</div></div>
       <form class="f" data-form="mytg"><b>Telegram</b><span class="muted small">${T('tg_mine_text')}</span><div class="bar"><input class="inp" id="me-tg" name="telegram" value="${esc(m.telegram ? '@' + m.telegram : '')}" placeholder="@username" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1;min-width:150px"><button class="btn">${T('save')}</button></div></form>
       ${/^https:\/\/t\.me\//.test(rules().botUrl || '') || m.telegram_id ? `<div class="f"><b>${T('tg_title')}</b>${m.telegram_id ? `<span class="row"><span class="tag t-ok">${T('tg_on')}</span><span class="muted small">${T('tg_on_text')}</span></span>` : `<span class="muted small">${T('tg_text')}</span>${m.link_code ? `<div class="row"><b class="num tgcode">/link ${esc(m.link_code)}</b><button class="btn sm" data-act="copy" data-v="/link ${esc(m.link_code)}">${ico('copy')}${T('copy')}</button></div>` : ''}<div class="bar"><button class="btn sm" data-act="tgcode">${T(m.link_code ? 'tg_new' : 'tg_get')}</button>${/^https:\/\/t\.me\//.test(rules().botUrl || '') ? `<a class="btn sm" href="${esc(rules().botUrl)}" target="_blank" rel="noopener">${T('tg_open')}</a>` : ''}</div>`}</div>` : ''}
-      <details class="sect"><summary>${T('privacy_link')}</summary><p class="muted small">${T('privacy_text', { n: pv().guideDays })}</p></details>
-      <button class="btn" data-act="signout">${T('signout')}</button><span class="muted small num">${T('version')} ${APP_VERSION}${S.syncedAt ? ' · ' + T('updated_at', { time: new Intl.DateTimeFormat(LOCALES[lang()], { hour: '2-digit', minute: '2-digit' }).format(new Date(S.syncedAt)) }) : ''}</span></div>
+      </div>
       <div class="list">${(() => { const acc = String(pd.account || ''), has = !!(pd.bank_name || pd.holder || acc), mask = acc ? '•••• ' + acc.replace(/\s/g, '').slice(-4) : '—';
         return has && !state.payEdit ? `<div class="card f"><b>${T('payout')}</b><span class="muted small">${T('payout_safe')}</span><dl class="fields"><dt>${T('bank_name')}</dt><dd>${esc(pd.bank_name || '—')}</dd><dt>${T('holder')}</dt><dd>${esc(pd.holder || '—')}</dd><dt>${T('account')}</dt><dd class="num">${esc(mask)}</dd></dl><div class="actions"><button class="btn" data-act="payshow">${T('edit')}</button></div></div>`
         : `<form class="card f" data-form="payout"><b>${T('payout')}</b><span class="muted small">${T('payout_safe')}</span><label>${T('bank_name')}<input id="pd-bank" name="bank_name" value="${esc(pd.bank_name || '')}" autocomplete="off"></label><label>${T('holder')}<input id="pd-holder" name="holder" value="${esc(pd.holder || '')}" autocomplete="off"></label><label>${T('account')}<input id="pd-acc" name="account" value="${esc(acc)}" autocomplete="off" autocapitalize="characters" spellcheck="false"></label><div class="actions">${has ? `<button type="button" class="btn" data-act="payshow">${T('close')}</button>` : ''}<button class="btn primary">${T('save')}</button></div></form>`; })()}
@@ -2156,7 +2164,17 @@
       <div class="card f"><b>${T('pd_title')}</b><span class="muted small">${T('pd_text')}</span>${db.personal_dates.filter(x => x.user_id === m.id).sort((x, y) => x.date.slice(5).localeCompare(y.date.slice(5))).map(x => `<div class="row"><span class="tag t-group">${esc(x.title)}</span><span class="num">${esc(fmt(x.date, x.yearly ? { day: 'numeric', month: 'long' } : { day: 'numeric', month: 'long', year: 'numeric' }))}</span>${x.yearly ? `<span class="muted small">${T('pd_yearly')}</span>` : ''}<span class="spacer"></span><button class="btn sm" data-act="pdel" data-id="${x.id}">${T('remove')}</button></div>`).join('')}
         <form class="bar" data-form="pdate"><input class="inp" id="pd-title" name="title" placeholder="${T('pd_name')}" required style="flex:1;min-width:140px"><input class="inp" id="pd-date" name="date" type="date" required style="max-width:170px"><label style="flex-direction:row;align-items:center;gap:6px;color:var(--ink)"><input type="checkbox" id="pd-yearly" name="yearly" style="width:auto">${T('pd_yearly')}</label><button class="btn">+ ${T('add')}</button></form></div>
       <div class="card f"><b>${T('contacts')}</b>${staff().filter(p => p.phone || tgUser(p.telegram)).map(p => `<div class="row nw">${avatar(p.id)}<span class="row grow-l"><span>${esc(p.name)}</span><span class="muted small">${T('role_' + p.role)}</span></span>${staffBtns(p, true)}</div>`).join('') || `<span class="muted small">${T('no_contacts')}</span>`}</div>
-      ${m.role === 'guide' ? myToursHtml(m) : ''}<div class="card f"><b>${T('install_title')}</b><span class="muted small">${T('install_text')}</span></div></div></div>`;
+      ${m.role === 'guide' ? myToursHtml(m) : ''}</div></div>`;
+  }
+  // App settings, apart from the profile: how the app looks on this phone, language, notifications, install, privacy, sign out.
+  function settingsHtml(m, perm) {
+    return `<div class="cols"><div class="card f">
+      <div class="f"><b>${T('ds_title')}</b>${displayHtml()}</div>
+      <label>${T('language')}<select id="me-lang" data-ch="lang">${opt('en', 'English', lang())}${opt('ru', 'Русский', lang())}${opt('ka', 'ქართული', lang())}</select></label>
+      ${notifCardHtml(perm)}<div class="checks col">${Object.keys(NOTE_GROUPS).map(g => `<label><input type="checkbox" id="mute-${g}" data-ch="mutepref" data-g="${g}" ${(m.mute || []).includes(g) ? '' : 'checked'}>${T('note_' + g)}</label>`).join('')}</div></div>
+      </div><div class="list">${installCardHtml(true)}<div class="card f">
+      <details class="sect"><summary>${T('privacy_link')}</summary><p class="muted small">${T('privacy_text', { n: pv().guideDays })}</p></details>
+      <button class="btn" data-act="signout">${T('signout')}</button><span class="muted small num">${T('version')} ${APP_VERSION}${S.syncedAt ? ' · ' + T('updated_at', { time: new Intl.DateTimeFormat(LOCALES[lang()], { hour: '2-digit', minute: '2-digit' }).format(new Date(S.syncedAt)) }) : ''}</span></div></div></div>`;
   }
   function bellHtml() {
     const ns = myNotes().slice(0, 40);
@@ -2341,6 +2359,8 @@
     },
     // The phone's own share sheet (WhatsApp, Telegram, Messages, ...); WhatsApp link where the browser has none.
     reload() { location.reload(); },
+    async install() { if (!installEvt) return; installEvt.prompt(); try { await installEvt.userChoice; } catch (e) { /* closed */ } installEvt = null; render(); },
+    instlater() { try { localStorage.setItem('fs-install-later', String(Date.now() + 7 * 86400000)); } catch (e) { /* private mode */ } render(); },
     mtskip() { state.mtSkip = true; render(); },
     testinfo() { state.modal = { type: 'test', back: state.modal }; renderModal(); },
     async share(el) {
@@ -2665,16 +2685,19 @@
   });
   S.authEvent = ev => { if (ev === 'PASSWORD_RECOVERY') { state.auth = 'newpass'; render(); } };
   // Text size, colours and contrast: kept on this phone and on the account, so they follow the person to another phone.
-  const DKEYS = { fs: 'fs-fsize', theme: 'fs-theme', contrast: 'fs-contrast' };
+  const DKEYS = { fs: 'fs-fsize', theme: 'fs-theme', contrast: 'fs-contrast', accent: 'fs-accent' };
+  const ACCENTS = [['', '#f0901e'], ['sky', '#5aa9e6'], ['mint', '#45b88a'], ['lilac', '#b39ddb'], ['rose', '#f28fad'], ['sun', '#f2c94c']];
   const dget = k => { try { return localStorage.getItem(DKEYS[k]) || ''; } catch (e) { return ''; } };
+  document.documentElement.dataset.os = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ? 'ios' : /Android/i.test(navigator.userAgent) ? 'android' : 'other';
   function applyDisplay() { const r = document.documentElement; Object.keys(DKEYS).forEach(k => { const v = dget(k); if (v) r.dataset[k] = v; else delete r.dataset[k]; }); }
-  function setDisplay(k, v, keepAccount) { try { localStorage.setItem(DKEYS[k], v); localStorage.setItem('fs-display-set', '1'); } catch (e) { /* private mode */ } applyDisplay(); if (!keepAccount && me() && S.mode === 'supabase') { const d = { ...((me().display && typeof me().display === 'object') ? me().display : {}), fs: dget('fs'), theme: dget('theme'), contrast: dget('contrast') }; S.save('profiles', { ...stripEmail(me()), display: d }).catch(() => { /* stays on this phone */ }); } }
+  function setDisplay(k, v, keepAccount) { try { localStorage.setItem(DKEYS[k], v); localStorage.setItem('fs-display-set', '1'); } catch (e) { /* private mode */ } applyDisplay(); if (!keepAccount && me() && S.mode === 'supabase') { const d = { ...((me().display && typeof me().display === 'object') ? me().display : {}), fs: dget('fs'), theme: dget('theme'), contrast: dget('contrast'), accent: dget('accent') }; S.save('profiles', { ...stripEmail(me()), display: d }).catch(() => { /* stays on this phone */ }); } }
   function displayFromAccount() { try { if (localStorage.getItem('fs-display-set')) return; } catch (e) { return; } const d = me() && me().display; if (d && typeof d === 'object') { Object.keys(DKEYS).forEach(k => { if (d[k]) setDisplay(k, d[k], true); }); } }
   function displayHtml() {
     const seg = (k, opts) => `<div class="seg wrap">${opts.map(([v, l]) => `<button data-act="dset" data-k="${k}" data-v="${v}" aria-pressed="${dget(k) === v}">${l}</button>`).join('')}</div>`;
     return `<span class="muted small">${T('ds_size')}</span>${seg('fs', [['s', T('ds_small')], ['', T('ds_normal')], ['l', T('ds_big')], ['xl', T('ds_xl')]])}
       <span class="muted small">${T('ds_theme')}</span>${seg('theme', [['', T('ds_system')], ['light', T('ds_light')], ['dark', T('ds_dark')]])}
-      <span class="muted small">${T('ds_contrast')}</span>${seg('contrast', [['', T('ds_c_normal')], ['high', T('ds_c_high')]])}<span class="muted small">${T('ds_hint')}</span>`;
+      <span class="muted small">${T('ds_contrast')}</span>${seg('contrast', [['', T('ds_c_normal')], ['high', T('ds_c_high')]])}
+      <span class="muted small">${T('ds_accent')}</span><div class="accents">${ACCENTS.map(([v, c]) => `<button class="acc" data-act="dset" data-k="accent" data-v="${v}" style="background:${c}" aria-pressed="${dget('accent') === v}" aria-label="${T('ds_acc_' + (v || 'orange'))}" title="${T('ds_acc_' + (v || 'orange'))}"></button>`).join('')}</div><span class="muted small">${T('ds_hint')}</span>`;
   }
   applyDisplay();
   (async () => {

@@ -645,7 +645,38 @@ button[aria-busy="true"]::after{content:"";position:absolute;left:50%;top:50%;wi
 /* sheets slide up, screens fade in; nothing moves with reduced motion */
 .overlay .sheet{animation:fsup .22s cubic-bezier(.2,0,0,1)}
 @keyframes fsup{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}
-main{animation:fsfade .18s ease-out}
-@keyframes fsfade{from{opacity:.4}to{opacity:1}}
 button,a{-webkit-tap-highlight-color:transparent}
-@media (prefers-reduced-motion:reduce){html.busy body::after,html.syncing body::after,.overlay .sheet,main,button[aria-busy="true"]::after{animation:none}}
+@media (prefers-reduced-motion:reduce){html.busy body::after,html.syncing body::after,overlay-x,.overlay .sheet,button[aria-busy="true"]::after{animation:none}}
+/* Personal colour of buttons (Me > Settings). Dark text stays readable on every one (6:1 or better). */
+html[data-accent="sky"]{--accent:#5aa9e6;--accent-soft:#e1eef9}
+html[data-accent="mint"]{--accent:#45b88a;--accent-soft:#dcf1e7}
+html[data-accent="lilac"]{--accent:#b39ddb;--accent-soft:#ece6f6}
+html[data-accent="rose"]{--accent:#f28fad;--accent-soft:#fbe4eb}
+html[data-accent="sun"]{--accent:#f2c94c;--accent-soft:#fbf1d2}
+@media (prefers-color-scheme:dark){html:not([data-theme="light"])[data-accent]{--accent-soft:color-mix(in srgb,var(--accent) 22%,#201f1b)}}
+html[data-theme="dark"][data-accent]{--accent-soft:color-mix(in srgb,var(--accent) 22%,#201f1b)}
+.accents{display:flex;flex-wrap:wrap;gap:12px}
+.acc{width:44px;height:44px;border-radius:50%;border:3px solid transparent;padding:0;box-shadow:inset 0 0 0 2px var(--surface)}
+.acc[aria-pressed="true"]{border-color:var(--ink)}
+/* Add to Home Screen */
+.instcard{border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+.insteps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:6px;font-size:var(--t-body)}
+/* Phone conventions: iPhone sheets get the grab handle; Android buttons darken when pressed (Material) */
+html[data-os="ios"] .overlay .sheet::before{content:"";display:block;width:40px;height:5px;border-radius:3px;background:var(--line);margin:-4px auto 10px}
+html[data-os="android"] .btn:active,html[data-os="android"] .iconbtn:active,html[data-os="android"] .tabs button:active{background:color-mix(in srgb,var(--ink) 10%,var(--surface))}
+/* Small and older phones (320–360 px wide) */
+@media (max-width:360px){
+  :root{--gut:max(10px,env(safe-area-inset-left,0px));--gutr:max(10px,env(safe-area-inset-right,0px))}
+  .tabs button{font-size:10px;padding:6px 0}
+  .strip{gap:2px}.strip button{padding:4px 0}
+  .brand{font-size:var(--t-body)}
+  .sugrow{grid-template-columns:1fr}
+  .stats{grid-template-columns:1fr 1fr}
+  h2,.bar h2,.sheet h2{font-size:18px}
+}
+/* Browsers without color-mix (phones older than about 2023): keep borders and cards visible */
+@supports not (color:color-mix(in srgb,red 50%,blue)){
+  .acard,.card,.tag,.chip,.sugc,.tsum{border:1px solid var(--line)}
+  .acard{background:var(--surface)}
+  .tag{background:var(--surface);color:var(--ink)}
+}
