@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.11';
+  const APP_VERSION = '3.12';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -1458,10 +1458,13 @@
       ${k.notes ? `<div class="muted small">${esc(k.notes)}</div>` : ''}${k.status === 'done' && k.done_by ? `<div class="muted small">${T('done_by', { name: pname(k.done_by) })}</div>` : ''}</div>`;
   }
   // Getting started: what each person does once. Shown in Tasks and as a reminder on the calendar, ticked by itself when done.
+  const botOn = () => /^https:\/\/t\.me\//.test(rules().botUrl || '');
   function setupSteps(p = me()) {
     if (!p || S.mode !== 'supabase' && !window.__fsSetupDemo) return [];
     const st = [{ k: 'details', done: !!(p.phone && String(p.languages || '').trim()) }, { k: 'photo', done: !!p.avatar }];
     if (p.role === 'guide') st.push({ k: 'tours', done: !!((p.display || {}).toursOk) });
+    // Telegram: with the bot set up, the step is linking the bot (tours, changes and free-tour offers arrive there); otherwise the username.
+    st.push({ k: 'tg', done: botOn() ? !!p.telegram_id : !!p.telegram });
     return st;
   }
   function setupCard(compact) {
@@ -2243,7 +2246,7 @@
       <details class="sect avpick" ${state.avOpen ? 'open' : ''}><summary>${T('av_choose')}</summary>${(() => { const cur = avLib(m.avatar) || { icon: '', color: state.avColor || m.color || AV_COLORS[0] }, col = state.avColor || cur.color; return `<div class="avcols">${AV_COLORS.map(c => `<button type="button" class="avcol" data-act="avcolor" data-v="${c}" style="background:${c}" aria-pressed="${c === col}" aria-label="${c}"></button>`).join('')}</div><div class="avgrid">${AV_ICONS.map(k => `<button type="button" class="avopt" data-act="avpick" data-v="ms:${k}:${col}" aria-pressed="${cur.icon === k}" style="background:${col}">${msi(k)}</button>`).join('')}</div>${m.avatar ? `<button type="button" class="lnk" data-act="avpick" data-v="">${T('av_none')}</button>` : ''}`; })()}</details>
       <form class="f" data-form="mydetails" id="me-details"><b>${T('md_title')}</b><div class="two"><label>${T('phone')}<input name="phone" type="tel" value="${esc(m.phone || '')}" placeholder="+995…" autocomplete="tel"></label><label>${T('md_langs')}<input name="languages" value="${esc(m.languages || '')}" placeholder="EN, RU, KA"></label></div>${(rules().promos || {})[m.id] ? `<div class="tsum">${T('promo_mine', { code: rules().promos[m.id] })}</div>` : ''}<div class="actions"><button class="btn qsave">${T('save')}</button></div></form>
       <form class="f" data-form="mytg"><b>Telegram</b><span class="muted small">${T('tg_mine_text')}</span><div class="bar"><input class="inp" id="me-tg" name="telegram" value="${esc(m.telegram ? '@' + m.telegram : '')}" placeholder="@username" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1;min-width:150px"><button class="btn qsave">${T('save')}</button></div></form>
-      ${/^https:\/\/t\.me\//.test(rules().botUrl || '') || m.telegram_id ? `<div class="f"><b>${T('tg_title')}</b>${m.telegram_id ? `<span class="row"><span class="tag t-ok">${T('tg_on')}</span><span class="muted small">${T('tg_on_text')}</span></span>` : `<span class="muted small">${T('tg_text')}</span>${m.link_code ? `<div class="row"><b class="num tgcode">/link ${esc(m.link_code)}</b><button class="btn sm" data-act="copy" data-v="/link ${esc(m.link_code)}">${ico('copy')}${T('copy')}</button></div>` : ''}<div class="bar"><button class="btn sm" data-act="tgcode">${T(m.link_code ? 'tg_new' : 'tg_get')}</button>${/^https:\/\/t\.me\//.test(rules().botUrl || '') ? `<a class="btn sm" href="${esc(rules().botUrl)}" target="_blank" rel="noopener">${T('tg_open')}</a>` : ''}</div>`}</div>` : ''}
+      ${/^https:\/\/t\.me\//.test(rules().botUrl || '') || m.telegram_id ? `<div class="f" id="me-tgbot"><b>${T('tg_title')}</b>${m.telegram_id ? `<span class="row"><span class="tag t-ok">${T('tg_on')}</span><span class="muted small">${T('tg_on_text')}</span></span>` : `<span class="muted small">${T('tg_text')}</span>${m.link_code ? `<div class="row"><b class="num tgcode">/link ${esc(m.link_code)}</b><button class="btn sm" data-act="copy" data-v="/link ${esc(m.link_code)}">${ico('copy')}${T('copy')}</button></div>` : ''}<div class="bar"><button class="btn sm" data-act="tgcode">${T(m.link_code ? 'tg_new' : 'tg_get')}</button>${/^https:\/\/t\.me\//.test(rules().botUrl || '') ? `<a class="btn sm" href="${esc(rules().botUrl)}" target="_blank" rel="noopener">${T('tg_open')}</a>` : ''}</div>`}</div>` : ''}
       </div>
       <div class="card f"><b>${T('pd_title')}</b><span class="muted small">${T('pd_text')}</span>${db.personal_dates.filter(x => x.user_id === m.id).sort((x, y) => x.date.slice(5).localeCompare(y.date.slice(5))).map(x => `<div class="row"><span class="tag t-group">${esc(x.title)}</span><span class="num">${esc(fmt(x.date, x.yearly ? { day: 'numeric', month: 'long' } : { day: 'numeric', month: 'long', year: 'numeric' }))}</span>${x.yearly ? `<span class="muted small">${T('pd_yearly')}</span>` : ''}<span class="spacer"></span><button class="btn sm" data-act="pdel" data-id="${x.id}">${T('remove')}</button></div>`).join('')}
         <form class="bar" data-form="pdate"><input class="inp" id="pd-title" name="title" placeholder="${T('pd_name')}" required style="flex:1;min-width:140px"><input class="inp num" id="pd-date" name="date" type="text" inputmode="numeric" autocomplete="off" required placeholder="${T('pd_date_ph')}" style="max-width:170px"><label class="pdy"><input type="checkbox" id="pd-yearly" name="yearly">${T('pd_yearly')}</label><button class="btn">+ ${T('add')}</button></form></div>
@@ -2504,7 +2507,7 @@
     balm(el) { const mo = state.balMonth || today().slice(0, 7), d = new Date(Number(mo.slice(0, 4)), Number(mo.slice(5, 7)) - 1 + Number(el.dataset.d), 1); state.balMonth = iso(d).slice(0, 7); render(); },
     avcolor(el) { state.avColor = el.dataset.v; state.avOpen = true; render(); },
     avpick(el) { state.avOpen = false; run(() => S.save('profiles', { ...stripEmail(me()), avatar: el.dataset.v || null }), T('saved')); },
-    gosetup(el) { const k = el.dataset.k || (setupSteps().find(x => !x.done) || {}).k; state.view = 'me'; state.meTab = 'profile'; if (k === 'photo') state.avOpen = true; render(); const x = document.getElementById(k === 'tours' ? 'me-tours' : k === 'photo' ? 'me-photo' : 'me-details'); if (x) x.scrollIntoView({ block: 'center', behavior: 'smooth' }); },
+    gosetup(el) { const k = el.dataset.k || (setupSteps().find(x => !x.done) || {}).k; state.view = 'me'; state.meTab = 'profile'; if (k === 'photo') state.avOpen = true; render(); const x = document.getElementById(k === 'tours' ? 'me-tours' : k === 'photo' ? 'me-photo' : k === 'tg' ? (document.getElementById('me-tgbot') ? 'me-tgbot' : 'me-tg') : 'me-details'); if (x) x.scrollIntoView({ block: 'center', behavior: 'smooth' }); },
     async mytoursok() {
       const m = me(), list = catalog().filter(c => c.id), was = new Set((m.skills || []).length ? m.skills : list.map(c => String(c.id))), now = state.myTours || was;
       const add = list.filter(c => now.has(String(c.id)) && !was.has(String(c.id))).map(c => c.title), drop = list.filter(c => !now.has(String(c.id)) && was.has(String(c.id))).map(c => c.title);

@@ -259,3 +259,6 @@ Design clean-up of **Me > Profile** (method: unslop by @heydamir, CC BY 4.0). No
 - Me tabs stay on one row on phones (swipe sideways for the rest).
 - Bigger taps and text for older phones: 24px check boxes with the whole row tappable, 40px colour dots, 12px labels in the bottom menu.
 - Spacing on a 4px grid across cards, fields, tags and lists; card headings a little lighter (600).
+
+## 3.12
+- Getting started (Tasks) has a fourth step: **Connect Telegram**. With the bot link set in Back office > Rules it is done once the person links the bot (/link code), otherwise once the Telegram username is saved. Tapping it opens the right place in Me.
