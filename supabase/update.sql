@@ -1,4 +1,4 @@
--- Friendly Schedule: ONE update with everything added since the first setup (versions 2.4 to 3.3).
+-- Friendly Schedule: ONE update with everything added since the first setup (versions 2.4 to 3.4).
 -- Safe to run more than once. Paste all of it into Supabase > SQL Editor and press Run.
 
 -- 2.4 Telegram username; 2.5 badges already celebrated (so the welcome badge shows once per account)
@@ -71,3 +71,139 @@ begin
 end $$;
 revoke all on function public.merge_clients(uuid, uuid[]) from public;
 grant execute on function public.merge_clients(uuid, uuid[]) to authenticated;
+
+-- 3.4 Faster reads. Each access rule now runs once per request instead of once for every row,
+-- so long guest lists no longer stop with "statement timeout".
+create or replace function public.my_tour_ids() returns setof uuid
+language sql stable security definer set search_path = public as $$
+  select id from public.tours
+  where public.app_role() is not null and (guide_id = auth.uid() or driver_id = auth.uid())
+    and coalesce(date_to, date) >= current_date - public.guest_days()
+$$;
+create or replace function public.my_client_ids() returns setof uuid
+language sql stable security definer set search_path = public as $$
+  select distinct b.client_id from public.bookings b
+  where b.client_id is not null and b.tour_id in (select public.my_tour_ids())
+$$;
+grant execute on function public.my_tour_ids() to authenticated;
+grant execute on function public.my_client_ids() to authenticated;
+drop policy if exists profiles_read on public.profiles;
+create policy profiles_read on public.profiles for select to authenticated using (id = (select auth.uid()) or (select public.app_role()) is not null);
+drop policy if exists profiles_update_own on public.profiles;
+create policy profiles_update_own on public.profiles for update to authenticated using (id = (select auth.uid())) with check (id = (select auth.uid()));
+drop policy if exists profiles_admin on public.profiles;
+create policy profiles_admin on public.profiles for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
+drop policy if exists tours_read on public.tours;
+create policy tours_read on public.tours for select to authenticated using ((select public.app_role()) is not null);
+drop policy if exists tours_admin on public.tours;
+create policy tours_admin on public.tours for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
+drop policy if exists bookings_read on public.bookings;
+create policy bookings_read on public.bookings for select to authenticated using ((select public.is_admin()) or tour_id in (select public.my_tour_ids()));
+drop policy if exists bookings_attendance on public.bookings;
+create policy bookings_attendance on public.bookings for update to authenticated using (public.on_tour(tour_id)) with check (public.on_tour(tour_id));
+drop policy if exists bookings_admin on public.bookings;
+create policy bookings_admin on public.bookings for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
+drop policy if exists clients_read on public.clients;
+create policy clients_read on public.clients for select to authenticated using ((select public.is_admin()) or id in (select public.my_client_ids()));
+drop policy if exists clients_admin on public.clients;
+create policy clients_admin on public.clients for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
+drop policy if exists ratings_read on public.client_ratings;
+create policy ratings_read on public.client_ratings for select to authenticated using ((select public.is_admin()) or client_id in (select public.my_client_ids()));
+drop policy if exists ratings_delete_own on public.client_ratings;
+create policy ratings_delete_own on public.client_ratings for delete to authenticated using (user_id = (select auth.uid()) and rating in ('like','dislike'));
+drop policy if exists ratings_insert on public.client_ratings;
+create policy ratings_insert on public.client_ratings for insert to authenticated with check (user_id = (select auth.uid()) and client_id in (select public.my_client_ids()));
+drop policy if exists ratings_admin on public.client_ratings;
+create policy ratings_admin on public.client_ratings for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
+drop policy if exists scores_read on public.tour_ratings;
+create policy scores_read on public.tour_ratings for select to authenticated using ((select public.is_admin()) or user_id = (select auth.uid()));
+drop policy if exists scores_insert on public.tour_ratings;
+create policy scores_insert on public.tour_ratings for insert to authenticated with check (user_id = (select auth.uid()) and public.on_tour(tour_id));
+drop policy if exists scores_update on public.tour_ratings;
+create policy scores_update on public.tour_ratings for update to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
+drop policy if exists scores_admin on public.tour_ratings;
+create policy scores_admin on public.tour_ratings for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
+drop policy if exists app_errors_add on public.app_errors;
+create policy app_errors_add on public.app_errors for insert to authenticated with check (user_id = (select auth.uid()));
+drop policy if exists app_errors_admin_read on public.app_errors;
+create policy app_errors_admin_read on public.app_errors for select to authenticated using ((select public.is_admin()));
+drop policy if exists app_errors_admin_clear on public.app_errors;
+create policy app_errors_admin_clear on public.app_errors for delete to authenticated using ((select public.is_admin()));
+drop policy if exists payout_own on public.payout_details;
+create policy payout_own on public.payout_details for all to authenticated using (id = (select auth.uid())) with check (id = (select auth.uid()));
+drop policy if exists payout_admin on public.payout_details;
+create policy payout_admin on public.payout_details for select to authenticated using ((select public.is_admin()));
+drop policy if exists log_insert on public.log;
+create policy log_insert on public.log for insert to authenticated with check ((select public.app_role()) is not null and user_id = (select auth.uid()));
+drop policy if exists log_read on public.log;
+create policy log_read on public.log for select to authenticated using ((select public.is_admin()));
+drop policy if exists creq_read on public.change_requests;
+create policy creq_read on public.change_requests for select to authenticated using ((select public.is_admin()) or user_id = (select auth.uid()) or swap_with = (select auth.uid()));
+drop policy if exists creq_answer on public.change_requests;
+create policy creq_answer on public.change_requests for update to authenticated using (swap_with = (select auth.uid()) and status = 'pending') with check (swap_with = (select auth.uid()));
+drop policy if exists creq_insert on public.change_requests;
+create policy creq_insert on public.change_requests for insert to authenticated with check (user_id = (select auth.uid()) and status = 'pending' and public.on_tour(tour_id));
+drop policy if exists creq_admin on public.change_requests;
+create policy creq_admin on public.change_requests for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
+drop policy if exists adj_read on public.pay_adjustments;
+create policy adj_read on public.pay_adjustments for select to authenticated using ((select public.is_admin()) or user_id = (select auth.uid()));
+drop policy if exists adj_admin on public.pay_adjustments;
+create policy adj_admin on public.pay_adjustments for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
+drop policy if exists disputes_read on public.pay_disputes;
+create policy disputes_read on public.pay_disputes for select to authenticated using ((select public.is_admin()) or user_id = (select auth.uid()));
+drop policy if exists disputes_insert on public.pay_disputes;
+create policy disputes_insert on public.pay_disputes for insert to authenticated with check (user_id = (select auth.uid()) and status = 'open' and reply is null and public.on_tour(tour_id));
+drop policy if exists disputes_admin on public.pay_disputes;
+create policy disputes_admin on public.pay_disputes for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
+drop policy if exists costs_admin on public.tour_costs;
+create policy costs_admin on public.tour_costs for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
+drop policy if exists pdates_own on public.personal_dates;
+create policy pdates_own on public.personal_dates for all to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
+drop policy if exists pdates_admin on public.personal_dates;
+create policy pdates_admin on public.personal_dates for select to authenticated using ((select public.is_admin()));
+drop policy if exists usage_insert on public.usage;
+create policy usage_insert on public.usage for insert to authenticated with check (user_id = (select auth.uid()) and (select public.app_role()) is not null);
+drop policy if exists usage_read on public.usage;
+create policy usage_read on public.usage for select to authenticated using ((select public.is_admin()));
+drop policy if exists offers_insert on public.offers;
+create policy offers_insert on public.offers for insert to authenticated with check (user_id = (select auth.uid()) and (select public.app_role()) is not null);
+drop policy if exists offers_read on public.offers;
+create policy offers_read on public.offers for select to authenticated using ((select public.is_admin()) or user_id = (select auth.uid()));
+drop policy if exists off_read on public.time_off;
+create policy off_read on public.time_off for select to authenticated using ((select public.app_role()) is not null);
+drop policy if exists off_insert_own on public.time_off;
+create policy off_insert_own on public.time_off for insert to authenticated
+  with check ((select public.app_role()) is not null and user_id = (select auth.uid()) and (status = 'pending' or type = 'sick'));
+drop policy if exists off_delete_own on public.time_off;
+create policy off_delete_own on public.time_off for delete to authenticated using (user_id = (select auth.uid()) and status = 'pending');
+drop policy if exists off_admin on public.time_off;
+create policy off_admin on public.time_off for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
+drop policy if exists holidays_read on public.holidays;
+create policy holidays_read on public.holidays for select to authenticated using ((select public.app_role()) is not null);
+drop policy if exists holidays_admin on public.holidays;
+create policy holidays_admin on public.holidays for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
+drop policy if exists tasks_read on public.tasks;
+create policy tasks_read on public.tasks for select to authenticated using ((select public.is_admin()) or (select auth.uid()) = any(assignees));
+drop policy if exists tasks_update_mine on public.tasks;
+create policy tasks_update_mine on public.tasks for update to authenticated using ((select auth.uid()) = any(assignees)) with check ((select auth.uid()) = any(assignees));
+drop policy if exists tasks_week_own on public.tasks;
+create policy tasks_week_own on public.tasks for insert to authenticated
+  with check ((select public.app_role()) is not null and kind = 'week_check' and created_by = (select auth.uid()) and assignees = array[(select auth.uid())] and tour_id is null and status = 'open');
+drop policy if exists tasks_admin on public.tasks;
+create policy tasks_admin on public.tasks for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
+drop policy if exists notes_read on public.notifications;
+create policy notes_read on public.notifications for select to authenticated using (user_id = (select auth.uid()));
+drop policy if exists notes_insert on public.notifications;
+create policy notes_insert on public.notifications for insert to authenticated with check ((select public.app_role()) is not null);
+drop policy if exists notes_update on public.notifications;
+create policy notes_update on public.notifications for update to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
+drop policy if exists notes_delete on public.notifications;
+create policy notes_delete on public.notifications for delete to authenticated using (user_id = (select auth.uid()));
+drop policy if exists settings_read on public.settings;
+create policy settings_read on public.settings for select to authenticated using ((select public.app_role()) is not null);
+drop policy if exists settings_admin on public.settings;
+create policy settings_admin on public.settings for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
+drop policy if exists invites_admin on public.invites;
+create policy invites_admin on public.invites for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
+drop policy if exists push_own on public.push_subscriptions;
+create policy push_own on public.push_subscriptions for all to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));

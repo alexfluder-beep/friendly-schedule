@@ -236,6 +236,20 @@ language sql stable security definer set search_path = public as $$
     where b.client_id = c and (t.guide_id = auth.uid() or t.driver_id = auth.uid())
       and coalesce(t.date_to, t.date) >= current_date - public.guest_days()))
 $$;
+-- 3.4 Fast access lists: worked out once per request, not once per row (keeps big guest lists from timing out)
+create or replace function public.my_tour_ids() returns setof uuid
+language sql stable security definer set search_path = public as $$
+  select id from public.tours
+  where public.app_role() is not null and (guide_id = auth.uid() or driver_id = auth.uid())
+    and coalesce(date_to, date) >= current_date - public.guest_days()
+$$;
+create or replace function public.my_client_ids() returns setof uuid
+language sql stable security definer set search_path = public as $$
+  select distinct b.client_id from public.bookings b
+  where b.client_id is not null and b.tour_id in (select public.my_tour_ids())
+$$;
+grant execute on function public.my_tour_ids() to authenticated;
+grant execute on function public.my_client_ids() to authenticated;
 -- New sign-ups: if the admin already added this email (Back office > Team > Add person), the person gets
 -- their role and access at once. Anyone else gets a profile with no access until an admin gives it.
 create or replace function public.handle_new_user() returns trigger
@@ -475,100 +489,100 @@ alter table public.pay_disputes enable row level security;
 alter table public.tour_costs enable row level security;
 
 -- profiles: everyone with access sees the team; you always see your own row
-create policy profiles_read on public.profiles for select to authenticated using (id = auth.uid() or public.app_role() is not null);
-create policy profiles_update_own on public.profiles for update to authenticated using (id = auth.uid()) with check (id = auth.uid());
-create policy profiles_admin on public.profiles for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy profiles_read on public.profiles for select to authenticated using (id = (select auth.uid()) or (select public.app_role()) is not null);
+create policy profiles_update_own on public.profiles for update to authenticated using (id = (select auth.uid())) with check (id = (select auth.uid()));
+create policy profiles_admin on public.profiles for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
 
 -- tours: the whole team sees the calendar; only admins change it
-create policy tours_read on public.tours for select to authenticated using (public.app_role() is not null);
-create policy tours_admin on public.tours for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy tours_read on public.tours for select to authenticated using ((select public.app_role()) is not null);
+create policy tours_admin on public.tours for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
 
 -- bookings hold guest names and phones: admins, plus the guide and driver on that tour, and only around the tour dates
-create policy bookings_read on public.bookings for select to authenticated using (public.can_see_guests(tour_id));
+create policy bookings_read on public.bookings for select to authenticated using ((select public.is_admin()) or tour_id in (select public.my_tour_ids()));
 create policy bookings_attendance on public.bookings for update to authenticated using (public.on_tour(tour_id)) with check (public.on_tour(tour_id));
-create policy bookings_admin on public.bookings for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy bookings_admin on public.bookings for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
 
 -- clients: admins, plus guides and drivers who have this guest on a current or recent tour
-create policy clients_read on public.clients for select to authenticated using (public.can_see_client(id));
-create policy clients_admin on public.clients for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy clients_read on public.clients for select to authenticated using ((select public.is_admin()) or id in (select public.my_client_ids()));
+create policy clients_admin on public.clients for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
 -- guest ratings: a guide or driver rates guests from their own tours; ratings cannot be edited afterwards
-create policy ratings_read on public.client_ratings for select to authenticated using (public.can_see_client(client_id));
-create policy ratings_delete_own on public.client_ratings for delete to authenticated using (user_id = auth.uid() and rating in ('like','dislike'));
-create policy ratings_insert on public.client_ratings for insert to authenticated with check (user_id = auth.uid() and public.can_see_client(client_id));
-create policy ratings_admin on public.client_ratings for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy ratings_read on public.client_ratings for select to authenticated using ((select public.is_admin()) or client_id in (select public.my_client_ids()));
+create policy ratings_delete_own on public.client_ratings for delete to authenticated using (user_id = (select auth.uid()) and rating in ('like','dislike'));
+create policy ratings_insert on public.client_ratings for insert to authenticated with check (user_id = (select auth.uid()) and client_id in (select public.my_client_ids()));
+create policy ratings_admin on public.client_ratings for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
 
 -- tour scores 0-10: you score tours you worked on; only you and admins see your score
-create policy scores_read on public.tour_ratings for select to authenticated using (public.is_admin() or user_id = auth.uid());
-create policy scores_insert on public.tour_ratings for insert to authenticated with check (user_id = auth.uid() and public.on_tour(tour_id));
-create policy scores_update on public.tour_ratings for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
-create policy scores_admin on public.tour_ratings for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy scores_read on public.tour_ratings for select to authenticated using ((select public.is_admin()) or user_id = (select auth.uid()));
+create policy scores_insert on public.tour_ratings for insert to authenticated with check (user_id = (select auth.uid()) and public.on_tour(tour_id));
+create policy scores_update on public.tour_ratings for update to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
+create policy scores_admin on public.tour_ratings for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
 -- bank details: own row and admins only
 -- problem log: everyone signed in can add their own entries; only admins read and clear the list
-create policy app_errors_add on public.app_errors for insert to authenticated with check (user_id = auth.uid());
-create policy app_errors_admin_read on public.app_errors for select to authenticated using (public.is_admin());
-create policy app_errors_admin_clear on public.app_errors for delete to authenticated using (public.is_admin());
-create policy payout_own on public.payout_details for all to authenticated using (id = auth.uid()) with check (id = auth.uid());
-create policy payout_admin on public.payout_details for select to authenticated using (public.is_admin());
+create policy app_errors_add on public.app_errors for insert to authenticated with check (user_id = (select auth.uid()));
+create policy app_errors_admin_read on public.app_errors for select to authenticated using ((select public.is_admin()));
+create policy app_errors_admin_clear on public.app_errors for delete to authenticated using ((select public.is_admin()));
+create policy payout_own on public.payout_details for all to authenticated using (id = (select auth.uid())) with check (id = (select auth.uid()));
+create policy payout_admin on public.payout_details for select to authenticated using ((select public.is_admin()));
 -- change log: anyone with access adds entries, only admins read them, nobody edits them
-create policy log_insert on public.log for insert to authenticated with check (public.app_role() is not null and user_id = auth.uid());
-create policy log_read on public.log for select to authenticated using (public.is_admin());
+create policy log_insert on public.log for insert to authenticated with check ((select public.app_role()) is not null and user_id = (select auth.uid()));
+create policy log_read on public.log for select to authenticated using ((select public.is_admin()));
 
 -- change requests: you send them for your own tours and see your own; admins see and decide all
-create policy creq_read on public.change_requests for select to authenticated using (public.is_admin() or user_id = auth.uid() or swap_with = auth.uid());
-create policy creq_answer on public.change_requests for update to authenticated using (swap_with = auth.uid() and status = 'pending') with check (swap_with = auth.uid());
-create policy creq_insert on public.change_requests for insert to authenticated with check (user_id = auth.uid() and status = 'pending' and public.on_tour(tour_id));
-create policy creq_admin on public.change_requests for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy creq_read on public.change_requests for select to authenticated using ((select public.is_admin()) or user_id = (select auth.uid()) or swap_with = (select auth.uid()));
+create policy creq_answer on public.change_requests for update to authenticated using (swap_with = (select auth.uid()) and status = 'pending') with check (swap_with = (select auth.uid()));
+create policy creq_insert on public.change_requests for insert to authenticated with check (user_id = (select auth.uid()) and status = 'pending' and public.on_tour(tour_id));
+create policy creq_admin on public.change_requests for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
 
 -- pay corrections: the person sees their own, only admins write
-create policy adj_read on public.pay_adjustments for select to authenticated using (public.is_admin() or user_id = auth.uid());
-create policy adj_admin on public.pay_adjustments for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy adj_read on public.pay_adjustments for select to authenticated using ((select public.is_admin()) or user_id = (select auth.uid()));
+create policy adj_admin on public.pay_adjustments for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
 -- pay disputes: you open them for your own tours and see your own; only admins answer
-create policy disputes_read on public.pay_disputes for select to authenticated using (public.is_admin() or user_id = auth.uid());
-create policy disputes_insert on public.pay_disputes for insert to authenticated with check (user_id = auth.uid() and status = 'open' and reply is null and public.on_tour(tour_id));
-create policy disputes_admin on public.pay_disputes for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy disputes_read on public.pay_disputes for select to authenticated using ((select public.is_admin()) or user_id = (select auth.uid()));
+create policy disputes_insert on public.pay_disputes for insert to authenticated with check (user_id = (select auth.uid()) and status = 'open' and reply is null and public.on_tour(tour_id));
+create policy disputes_admin on public.pay_disputes for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
 -- tour costs: admins only, guides and drivers never see them
-create policy costs_admin on public.tour_costs for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy costs_admin on public.tour_costs for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
 -- personal dates: your own, readable by admins for planning
-create policy pdates_own on public.personal_dates for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
-create policy pdates_admin on public.personal_dates for select to authenticated using (public.is_admin());
+create policy pdates_own on public.personal_dates for all to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
+create policy pdates_admin on public.personal_dates for select to authenticated using ((select public.is_admin()));
 
 -- usage counts and tour offers: each person adds their own; admins read all, people read their own offers
-create policy usage_insert on public.usage for insert to authenticated with check (user_id = auth.uid() and public.app_role() is not null);
-create policy usage_read on public.usage for select to authenticated using (public.is_admin());
-create policy offers_insert on public.offers for insert to authenticated with check (user_id = auth.uid() and public.app_role() is not null);
-create policy offers_read on public.offers for select to authenticated using (public.is_admin() or user_id = auth.uid());
+create policy usage_insert on public.usage for insert to authenticated with check (user_id = (select auth.uid()) and (select public.app_role()) is not null);
+create policy usage_read on public.usage for select to authenticated using ((select public.is_admin()));
+create policy offers_insert on public.offers for insert to authenticated with check (user_id = (select auth.uid()) and (select public.app_role()) is not null);
+create policy offers_read on public.offers for select to authenticated using ((select public.is_admin()) or user_id = (select auth.uid()));
 
 -- time off: team can see it; you ask for your own; sick days need no approval
-create policy off_read on public.time_off for select to authenticated using (public.app_role() is not null);
+create policy off_read on public.time_off for select to authenticated using ((select public.app_role()) is not null);
 create policy off_insert_own on public.time_off for insert to authenticated
-  with check (public.app_role() is not null and user_id = auth.uid() and (status = 'pending' or type = 'sick'));
-create policy off_delete_own on public.time_off for delete to authenticated using (user_id = auth.uid() and status = 'pending');
-create policy off_admin on public.time_off for all to authenticated using (public.is_admin()) with check (public.is_admin());
+  with check ((select public.app_role()) is not null and user_id = (select auth.uid()) and (status = 'pending' or type = 'sick'));
+create policy off_delete_own on public.time_off for delete to authenticated using (user_id = (select auth.uid()) and status = 'pending');
+create policy off_admin on public.time_off for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
 
-create policy holidays_read on public.holidays for select to authenticated using (public.app_role() is not null);
-create policy holidays_admin on public.holidays for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy holidays_read on public.holidays for select to authenticated using ((select public.app_role()) is not null);
+create policy holidays_admin on public.holidays for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
 
 -- tasks: you see the ones assigned to you and can tick them done
-create policy tasks_read on public.tasks for select to authenticated using (public.is_admin() or auth.uid() = any(assignees));
-create policy tasks_update_mine on public.tasks for update to authenticated using (auth.uid() = any(assignees)) with check (auth.uid() = any(assignees));
+create policy tasks_read on public.tasks for select to authenticated using ((select public.is_admin()) or (select auth.uid()) = any(assignees));
+create policy tasks_update_mine on public.tasks for update to authenticated using ((select auth.uid()) = any(assignees)) with check ((select auth.uid()) = any(assignees));
 -- the Sunday week-check task is the only task a person may create, and only for themselves
 create policy tasks_week_own on public.tasks for insert to authenticated
-  with check (public.app_role() is not null and kind = 'week_check' and created_by = auth.uid() and assignees = array[auth.uid()] and tour_id is null and status = 'open');
-create policy tasks_admin on public.tasks for all to authenticated using (public.is_admin()) with check (public.is_admin());
+  with check ((select public.app_role()) is not null and kind = 'week_check' and created_by = (select auth.uid()) and assignees = array[(select auth.uid())] and tour_id is null and status = 'open');
+create policy tasks_admin on public.tasks for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
 
 -- notifications: anyone with access can send one; you only read and mark your own
-create policy notes_read on public.notifications for select to authenticated using (user_id = auth.uid());
-create policy notes_insert on public.notifications for insert to authenticated with check (public.app_role() is not null);
-create policy notes_update on public.notifications for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
-create policy notes_delete on public.notifications for delete to authenticated using (user_id = auth.uid());
+create policy notes_read on public.notifications for select to authenticated using (user_id = (select auth.uid()));
+create policy notes_insert on public.notifications for insert to authenticated with check ((select public.app_role()) is not null);
+create policy notes_update on public.notifications for update to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
+create policy notes_delete on public.notifications for delete to authenticated using (user_id = (select auth.uid()));
 
-create policy settings_read on public.settings for select to authenticated using (public.app_role() is not null);
-create policy settings_admin on public.settings for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy settings_read on public.settings for select to authenticated using ((select public.app_role()) is not null);
+create policy settings_admin on public.settings for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
 
 -- invitations: admins only
-create policy invites_admin on public.invites for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy invites_admin on public.invites for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
 
-create policy push_own on public.push_subscriptions for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy push_own on public.push_subscriptions for all to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
 
 -- ---------- live updates ----------
 alter publication supabase_realtime add table public.profiles, public.tours, public.bookings, public.clients, public.client_ratings, public.tour_ratings, public.payout_details, public.change_requests, public.pay_adjustments, public.personal_dates, public.time_off, public.holidays, public.tasks, public.notifications, public.settings, public.invites, public.pay_disputes, public.tour_costs;

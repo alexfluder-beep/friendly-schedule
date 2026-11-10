@@ -163,7 +163,7 @@ To let people in without an email confirmation step, turn off **Authentication >
 
 ## Versions 2.5 to 2.8 (feedback round of 10 Nov)
 
-Database: run `supabase/update.sql` once in Supabase > SQL Editor (safe to run again). It covers every change from 2.4 to 3.3.
+Database: run `supabase/update.sql` once in Supabase > SQL Editor (safe to run again). It covers every change from 2.4 to 3.4.
 
 - **Problems log** (Back office > Problems): errors, failed saves, connection drops longer than 30 seconds and "app could not start", from every phone, with person, screen, phone type and version. Phones without internet keep them and send later. People can also type a short report in the "Test version" window.
 - **Driver list**: drivers first, then guides who drive (own car or Delica), then others; says so when there are no drivers yet.
@@ -204,3 +204,8 @@ Database: run `supabase/update.sql` once in Supabase > SQL Editor (safe to run a
 - **Website orders** pasted from TrekkSoft ("2 x Tour (24 November, 2026, 10:30)" with Guest 1, Guest 2 blocks) are read: lead guest, phone, number of people, other guests in the notes, price added up.
 - **Display for each person**: text size Small / Normal / Big / Very big, colours Like the phone / Light / Dark, contrast Normal / Strong (black text, darker lines, bolder). Saved on the account (needs `supabase/update.sql`) and on the phone. The **Aa** button in the top bar opens it from any screen. Grey secondary text is a little darker for everyone.
 - Database: included in `supabase/update.sql`.
+
+## 3.4
+- **Clearer text sizes**: one type scale for the whole app (11, 12, 14, 16, 18, 22, 28, 34 px, after Material 3 and Apple guidance). Body text is 16 px (was 15), screen and window titles 22 px (20 on phones), tour titles on cards 18 px, labels and tags 12-14 px. Nothing is smaller than 11 px. The Aa sizes still scale all of it.
+- **Faster and no more "statement timeout"**: access rules on guests, bookings and the team now run once per request instead of once per row. Test with 13,000 guests: a guide's list went from 53 s to 0.02 s, the admin's from 1 s to 0.3 s. Needs `supabase/update.sql`.
+- Problem log ignores "Load failed" / "AbortError" when the phone paused the app or lost signal. Slow reads wait 30 s instead of 15 s.

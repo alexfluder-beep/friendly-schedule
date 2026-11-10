@@ -39,7 +39,7 @@
   const saveCache = () => { if (mode !== 'supabase' || !me || !me.active) return; clearTimeout(cacheTimer); cacheTimer = setTimeout(() => { idb.set('cache', { me, db, at: new Date().toISOString() }); idb.set('outbox', outbox); }, 800); };
   const isNetErr = e => !navigator.onLine || /fetch|network|load failed|abort|timed? ?out/i.test(String((e && e.message) || e) + ' ' + ((e && e.name) || ''));
   // Weak internet: a request that hangs is stopped after 15 seconds, and the change waits on the phone instead.
-  const slowFetch = (url, o) => { const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 15000); if (o && o.signal) o.signal.addEventListener('abort', () => ac.abort()); return fetch(url, { ...(o || {}), signal: ac.signal }).finally(() => clearTimeout(tm)); };
+  const slowFetch = (url, o) => { const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 30000); if (o && o.signal) o.signal.addEventListener('abort', () => ac.abort()); return fetch(url, { ...(o || {}), signal: ac.signal }).finally(() => clearTimeout(tm)); };
   async function sendOp(o) {
     const q = o.op === 'remove' ? sb.from(o.table).delete().eq('id', o.id) : o.insert ? sb.from(o.table).insert(o.row) : sb.from(o.table).update(o.row).eq('id', o.row.id);
     const { error } = await q; if (error) throw error;

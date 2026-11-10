@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.3';
+  const APP_VERSION = '3.4';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -383,9 +383,11 @@
   const ERRQ = 'fs-errq';
   const deviceName = () => `${/Android/i.test(navigator.userAgent) ? 'Android' : /iPhone|iPad/i.test(navigator.userAgent) ? 'iPhone' : /Mac/i.test(navigator.userAgent) ? 'Mac' : /Windows/i.test(navigator.userAgent) ? 'Windows' : 'other'} · ${/CriOS|Chrome/i.test(navigator.userAgent) ? 'Chrome' : /Safari/i.test(navigator.userAgent) ? 'Safari' : /Firefox/i.test(navigator.userAgent) ? 'Firefox' : 'browser'} · ${window.innerWidth}px`;
   let errBusy = false;
+  let hiddenAt = 0; document.addEventListener('visibilitychange', () => { if (document.hidden) hiddenAt = Date.now(); else hiddenAt = Date.now(); });
   function logErr(kind, message, detail) {
     try {
       const msg = String(message || '').slice(0, 500); if (!msg || /ResizeObserver loop|^Script error\.?$/i.test(msg)) return;
+      if (/abort|load failed|failed to fetch|networkerror/i.test(msg) && (!navigator.onLine || document.hidden || Date.now() - hiddenAt < 15000)) return; // the phone paused the app or lost signal: not a real problem
       const q = JSON.parse(localStorage.getItem(ERRQ) || '[]');
       if (q.length && q[q.length - 1].message === msg && Date.now() - new Date(q[q.length - 1].at).getTime() < 60000) return; // same error again within a minute
       q.push({ id: S.uid(), at: new Date().toISOString(), kind, message: msg, detail: String(detail || '').slice(0, 2000), page: `${state.view}${state.view === 'calendar' ? '/' + state.mode : state.view === 'admin' ? '/' + (state.adminTab || '') : ''}`, version: APP_VERSION, device: deviceName() });
