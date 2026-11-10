@@ -1,4 +1,4 @@
--- Friendly Schedule: ONE update with everything added since the first setup (versions 2.4 to 3.9).
+-- Friendly Schedule: ONE update with everything added since the first setup (versions 2.4 to 3.10).
 -- Safe to run more than once. Paste all of it into Supabase > SQL Editor and press Run.
 
 -- 2.4 Telegram username; 2.5 badges already celebrated (so the welcome badge shows once per account)
@@ -267,3 +267,32 @@ create index if not exists expenses_tour_id_fk_idx on public.expenses(tour_id);
 create index if not exists tasks_assignees_idx on public.tasks using gin (assignees);
 revoke execute on function public.my_tour_ids() from anon;
 revoke execute on function public.my_client_ids() from anon;
+
+-- 3.10 Safety (Supabase security advisor): people who are not signed in cannot call any of the app's database functions,
+-- and the functions that only run inside the database (on sign-up, before saving) cannot be called from outside at all.
+do $$
+declare f record;
+begin
+  for f in select p.oid::regprocedure as sig, p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname in ('admin_remove_person','app_role','can_see_client','can_see_guests','erase_guests','guest_days','guest_visits',
+      'handle_new_user','is_admin','merge_clients','my_client_ids','my_counts','my_repeat_guests','my_tour_ids','on_tour','protect_booking','protect_creq',
+      'protect_profile','protect_task','purge_old_guests','stale_guests','weekly_check','send_push_for_notice')
+  loop
+    execute format('revoke execute on function %s from public, anon', f.sig);
+    if f.proname in ('handle_new_user','protect_booking','protect_creq','protect_profile','protect_task','weekly_check','send_push_for_notice') then
+      execute format('revoke execute on function %s from authenticated', f.sig);
+    else
+      execute format('grant execute on function %s to authenticated', f.sig);
+    end if;
+  end loop;
+end $$;
+-- Covering indexes for the remaining links the performance advisor listed.
+create index if not exists change_requests_decided_by_idx on public.change_requests(decided_by);
+create index if not exists invites_created_by_idx on public.invites(created_by);
+create index if not exists offers_booking_id_idx on public.offers(booking_id);
+create index if not exists pay_adjustments_created_by_idx on public.pay_adjustments(created_by);
+create index if not exists pay_disputes_decided_by_idx on public.pay_disputes(decided_by);
+create index if not exists tasks_created_by_idx on public.tasks(created_by);
+create index if not exists tasks_done_by_idx on public.tasks(done_by);
+create index if not exists time_off_decided_by_idx on public.time_off(decided_by);
+create index if not exists usage_user_id_idx on public.usage(user_id);
