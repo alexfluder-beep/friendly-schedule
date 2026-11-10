@@ -322,6 +322,7 @@
       try { await sendOp(op); saveCache(); } catch (error) { if (isNetErr(error)) { store.offline = true; queue(op); emit(null, null, 'STATE', true); return; } await store.refresh(table); throw error; }
     },
     async saveMany(table, rows) {
+      const seen = new Map(); rows.forEach(r => seen.set(r.id, { ...(seen.get(r.id) || {}), ...r })); rows = [...seen.values()];   // one row per ID, or the database refuses the whole batch
       rows.forEach(r => applyLocal(table, r, 'UPSERT')); emit(table, null, 'BULK');
       if (mode === 'demo') { persistDemo(); return; }
       for (let i = 0; i < rows.length; i += 200) {
@@ -341,6 +342,7 @@
       const rows = await fetchTable(table, store.loadedFrom || windowStart()).catch(() => null);
       if (rows) { db[table] = rows; emit(table, null, 'BULK'); }
     },
+    async removePushSubscription(endpoint) { if (mode !== 'supabase') return; await sb.from('push_subscriptions').delete().eq('endpoint', endpoint); },
     async savePushSubscription(sub) {
       if (mode !== 'supabase') return;
       const j = sub.toJSON();

@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.0';
+  const APP_VERSION = '3.1';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -345,6 +345,22 @@
       else new Notification('Friendly Schedule', { body: text });
     } catch (e) { /* not supported here */ }
   }
+  // ---------- notification settings for this phone ----------
+  const isIOS = () => /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const standalone = () => window.matchMedia && window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  function notifCardHtml(perm) {
+    const ready = !!CFG.vapidPublicKey && S.mode === 'supabase', sub = state.pushSub;
+    if (state.pushSub === undefined && swReg && 'PushManager' in window) { state.pushSub = null; swReg.pushManager.getSubscription().then(x => { state.pushSub = x || false; render(); }).catch(() => { state.pushSub = false; }); }
+    const on = perm === 'granted' && !!sub;
+    const st = perm === 'unsupported' ? (isIOS() && !standalone() ? 'nf_ios_home' : 'push_unsupported') : perm === 'denied' ? 'nf_blocked' : on ? 'nf_on' : perm === 'granted' && !ready ? 'nf_open_only' : 'nf_off';
+    return `<div class="card f nfcard"><div class="row"><b>${T('nf_title')}</b><span class="spacer"></span><span class="tag ${on ? 't-ok' : 't-muted'}">${T(on ? 'nf_tag_on' : 'nf_tag_off')}</span></div>
+      <span class="small">${T(st)}</span>
+      <div class="bar">${perm !== 'unsupported' && perm !== 'denied' && !on ? `<button class="btn primary" data-act="push">${T('push_enable')}</button>` : ''}${on ? `<button class="btn" data-act="pushtest">${T('nf_test')}</button><button class="btn" data-act="pushoff">${T('nf_off_btn')}</button>` : ''}</div>
+      ${isIOS() ? `<span class="muted small">${T('push_ios')}</span>` : ''}${perm === 'denied' ? `<span class="muted small">${T(isIOS() ? 'nf_unblock_ios' : 'nf_unblock')}</span>` : ''}
+      <b class="small">${T('note_pick')}</b>`;
+  }
+  async function pushOff() { try { const s = swReg && await swReg.pushManager.getSubscription(); if (s) { await S.removePushSubscription(s.endpoint); await s.unsubscribe(); } } catch (e) { console.error(e); } state.pushSub = false; toast(T('nf_off_done')); render(); }
+  async function pushTest() { await S.save('notifications', { id: S.uid(), user_id: me().id, kind: 'test', params: {}, read: false, created_at: new Date().toISOString() }); toast(T('nf_test_sent')); }
   async function enableNotifications() {
     if (!('Notification' in window)) { toast(T('push_unsupported')); return; }
     let perm = 'denied';
@@ -354,7 +370,7 @@
       if (swReg && CFG.vapidPublicKey && 'PushManager' in window) {
         const key = Uint8Array.from(atob(CFG.vapidPublicKey.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
         const sub = await swReg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
-        await S.savePushSubscription(sub);
+        await S.savePushSubscription(sub); state.pushSub = sub;
         toast(T('push_on'));
       } else toast(T('push_open_only'));
     } catch (e) { console.error(e); toast(T('push_open_only')); }
@@ -723,7 +739,7 @@
           <div class="four"><label>${T('adults')}<input type="number" min="0" data-bi="${i}" data-bf="adults" value="${esc(b.adults ?? 1)}"></label><label>${T('children')}<input type="number" min="0" data-bi="${i}" data-bf="children" value="${esc(b.children ?? 0)}"></label><label>${T('ref')}<input data-bi="${i}" data-bf="ref" value="${esc(b.ref || '')}" autocomplete="off"></label><label>${T('guest_lang')}<input data-bi="${i}" data-bf="lang" list="fs-langs" value="${esc(b.lang || '')}" placeholder="EN" autocomplete="off"></label></div>
           <div class="two"><label><span>${T('phone')} <span class="pflag" id="pflag-${i}">${esc(phoneFlag(normPhone(b.phone)))}</span></span><input type="tel" inputmode="tel" data-bi="${i}" data-bf="phone" value="${esc(b.phone || '')}" placeholder="+995 5…" autocomplete="off"></label><label>${T('email')}<input type="email" inputmode="email" data-bi="${i}" data-bf="email" value="${esc(b.email || '')}" autocomplete="off"></label></div>
           <div class="four five"><label>${T('payment')}<select data-bi="${i}" data-bf="payment">${opt('', '—', b.payment)}${['prepaid', 'cash', 'unpaid'].map(x => opt(x, T('pay_' + x), b.payment)).join('')}</select></label><label>${T('bk_price')}<input type="number" min="0" step="any" inputmode="decimal" data-bi="${i}" data-bf="price" value="${esc(b.price ?? '')}"></label><label>${T('amount_due')}<input type="number" min="0" step="any" inputmode="decimal" data-bi="${i}" data-bf="amount_due" value="${esc(b.amount_due ?? '')}"></label><label>${T('currency')}<select data-bi="${i}" data-bf="currency">${CURRENCIES.map(x => opt(x, x, b.currency || guestCur())).join('')}</select></label><label>${T('source')}<select data-bi="${i}" data-bf="source">${opt('', sourceOf({ ref: b.ref }) ? T('auto') + ': ' + sourceOf({ ref: b.ref }) : '—', b.source)}${SOURCES.map(x => opt(x, x, b.source)).join('')}</select></label></div>
-          <div class="f"><span class="muted small">${T('options')}</span><div class="checks col opts">${marks.map(mk => `<label><input type="checkbox" data-bi="${i}" data-bm="${esc(mk)}" ${(b.marks || []).includes(mk) ? 'checked' : ''}>${esc(markLabel(mk))}</label>`).join('')}</div></div>
+          <div class="f"><span class="muted small">${T('options')}</span>${optPicker(b, i, marks)}</div>
           ${needsAddr(b) ? `<label>${T('guest_addr')}<input data-bi="${i}" data-bf="pickup_addr" list="fs-addrs" value="${esc(b.pickup_addr || '')}" placeholder="${T('addr_hint')}" autocomplete="off"></label><span class="muted small">${T('addr_auto')}</span>` : ''}
           <input class="inp" aria-label="${T('note')}" placeholder="${T('other_marks')}" data-bi="${i}" data-bf="notes" value="${esc(b.notes || '')}"></div>`).join('')}
         <datalist id="fs-addrs">${knownAddrs().map(x => `<option value="${esc(x)}">`).join('')}</datalist><datalist id="fs-langs">${GUEST_LANGS.map(x => `<option value="${x}">`).join('')}</datalist>
@@ -764,6 +780,13 @@
   // ---------- guests already in the base ----------
   // A name only in Chinese, Korean, Arabic and similar letters: guides and drivers also need it in Latin letters.
   const needsLatin = n => !!n && /[^\u0000-\u024f\u0400-\u04ff\u10a0-\u10ff\s\d.,()'\-+x×]/.test(n) && !/[A-Za-z]{2,}/.test(n.replace(/\bx\s*\d+/i, ''));
+  // Options as one drop-down: shows what is chosen, opens a searchable tick list.
+  const optSummary = b => { const ms = b.marks || []; return ms.length ? ms.map(markLabel).join(', ') : T('ms_none'); };
+  function optPicker(b, i, marks) {
+    return `<details class="msel" data-msel="${i}"><summary><span class="mstxt" id="ms-${i}">${esc(optSummary(b))}</span><span class="mscount">${(b.marks || []).length || ''}</span></summary>
+      <div class="mspanel">${marks.length > 6 ? `<input class="inp" type="search" placeholder="${T('search')}" data-msq="${i}" aria-label="${T('search')}">` : ''}<div class="mslist">${marks.map(mk => `<label data-mk="${esc(markLabel(mk).toLowerCase())}"><input type="checkbox" data-bi="${i}" data-bm="${esc(mk)}" ${(b.marks || []).includes(mk) ? 'checked' : ''}><span>${esc(markLabel(mk))}</span></label>`).join('')}</div>
+      <div class="bar"><button type="button" class="lnk" data-act="msclear" data-i="${i}">${T('ms_clear')}</button><span class="spacer"></span><button type="button" class="btn sm primary" data-act="msdone">${T('ms_done')}</button></div></div></details>`;
+  }
   function guestMatches(b) {
     const ph = digits(normPhone(b.phone)), em = (b.email || '').trim().toLowerCase(), nm = cleanName(b.guest || '').toLowerCase().trim(), ref = (b.ref || '').trim().toLowerCase(), out = new Map();
     const add = (cl, why) => { if (cl && !cl.anonymised_at && cl.id !== b.client_id && !out.has(cl.id)) out.set(cl.id, why); };
@@ -1707,23 +1730,35 @@
     else { await loadXlsx(); const wb = window.XLSX.read(await file.arrayBuffer(), { type: 'array' }); rows = window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: '' }); }
     const hi = rows.findIndex(r => r.some(x => /name/i.test(x)) && r.some(x => /phone|mobile|email|e-mail/i.test(x))); if (hi < 0) throw new Error(T('ct_nohead'));
     const H = rows[hi].map(x => String(x).toLowerCase().trim()), col = re => H.findIndex(x => re.test(x));
-    const cF = col(/^first/), cL = col(/^last|surname/), cN = col(/^(full |customer |client )?name$/), cP = col(/phone|mobile|cell/), cE = col(/e-?mail/), cC = col(/comment|note/);
-    const out = []; let skipped = 0;
+    const cF = col(/^first/), cL = col(/^last|surname/), cN = col(/^(full |customer |client )?name$/), cP = col(/^(phone|mobile|cell)/), cP2 = col(/^(phone|mobile)\s*1$|alternate phone/), cE = col(/^e-?mail$/), cE2 = col(/^e-?mail\s*1$/), cC = col(/^notes?$/), cA = col(/pick-?up address|hotel/);
+    const proxy = e => /reply\.|expmessaging|guest\.airbnb|@m\.expediapartnercentral|tripadvisor/i.test(e);
+    const byKey = new Map(), out = []; let skipped = 0, merged = 0;
     for (const r of rows.slice(hi + 1)) {
-      const name = (cN >= 0 ? r[cN] : [r[cF] || '', r[cL] || ''].join(' ')).replace(/\s+/g, ' ').trim(); if (!name) { skipped++; continue; }
-      out.push({ name: cleanName(name) || name, phone: normPhone(cP >= 0 ? r[cP] : '') || null, email: String(cE >= 0 ? r[cE] : '').trim().toLowerCase() || null, notes: String(cC >= 0 ? r[cC] : '').trim() || null });
+      let name = (cN >= 0 ? r[cN] : [r[cF] || '', r[cL] || ''].join(' ')).replace(/\s+/g, ' ').trim();
+      if (!name) { skipped++; continue; }
+      name = (cleanName(name.replace(/\b(cancel\w*|no ?show|pack)\b/gi, '')) || name).trim();
+      const phone = normPhone((cP >= 0 ? r[cP] : '') || (cP2 >= 0 ? r[cP2] : '')) || null;
+      const email = [cE >= 0 ? r[cE] : '', cE2 >= 0 ? r[cE2] : ''].map(x => String(x || '').trim().toLowerCase()).find(x => x && !proxy(x)) || null;
+      const notes = [cC >= 0 ? r[cC] : '', cA >= 0 ? r[cA] : ''].map(x => String(x || '').trim()).filter(Boolean).join(' · ') || null;
+      const k = (phone && digits(phone).length >= 7 ? 'p' + digits(phone).slice(-9) : '') || (email ? 'e' + email : '') || 'n' + name.toLowerCase();
+      const prev = byKey.get(k);
+      if (prev) { merged++; if (!prev.email && email) prev.email = email; if (!prev.phone && phone) prev.phone = phone; if (notes && !(prev.notes || '').includes(notes)) prev.notes = [prev.notes, notes].filter(Boolean).join(' · '); continue; }
+      const x = { name, phone, email, notes }; byKey.set(k, x); out.push(x);
     }
-    let fresh = 0, upd = 0; const plan = out.map(x => { const d = digits(x.phone).slice(-9), hit = db.clients.find(c => (d.length >= 7 && digits(c.phone).slice(-9) === d) || (x.email && (c.email || '').toLowerCase() === x.email)); if (hit) upd++; else fresh++; return { x, hit }; });
-    state.ct = { plan, fresh, upd, skipped }; render();
+    const byName = new Map(); db.clients.forEach(c => { if (!c.anonymised_at && !digits(c.phone) && !c.email) byName.set((c.name || '').toLowerCase(), c); });
+    let fresh = 0, upd = 0; const plan = out.map(x => { const d = digits(x.phone).slice(-9), hit = db.clients.find(c => !c.anonymised_at && ((d.length >= 7 && digits(c.phone).slice(-9) === d) || (x.email && (c.email || '').toLowerCase() === x.email))) || (d.length < 7 && !x.email ? byName.get(x.name.toLowerCase()) : null); if (hit) upd++; else fresh++; return { x, hit }; });
+    state.ct = { plan, fresh, upd, skipped, merged }; render();
   }
   async function importContacts() {
     const ct = state.ct; if (!ct) return; const add = [], up = [];
-    ct.plan.forEach(({ x, hit }) => { if (!hit) add.push({ id: S.uid(), ...x }); else { const m = { ...hit }; let ch = false; ['phone', 'email', 'notes'].forEach(k => { if (!m[k] && x[k]) { m[k] = x[k]; ch = true; } }); if (ch) up.push(m); } });
+    const touched = new Map();
+    ct.plan.forEach(({ x, hit }) => { if (!hit) { add.push({ id: S.uid(), ...x }); return; } const m = touched.get(hit.id) || { ...hit }; let ch = false; ['phone', 'email', 'notes'].forEach(k => { if (!m[k] && x[k]) { m[k] = x[k]; ch = true; } }); if (ch) touched.set(hit.id, m); });
+    up.push(...touched.values());
     await S.saveMany('clients', [...add, ...up]); logAct(`Imported guest contacts: ${add.length} new, ${up.length} updated`); state.ct = null; toast(T('ct_done', { n: add.length, u: up.length }));
   }
   function contactsImpHtml() {
     const ct = state.ct;
-    return `<div class="card f"><b>${T('ct_title')}</b><span class="muted small">${T('ct_text')}</span><input class="inp" type="file" id="ct-file" accept=".xlsx,.xls,.csv" data-ch="ctfile">${ct ? `<b>${T('ct_found', { n: ct.fresh, u: ct.upd, s: ct.skipped })}</b><div class="bar"><button class="btn primary" data-act="ctgo">${T('ct_go')}</button></div>` : ''}</div>`;
+    return `<div class="card f"><b>${T('ct_title')}</b><span class="muted small">${T('ct_text')}</span><input class="inp" type="file" id="ct-file" accept=".xlsx,.xls,.csv" data-ch="ctfile">${ct ? `<b>${T('ct_found', { n: ct.fresh, u: ct.upd, s: ct.skipped })}</b>${ct.merged ? `<span class="muted small">${T('ct_merged', { n: ct.merged })}</span>` : ''}<div class="bar"><button class="btn primary" data-act="ctgo">${T('ct_go')}</button></div>` : ''}</div>`;
   }
   async function readImport(file) {
     if (/\.csv$/i.test(file.name)) { state.imp = parseSetmore(csvRows(await file.text())); render(); return; }
@@ -1900,9 +1935,7 @@
       <div class="f"><b>${T('ds_title')}</b><span class="muted small">${T('ds_size')}</span><div class="seg">${[['s', T('ds_small')], ['', T('ds_normal')], ['l', T('ds_big')]].map(([k, l]) => `<button data-act="fsize" data-v="${k}" aria-pressed="${(document.documentElement.dataset.fs || '') === k}">${l}</button>`).join('')}</div>
         <span class="muted small">${T('ds_theme')}</span><div class="seg">${[['', T('ds_system')], ['light', T('ds_light')], ['dark', T('ds_dark')]].map(([k, l]) => `<button data-act="theme" data-v="${k}" aria-pressed="${(document.documentElement.dataset.theme || '') === k}">${l}</button>`).join('')}</div></div>
       <label>${T('language')}<select id="me-lang" data-ch="lang">${opt('en', 'English', lang())}${opt('ru', 'Русский', lang())}${opt('ka', 'ქართული', lang())}</select></label>
-      <div class="f"><b>${T('notifications')}</b><span class="muted small">${T(perm === 'granted' ? 'push_state_on' : perm === 'unsupported' ? 'push_unsupported' : 'push_state_off')}</span>
-        ${perm !== 'granted' && perm !== 'unsupported' ? `<button class="btn" data-act="push">${T('push_enable')}</button>` : ''}<span class="muted small">${T('push_ios')}</span>
-        <span class="muted small">${T('note_pick')}</span><div class="checks col">${Object.keys(NOTE_GROUPS).map(g => `<label><input type="checkbox" id="mute-${g}" data-ch="mutepref" data-g="${g}" ${(m.mute || []).includes(g) ? '' : 'checked'}>${T('note_' + g)}</label>`).join('')}</div></div>
+      ${notifCardHtml(perm)}<div class="checks col">${Object.keys(NOTE_GROUPS).map(g => `<label><input type="checkbox" id="mute-${g}" data-ch="mutepref" data-g="${g}" ${(m.mute || []).includes(g) ? '' : 'checked'}>${T('note_' + g)}</label>`).join('')}</div></div>
       <form class="f" data-form="mytg"><b>Telegram</b><span class="muted small">${T('tg_mine_text')}</span><div class="bar"><input class="inp" id="me-tg" name="telegram" value="${esc(m.telegram ? '@' + m.telegram : '')}" placeholder="@username" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1;min-width:150px"><button class="btn">${T('save')}</button></div></form>
       ${/^https:\/\/t\.me\//.test(rules().botUrl || '') || m.telegram_id ? `<div class="f"><b>${T('tg_title')}</b>${m.telegram_id ? `<span class="row"><span class="tag t-ok">${T('tg_on')}</span><span class="muted small">${T('tg_on_text')}</span></span>` : `<span class="muted small">${T('tg_text')}</span>${m.link_code ? `<div class="row"><b class="num tgcode">/link ${esc(m.link_code)}</b><button class="btn sm" data-act="copy" data-v="/link ${esc(m.link_code)}">${ico('copy')}${T('copy')}</button></div>` : ''}<div class="bar"><button class="btn sm" data-act="tgcode">${T(m.link_code ? 'tg_new' : 'tg_get')}</button>${/^https:\/\/t\.me\//.test(rules().botUrl || '') ? `<a class="btn sm" href="${esc(rules().botUrl)}" target="_blank" rel="noopener">${T('tg_open')}</a>` : ''}</div>`}</div>` : ''}
       <details class="sect"><summary>${T('privacy_link')}</summary><p class="muted small">${T('privacy_text', { n: pv().guideDays })}</p></details>
@@ -2147,6 +2180,8 @@
     },
     ctgo() { run(importContacts); },
     fitpick(el) { const m = state.modal; if (!m || !m.draft) return; m.draft[el.dataset.f] = el.dataset.id; const s = $(el.dataset.f === 'guide_id' ? '#t-guide' : '#t-driver'); if (s) s.value = el.dataset.id; const b = $('#fitbox'); if (b) b.innerHTML = fitHtml(m.draft); refreshTourWarn(); },
+    msdone(el) { const d = el.closest('details'); if (d) d.open = false; },
+    msclear(el) { const m = state.modal, b = m && m.draft && m.draft.bookings[Number(el.dataset.i)]; if (!b) return; const had = needsAddr(b); b.marks = []; el.closest('.mspanel').querySelectorAll('input[type=checkbox]').forEach(x => { x.checked = false; }); const sm = $('#ms-' + el.dataset.i); if (sm) { sm.textContent = optSummary(b); sm.nextElementSibling.textContent = ''; } if (had) setTimeout(renderModal, 0); },
     badd() { state.modal.draft.bookings.push({ id: S.uid(), guest: '', adults: 1, children: 0, phone: '', ref: '', notes: '', marks: [] }); renderModal(); },
     bdel(el) { state.modal.draft.bookings.splice(Number(el.dataset.i), 1); renderModal(); },
     close() { closeModal(); },
@@ -2186,6 +2221,8 @@
     },
     demoreset() { confirmDo(T('demo_reset') + '?', T('demo_reset'), async () => { S.demoReset(); state.imp = null; }); },
     push() { enableNotifications(); },
+    pushoff() { pushOff(); },
+    pushtest() { run(pushTest); },
     auth(el) { state.auth = el.dataset.to; state.authMsg = ''; render(); },
     signout() { run(async () => { await S.signOut(); state.auth = 'signin'; }); }
   };
@@ -2208,7 +2245,7 @@
     taskdone(el) { track('taskdone'); const k = db.tasks.find(x => x.id === el.dataset.id), done = el.checked; run(async () => { await S.save('tasks', { ...k, status: done ? 'done' : 'open', done_by: done ? me().id : null, done_at: done ? new Date().toISOString() : null }); if (done) await notify([k.created_by], 'task_done', { name: me().name, title: k.title }); }); },
     restorefile(el) { const f = el.files && el.files[0]; if (f) run(() => readRestore(f)); },
     impfile(el) { const f = el.files && el.files[0]; if (f) run(() => readImport(f)); },
-    ctfile(el) { const f = el.files && el.files[0]; if (f) run(() => readContacts(f)); },
+    ctfile(el) { const f = el.files && el.files[0]; if (f) run(async () => { try { await readContacts(f); } finally { el.value = ''; } }); },
     impmap(el) { state.imp.map[el.dataset.name] = el.value; },
     listmonth(el) { if (el.value) { state.listMonth = el.value; render(); } },
     q(el) { state.q = el.value; render(); },
@@ -2274,7 +2311,8 @@
       if (d.start_time && dur > 0) d.end_time = hhmm(mins(d.start_time) + dur * 60); else if (el.dataset.f === 'dur') d.end_time = '';
       const et = $('#t-endtxt'); if (et) et.textContent = d.end_time || '—';
     } else if (el.dataset.f) m.draft[el.dataset.f] = el.value;
-    else if (el.dataset.bm) { const b = m.draft.bookings[Number(el.dataset.bi)], st = new Set(b.marks || []); el.checked ? st.add(el.dataset.bm) : st.delete(el.dataset.bm); b.marks = [...st]; if (el.dataset.bm === 'pickup' || el.dataset.bm === 'dropoff' || el.dataset.bm === 'stays') setTimeout(renderModal, 0); }
+    else if (el.dataset.msq !== undefined) { const q2 = el.value.trim().toLowerCase(); el.closest('.mspanel').querySelectorAll('label[data-mk]').forEach(l => { l.hidden = !!q2 && !l.dataset.mk.includes(q2); }); return; }
+    else if (el.dataset.bm) { const b = m.draft.bookings[Number(el.dataset.bi)], st = new Set(b.marks || []); el.checked ? st.add(el.dataset.bm) : st.delete(el.dataset.bm); b.marks = [...st]; const sm = $('#ms-' + el.dataset.bi); if (sm) { sm.textContent = optSummary(b); const cn = sm.nextElementSibling; if (cn) cn.textContent = b.marks.length || ''; } if (el.dataset.bm === 'pickup' || el.dataset.bm === 'dropoff' || el.dataset.bm === 'stays') setTimeout(renderModal, 0); }
     else if (el.dataset.bi) { const bi = Number(el.dataset.bi), b = m.draft.bookings[bi]; b[el.dataset.bf] = el.value;
       if (['guest', 'phone', 'email', 'ref'].includes(el.dataset.bf)) { const box = $('#gsug-' + bi); if (box) box.innerHTML = suggHtml(b, bi); }
       if (el.dataset.bf === 'phone') { const f = $('#pflag-' + bi); if (f) f.textContent = phoneFlag(normPhone(el.value)); } }
@@ -2352,6 +2390,7 @@
   document.addEventListener('touchmove', ev => { if (!dg) return; const p = ev.touches[0]; if (dragMove(p.clientX, p.clientY) && ev.cancelable) ev.preventDefault(); }, { passive: false });
   document.addEventListener('touchend', ev => { if (!dg) return; const on = dg.on, p = ev.changedTouches[0]; dragStop(p.clientX, p.clientY); if (on && ev.cancelable) ev.preventDefault(); });
   document.addEventListener('touchcancel', () => dragStop());
+  document.addEventListener('click', ev => { document.querySelectorAll('details.msel[open]').forEach(d => { if (!d.contains(ev.target)) d.open = false; }); });
   document.addEventListener('contextmenu', ev => { if (dg && dg.touch) ev.preventDefault(); });
   document.addEventListener('click', ev => { if (Date.now() - dragEnd < 350 && !ev.target.closest('#modal')) { ev.stopPropagation(); ev.preventDefault(); } }, true);
   document.addEventListener('input', ev => { const el = ev.target, m = state.modal; if (!m || m.type !== 'move' || !el.dataset || !el.dataset.mv) return; m[el.dataset.mv] = el.value; const w = $('#mv-warn'); if (w) w.innerHTML = moveWarnHtml(m); });

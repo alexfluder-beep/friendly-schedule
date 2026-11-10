@@ -66,11 +66,8 @@ To let people in without an email confirmation step, turn off **Authentication >
 
 ## Notifications
 - While the app is open, changes and notifications arrive live.
-- For notifications when the app is closed (web push), extra one-time setup is needed:
-  1. Generate keys: `npx web-push generate-vapid-keys`. Put the public key in `config.js` (`vapidPublicKey`).
-  2. Deploy the function: `supabase functions deploy push --no-verify-jwt` and set secrets
-     `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (`mailto:you@example.com`), `WEBHOOK_SECRET` (any long random text).
-  3. In Supabase **Database > Webhooks**, create a webhook on table `notifications`, event **Insert**, to the function URL, with HTTP header `x-webhook-secret` set to the same secret.
+- For notifications when the app is closed (web push): the public key is already in `config.js`; follow `PUSH-SETUP.md` once in the Supabase website (function, four secrets, one webhook).
+- Each person turns notifications on in **Me > Phone notifications**, can send themselves a test and turn them off on that phone.
 - iPhone shows web push only after the app is added to the Home Screen (iOS 16.4 or newer).
 
 - Evening reminder for tomorrow's tours: enable the `pg_cron` extension in Supabase and run the `cron.schedule` line near the bottom of `schema.sql`.
@@ -197,3 +194,8 @@ Database: run `supabase/update-2.8.sql` once in Supabase > SQL Editor (safe to r
 - **Who fits this tour** in the tour editor: free people only (no day off, no other tour at that time), ranked by experience with this tour, language, tour list, normal working day, tours this week; Delica drivers for 4x4 tours.
 - **Week and month figures** above the calendar (admin): tours, guests, what bookings bring in, team pay, tour costs and profit in the pay currency. Exchange rates in Rules. Booking **Price** field; prices come from pasted emails (Airbnb takes your net total), the Setmore Cost column, or by hand.
 - **Booking emails**: checked against real Viator, GetYourGuide (new layout), Klook, Trip.com and Airbnb emails. Trip.com names like WANG/XIAOBO become "Xiaobo Wang (王晓波)". A name only in Chinese, Korean or similar letters gets a reminder to add it in Latin letters.
+
+## Version 3.1
+- **Options** (wine tasting, front seat, pick-up...) are one drop-down field: it shows what is chosen and a count; tap to open a tick list with search (when there are many options), Clear and Done.
+- **Guest contacts import** fixed for big files (the 13,000-row Setmore Customers export): rows of the same guest are joined, "CANCELED", "PACK" and similar words are taken out of names, platform proxy emails are skipped, phone/email from the second columns are used, and a batch never holds the same guest twice (that caused "ON CONFLICT DO UPDATE command cannot affect row a second time"). Importing the same file again only fills in missing details.
+- **Phone notifications** card on Me: on/off for this phone, test, turn off, clear help for blocked notifications and iPhone Home Screen.
