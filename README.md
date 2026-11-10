@@ -159,11 +159,11 @@ To let people in without an email confirmation step, turn off **Authentication >
 
 - Each person can have a Telegram username. The admin types it in **Edit person** (`@nino`, `nino` or a `t.me/nino` link all work), or in the 5th column of **Add several people at once**. Each person can also set or change their own on the **Me** screen.
 - Colleagues then get a Telegram button next to WhatsApp and Call: on the tour card, in the tour view and in the contacts list. The team list shows `@username`.
-- Database: included in `supabase/update-2.8.sql`.
+- Database: included in `supabase/update.sql`.
 
 ## Versions 2.5 to 2.8 (feedback round of 10 Nov)
 
-Database: run `supabase/update-2.8.sql` once in Supabase > SQL Editor (safe to run again). It covers 2.4 to 3.0.
+Database: run `supabase/update.sql` once in Supabase > SQL Editor (safe to run again). It covers every change from 2.4 to 3.3.
 
 - **Problems log** (Back office > Problems): errors, failed saves, connection drops longer than 30 seconds and "app could not start", from every phone, with person, screen, phone type and version. Phones without internet keep them and send later. People can also type a short report in the "Test version" window.
 - **Driver list**: drivers first, then guides who drive (own car or Delica), then others; says so when there are no drivers yet.
@@ -202,5 +202,5 @@ Database: run `supabase/update-2.8.sql` once in Supabase > SQL Editor (safe to r
 
 ## Versions 3.2 and 3.3
 - **Website orders** pasted from TrekkSoft ("2 x Tour (24 November, 2026, 10:30)" with Guest 1, Guest 2 blocks) are read: lead guest, phone, number of people, other guests in the notes, price added up.
-- **Display for each person**: text size Small / Normal / Big / Very big, colours Like the phone / Light / Dark, contrast Normal / Strong (black text, darker lines, bolder). Saved on the account (needs `supabase/update-3.3.sql`) and on the phone. The **Aa** button in the top bar opens it from any screen. Grey secondary text is a little darker for everyone.
-- Database: run `supabase/update-3.3.sql` (only this file if 3.0/3.1 were already applied).
+- **Display for each person**: text size Small / Normal / Big / Very big, colours Like the phone / Light / Dark, contrast Normal / Strong (black text, darker lines, bolder). Saved on the account (needs `supabase/update.sql`) and on the phone. The **Aa** button in the top bar opens it from any screen. Grey secondary text is a little darker for everyone.
+- Database: included in `supabase/update.sql`.
