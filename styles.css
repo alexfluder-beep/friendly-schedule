@@ -610,3 +610,42 @@ td.wrapcell{white-space:normal;min-width:180px;max-width:260px}
 .sheet .hdr .emb.big{margin-top:2px}
 input[type=file]{font-size:var(--t-body);color:var(--muted)}
 input[type=file]::file-selector-button{min-height:44px;margin-right:12px;padding:6px 18px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--ink);font:inherit;font-weight:600;cursor:pointer}
+/* Sick days look different from days off: rose colour, solid outline, cross icon; half days a lighter dashed outline */
+.acard.off.sick{--k:var(--sick);border:2px solid color-mix(in srgb,var(--sick) 45%,var(--line));background:color-mix(in srgb,var(--sick) 7%,var(--surface))}
+.acard.off.sick .ttl{color:var(--sick)}
+.acard.off.half{border-style:dotted}
+.mgrid button.myoff.mysick,.sq.myoff.mysick,.strip button.myoff.mysick{background:color-mix(in srgb,var(--sick) 14%,var(--surface))}
+.sq.mysick{background:color-mix(in srgb,var(--sick) 30%,var(--surface))}
+/* Getting started */
+.setupban{display:flex;width:100%;justify-content:space-between;align-items:center;gap:12px;min-height:48px;text-align:left;border:1px solid color-mix(in srgb,var(--accent) 40%,var(--line));background:var(--accent-soft);color:var(--ink);font-size:var(--t-body);margin-bottom:12px}
+.surow{display:flex;align-items:center;gap:12px;min-height:52px;width:100%;background:none;border:0;border-top:1px solid var(--line);text-align:left;font-size:var(--t-body);color:var(--ink);padding:4px 0}
+.surow .sudot{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);display:inline-flex;align-items:center;justify-content:center;flex:none;font-weight:700}
+.surow.done{color:var(--muted)}.surow.done .sudot{background:var(--ok);border-color:var(--ok);color:#fff}
+.mslist.mt{max-height:none}
+.mslist.mt label{display:flex;align-items:center;gap:12px;min-height:48px;flex-direction:row;color:var(--ink);font-size:var(--t-body);font-weight:500}
+.mslist.mt input{width:22px;height:22px;flex:none;accent-color:var(--accent)}
+/* Day-off plan: one row per person, one column per week; what is already asked or approved shows in its week */
+.suglist{display:flex;flex-direction:column}
+.sugrow{display:grid;grid-template-columns:minmax(120px,1.2fr) repeat(4,minmax(0,1fr));gap:8px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.sughd{border-top:0;padding-bottom:4px}
+.sugwho b{font-weight:600}
+.sugcell{display:flex;flex-direction:column;gap:6px}
+.sugc{display:flex;flex-direction:column;align-items:flex-start;gap:0;min-height:52px;justify-content:center;padding:6px 10px;border-radius:12px;border:1px solid var(--line);background:var(--surface);font-weight:600;text-align:left;font-size:var(--t-body);color:var(--ink)}
+button.sugc{cursor:pointer}button.sugc:hover{border-color:var(--accent)}
+.sugc.ok{background:color-mix(in srgb,var(--dayoff) 14%,var(--surface));border-color:color-mix(in srgb,var(--dayoff) 40%,var(--line));color:var(--dayoff)}
+.sugc.wait{border-style:dashed;border-color:var(--dayoff);color:var(--dayoff)}
+.sugc.none{border:0;background:none;color:var(--muted);font-weight:400;min-height:0}
+@media (max-width:760px){.sughd{display:none}.sugrow{grid-template-columns:1fr 1fr}.sugwho{grid-column:1/-1}}
+/* Native feel: thin moving bar at the very top while saving or sending; a pressed button shows a spinner */
+html.busy body::after,html.syncing body::after{content:"";position:fixed;z-index:60;left:0;right:0;top:env(safe-area-inset-top,0px);height:3px;background:linear-gradient(90deg,transparent,var(--accent) 40%,var(--accent) 60%,transparent);background-size:40% 100%;background-repeat:no-repeat;animation:fsbar 1.1s ease-in-out infinite}
+@keyframes fsbar{from{background-position:-40% 0}to{background-position:140% 0}}
+button[aria-busy="true"]{position:relative;color:transparent!important}
+button[aria-busy="true"]::after{content:"";position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;border:2px solid var(--line);border-top-color:var(--ink);border-radius:50%;animation:fsspin .7s linear infinite}
+@keyframes fsspin{to{transform:rotate(360deg)}}
+/* sheets slide up, screens fade in; nothing moves with reduced motion */
+.overlay .sheet{animation:fsup .22s cubic-bezier(.2,0,0,1)}
+@keyframes fsup{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}
+main{animation:fsfade .18s ease-out}
+@keyframes fsfade{from{opacity:.4}to{opacity:1}}
+button,a{-webkit-tap-highlight-color:transparent}
+@media (prefers-reduced-motion:reduce){html.busy body::after,html.syncing body::after,.overlay .sheet,main,button[aria-busy="true"]::after{animation:none}}
