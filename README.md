@@ -248,3 +248,14 @@ Database: run `supabase/update.sql` once in Supabase > SQL Editor (safe to run a
 - **Setmore Appointments report (.xls/.xlsx/.csv)** reads more: options from the name, service and both Comments columns (+wine, front seat, pick-up, drop-off, non-refundable…), the platform from booking codes (GYG… = GetYourGuide, BR-… = Viator, Klook, Airbnb…), the pick-up address or hotel, the Label ("online" = paid online), and counts the cancelled rows it leaves out. The preview shows what it found.
 - **Non-refundable** is a new option for bookings; it is also picked up from booking emails.
 - **Guest list check** (Back office > Guests > Check guest list): looks through all guests and bookings and suggests fixes – platform from booking codes, options from names and comments, booking codes from comments, clean names without "X2 +wine", no platform relay emails, phone format. Untick a group you do not want, press Apply; every fix is written in the booking history ("Checked: …").
+
+## 3.11
+Design clean-up of **Me > Profile** (method: unslop by @heydamir, CC BY 4.0). No database change.
+- "Upload a photo" button instead of the browser's "Choose File / No file chosen".
+- Save buttons stay quiet and turn orange only after something in that card changed, so the one thing to press stands out.
+- Working hours are typed as 24-hour time (9, 930 or 09:30 all become 09:30), the same on every phone. Special dates are typed day first (24.11 or 24.11.2026); a wrong date is explained and nothing typed is lost.
+- On a computer the two columns are balanced: profile, special dates and team contacts on the left; bank details and working hours on the right.
+- Team contacts: WhatsApp, call, Telegram and copy always sit in the same columns.
+- Me tabs stay on one row on phones (swipe sideways for the rest).
+- Bigger taps and text for older phones: 24px check boxes with the whole row tappable, 40px colour dots, 12px labels in the bottom menu.
+- Spacing on a 4px grid across cards, fields, tags and lists; card headings a little lighter (600).

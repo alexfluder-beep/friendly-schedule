@@ -717,3 +717,45 @@ html[data-os="android"] .btn:active,html[data-os="android"] .iconbtn:active,html
 .gck{display:inline-flex;align-items:center;gap:10px;flex-direction:row!important;color:var(--ink)!important;font-size:var(--t-body)!important}
 .gck input{width:22px;height:22px}
 .gcl{margin:6px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
+
+/* 3.11 unslop pass on Me (unslop by @heydamir, CC BY 4.0): 4px grid, quiet Save, one row of tabs, aligned contacts, bigger taps */
+.vh{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;clip:rect(0 0 0 0)}
+.filebtn{position:relative;cursor:pointer;font-size:var(--t-body);color:var(--ink)}
+.filebtn .msi{width:20px;height:20px;color:var(--muted)}
+.filebtn:focus-within{outline:2px solid var(--ink);outline-offset:2px}
+.card{padding:12px;gap:8px}
+.f input,.f select,.f textarea,.inp{padding:8px 12px}
+input[type=checkbox],input[type=radio]{margin:0}
+.card.f > b:first-child,form.f > b:first-child,.card.f > .f > b:first-child,.bar h2{font-weight:600}
+details.sect.avpick summary{font-size:var(--t-body);font-weight:500;color:var(--muted);padding:12px 0}
+.seg{flex-wrap:nowrap;max-width:100%;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.seg::-webkit-scrollbar{display:none}
+.seg button{flex:none;white-space:nowrap;padding:8px 16px}
+.seg.wrap{flex-wrap:wrap;overflow:visible}
+.btn.qsave:not(.primary){color:var(--ink)}
+.wrow{gap:8px}
+.wrow .wday{min-height:44px;cursor:pointer}
+.wrow .wday input,#pd-yearly,.f .checks input[type=checkbox]{width:24px;height:24px}
+.wrow .hm{max-width:none;text-align:center;letter-spacing:.02em}
+.wrow:has(.wday input:not(:checked)) .hm{opacity:.35}
+.avcol{width:40px;height:40px}
+.banner.slim{gap:12px}.banner.slim select{min-height:40px}
+.subtop{gap:8px}
+.badge{padding:0 4px}
+.ctlist .row.nw{gap:12px;min-height:48px}
+.ctlist .grow-l{flex-wrap:nowrap;flex-direction:column;align-items:flex-start;gap:0}
+.ctlist .grow-l > span:first-child{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ctlist .cbtns{display:grid;grid-template-columns:repeat(4,40px);gap:4px;justify-content:end}
+.ctlist .ib{width:40px;height:40px}
+.ctlist .k-wa{grid-column:1}.ctlist .k-call{grid-column:2}.ctlist .k-tg{grid-column:3}.ctlist .k-copy{grid-column:4}
+@media (max-width:760px){.tabs button{font-size:var(--t-cap)}}
+@media (max-width:360px){.tabs button{font-size:11px}.ctlist .cbtns{grid-template-columns:repeat(4,36px)}.ctlist .ib{width:36px;height:36px}}
+.list{gap:12px}
+.tag{padding:4px 8px}
+.testchip{padding:2px 8px}
+.iconbtn{padding:0 12px}
+.cols > .list{min-width:0}
+.f label.filebtn{flex-direction:row;font-size:var(--t-body);color:var(--ink);font-weight:600}
+.f label.pdy{flex-direction:row;align-items:center;gap:8px;color:var(--ink);min-height:44px;cursor:pointer}
+.wrow .hm::placeholder{color:var(--line)}
+.ctlist .grow-l > span:first-child{white-space:normal;overflow-wrap:anywhere}
