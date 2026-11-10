@@ -1652,7 +1652,8 @@
       let t = groups[key];
       if (!t) { t = groups[key] = { id: S.uid(), member: mem, date, start_time: start, end_time: end, title: svc, kind: isClass ? 'group' : 'private', capacity: 0, pax: 0, adults: 0, children: 0, date_to: null, guide_pay: null, driver_pay: null, language: null, pickup: String(r[cHotel] || r[cAddr] || '').trim() || null, notes: String(r[cComments[0]] || '').trim() || null, status: 'confirmed', guide_id: null, driver_id: null, external_id: 'setmore:' + key }; out.tours.push(t); }
       t.pax += pax; t.adults += adults; t.children += children;
-      if (name) out.bookings.push({ id: S.uid(), tour_id: t.id, client_id: cid, guest: name, adults, children, pax, phone, ref: String(r[cComments[1]] || r[cBid] || '').trim() || null, notes: null, marks, price: cCost >= 0 && Number(r[cCost]) > 0 ? Number(r[cCost]) : null, currency: guestCur(), email: cid && out.clients[cid] ? out.clients[cid].email : null, history: [{ at: new Date().toISOString(), w: 'created', from: 'Setmore' }] });
+      if (name) out.bookings.push({ id: S.uid(), tour_id: t.id, client_id: cid, guest: name, adults, children, pax, phone, ref: String(r[cComments[1]] || r[cBid] || '').trim() || null, notes: null, marks, price: cCost >= 0 && Number(r[cCost]) > 0 ? Number(r[cCost]) : null, currency: 'USD', // Setmore prices are in US dollars (owner, 10 Nov)
+        email: cid && out.clients[cid] ? out.clients[cid].email : null, history: [{ at: new Date().toISOString(), w: 'created', from: 'Setmore' }] });
     }
     for (const mem of Object.keys(offDays)) {
       const ds = Object.keys(offDays[mem]).sort(); let cur = null;
