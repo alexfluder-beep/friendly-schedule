@@ -711,3 +711,5 @@ html[data-os="android"] .btn:active,html[data-os="android"] .iconbtn:active,html
 .lrow .lmain{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;min-width:0}
 .lrow .ldate{text-align:right;white-space:nowrap;font-size:var(--t-body)}
 .stats .stat{display:flex;flex-direction:column;gap:2px;line-height:1.25}
+.xrow .arow{flex-direction:row!important;align-items:center}
+.xrow .arow .emb{flex:none}
