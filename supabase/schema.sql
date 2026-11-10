@@ -63,7 +63,8 @@ create table if not exists public.bookings (
   source text, payment text check (payment in ('prepaid','cash','unpaid')), amount_due numeric,
   pickup_addr text, pickup_url text,       -- this guest's own pick-up or drop-off address and its map link
   marks text[] not null default '{}',     -- wine, private_room, front_seat, bear_food, pickup, dropoff, stays (stays at the destination after the tour), or your own
-  email text, lang text, currency text,   -- guest email, the language the guest asked for, currency of amount_due
+  email text, lang text, currency text,   -- guest email, the language the guest asked for, currency of price and amount_due
+  price numeric,                          -- what the booking brings in (platform price or net), for the week and month figures
   history jsonb not null default '[]',    -- booked, changed, moved, cancelled: time, who, what
   created_at timestamptz not null default now()
 );

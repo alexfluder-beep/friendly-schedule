@@ -166,7 +166,7 @@ To let people in without an email confirmation step, turn off **Authentication >
 
 ## Versions 2.5 to 2.8 (feedback round of 10 Nov)
 
-Database: run `supabase/update-2.8.sql` once in Supabase > SQL Editor (safe to run again). It covers 2.4 to 2.8.
+Database: run `supabase/update-2.8.sql` once in Supabase > SQL Editor (safe to run again). It covers 2.4 to 3.0.
 
 - **Problems log** (Back office > Problems): errors, failed saves, connection drops longer than 30 seconds and "app could not start", from every phone, with person, screen, phone type and version. Phones without internet keep them and send later. People can also type a short report in the "Test version" window.
 - **Driver list**: drivers first, then guides who drive (own car or Delica), then others; says so when there are no drivers yet.
@@ -183,3 +183,17 @@ Database: run `supabase/update-2.8.sql` once in Supabase > SQL Editor (safe to r
 - **Telegram code** card only shows once the admin has set the bot link in Rules (the bot itself still needs the bridge from `bot/`).
 - **Paste a booking** (Back office > Booking from email): paste any booking email (GetYourGuide, Viator, Klook, Trip.com, Airbnb, TrekkSoft...). It reads the code, tour, date, time, guest, people, phone, email, language, pick-up and options, finds the matching tour (or a catalogue tour) and opens it for checking; a cancellation email offers to remove the guest. TrekkSoft "New order" emails go to the TrekkSoft reader.
 - **Setmore guest contacts** (Back office > Setmore import): upload the Customers export (CSV or Excel); new guests are added, existing ones get missing phone/email/notes. CSV files are read without the online Excel library.
+
+## Versions 2.9 and 3.0
+
+- **Back office** grouped: Every day / Team and money / Numbers / Setup. A banner reminds the admin when the last backup is older than 7 days.
+- **Backup page** explains how data is kept (Supabase free plan has no automatic backups; Pro keeps 7 days), and can **restore** from a backup file (adds back and overwrites rows with the same ID; deletes nothing).
+- **Maintenance mode** (Rules, or `maintenance` in `config.js` when the database is down): guides and drivers see "We are updating the app" with a button to see their last saved schedule; admins see a banner.
+- **Error codes** E1 to E9 on screen and in Back office > Problems, with what each means.
+- **Georgian public holidays** (information only, grey line under the date, name in the day header); Orthodox Easter is calculated. Can be switched off in Rules.
+- **Tour statistics** (Back office > Tour statistics): tours and guests vs last year, guests month by month for two years, guests per weekday with the most common tour, tours ranked by guests with trend and cancellations, booking sources, private/group, languages.
+- **Team achievements** (admin): level, points, badges, titles and closest next badge for everyone; most and least common badges.
+- **Salary**: filter guides/drivers, sort by any column, download the table (CSV for Excel).
+- **Who fits this tour** in the tour editor: free people only (no day off, no other tour at that time), ranked by experience with this tour, language, tour list, normal working day, tours this week; Delica drivers for 4x4 tours.
+- **Week and month figures** above the calendar (admin): tours, guests, what bookings bring in, team pay, tour costs and profit in the pay currency. Exchange rates in Rules. Booking **Price** field; prices come from pasted emails (Airbnb takes your net total), the Setmore Cost column, or by hand.
+- **Booking emails**: checked against real Viator, GetYourGuide (new layout), Klook, Trip.com and Airbnb emails. Trip.com names like WANG/XIAOBO become "Xiaobo Wang (王晓波)". A name only in Chinese, Korean or similar letters gets a reminder to add it in Latin letters.

@@ -1,4 +1,4 @@
--- Friendly Schedule 2.4 to 2.8: everything added since the first setup.
+-- Friendly Schedule 2.4 to 3.0: everything added since the first setup.
 -- Safe to run more than once. Paste all of it into Supabase > SQL Editor and press Run.
 
 -- 2.4 Telegram username; 2.5 badges already celebrated (so the welcome badge shows once per account)
@@ -10,6 +10,7 @@ alter table public.invites add column if not exists telegram text;
 alter table public.bookings add column if not exists email text;
 alter table public.bookings add column if not exists lang text;
 alter table public.bookings add column if not exists currency text;
+alter table public.bookings add column if not exists price numeric;
 alter table public.bookings add column if not exists history jsonb not null default '[]';
 alter table public.bookings add column if not exists created_at timestamptz not null default now();
 
