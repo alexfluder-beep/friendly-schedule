@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.1';
+  const APP_VERSION = '3.2';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -1691,7 +1691,19 @@
     const pnum = Number(String(price).replace(/[^\d.,]/g, '').replace(/,(?=\d{3}\b)/g, '').replace(',', '.')) || null, pcur = /EUR|€/.test(price) ? 'EUR' : /GEL|₾/.test(price) ? 'GEL' : price ? 'USD' : '';
     const status = /cancell?ed|cancellation/i.test(t.slice(0, 600)) ? 'cancel' : /amended|changed|modified|rescheduled|has been updated/i.test(t.slice(0, 600)) ? 'change' : 'new';
     const kind = /private/i.test(title) ? 'private' : /group|shared|small-group|join-in/i.test(title) ? 'group' : /private tour/i.test(t) ? 'private' : /join-in|small group/i.test(t) ? 'group' : '';
-    return { src, ref, title, date: when.date, time: when.time, guest, adults, children, phone, email: email.toLowerCase(), lang, pickup, marks, price, pnum, pcur, status, kind };
+    const res = { src, ref, title, date: when.date, time: when.time, guest, adults, children, phone, email: email.toLowerCase(), lang, pickup, marks, price, pnum, pcur, status, kind };
+    // Website (TrekkSoft) order lines: "2 x Tour name (24 November, 2026, 10:30)", then "Guest 1 / First name / Last name / phone" blocks.
+    const tk = t.match(/^\s*(\d+)\s*x\s+(.+?)\s*\(([^()]*\d{4}[^()]*)\)\s*$/m);
+    if (tk) {
+      const w = parseWhen(tk[3]); res.title = tk[2].trim(); res.date = w.date || res.date; res.time = w.time || res.time; res.src = res.src || 'Website';
+      res.kind = /private/i.test(res.title) ? 'private' : /group/i.test(res.title) ? 'group' : res.kind;
+      const blocks = t.split(/\n\s*Guest\s+\d+\s*\n/i).slice(1), people = blocks.map(b => ({ name: [((b.match(/First name\s*:\s*([^\n]+)/i) || [])[1] || '').trim(), ((b.match(/Last name\s*:\s*([^\n]+)/i) || [])[1] || '').trim()].join(' ').trim(), phone: normPhone(((b.match(/Phone[^:\n]*:\s*(\+?[\d\s()-]{7,})/i) || [])[1] || '').replace(/[\s()-]/g, '')), email: ((b.match(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/) || [])[0] || '').toLowerCase(), child: /child|kid|infant/i.test(b) }));
+      const n = Number(tk[1]) || people.length || 1, kids = people.filter(x => x.child).length;
+      res.adults = n - kids; res.children = kids;
+      if (people.length) { const lead = people.find(x => x.name) || people[0]; res.guest = lead.name || res.guest; res.phone = lead.phone || res.phone; res.email = lead.email || res.email; const others = people.filter(x => x !== lead && (x.name || x.phone)); if (others.length) res.others = others.map(x => [x.name, x.phone].filter(Boolean).join(' ')).join('; '); }
+      const sums = [...t.matchAll(/\(\s*(USD|EUR|GEL)\s*([\d.,]+)\s*\)/gi)]; if (sums.length) { res.pnum = sums.reduce((s, m) => s + Number(m[2].replace(',', '')), 0); res.pcur = sums[0][1].toUpperCase(); res.price = `${res.pcur} ${res.pnum}`; }
+    }
+    return res;
   }
   // Similar tour names: shared words count, ignoring small words.
   const words = s => new Set(String(s || '').toLowerCase().replace(/[^a-z0-9\u10a0-\u10ff\u0400-\u04ff ]+/g, ' ').split(/\s+/).filter(w => w.length > 3 && !/^(tour|tours|from|with|tbilisi|day|trip|private|group|small|guided|hours|full|half|georgia|the|and)$/.test(w)));
@@ -1706,7 +1718,7 @@
     const pb = state.pb, mt = pb && pbMatch(pb);
     const row = (k, v) => (v ? `<dt>${T(k)}</dt><dd>${esc(v)}</dd>` : '');
     return `<div class="card f"><b>${T('pb_title')}</b><span class="muted small">${T('pb_text')}</span><textarea class="inp" id="pb-text" rows="6" placeholder="${T('pb_ph')}"></textarea><div class="bar"><button class="btn primary" data-act="pbread">${T('pb_read')}</button>${pb ? `<button class="btn" data-act="pbclear">${T('close')}</button>` : ''}</div>
-      ${pb ? `<div class="f"><b>${esc(pb.status === 'cancel' ? T('pb_cancel') : pb.status === 'change' ? T('pb_change') : T('pb_new'))}${pb.src ? ' · ' + esc(pb.src) : ''}</b><dl class="fields">${row('ref', pb.ref)}${row('tour', pb.title)}${row('date', pb.date ? fmtDay(pb.date) : '')}${row('start', pb.time)}${row('guest', pb.guest)}${row('guests_cap', acText({ adults: pb.adults, children: pb.children, pax: pb.adults + pb.children }))}${row('phone', pb.phone ? phoneFlag(pb.phone).split(' ')[0] + ' ' + pb.phone : '')}${row('email', pb.email)}${row('guest_lang', pb.lang)}${row('guest_addr', pb.pickup)}${row('options', pb.marks.map(markLabel).join(', '))}${row('pb_price', pb.price)}</dl>
+      ${pb ? `<div class="f"><b>${esc(pb.status === 'cancel' ? T('pb_cancel') : pb.status === 'change' ? T('pb_change') : T('pb_new'))}${pb.src ? ' · ' + esc(pb.src) : ''}</b><dl class="fields">${row('ref', pb.ref)}${row('tour', pb.title)}${row('date', pb.date ? fmtDay(pb.date) : '')}${row('start', pb.time)}${row('guest', pb.guest)}${row('guests_cap', acText({ adults: pb.adults, children: pb.children, pax: pb.adults + pb.children }))}${row('phone', pb.phone ? phoneFlag(pb.phone).split(' ')[0] + ' ' + pb.phone : '')}${row('email', pb.email)}${row('guest_lang', pb.lang)}${row('guest_addr', pb.pickup)}${row('options', pb.marks.map(markLabel).join(', '))}${row('pb_others', pb.others)}${row('pb_price', pb.price)}</dl>
         ${!pb.date || !pb.guest ? `<div class="warnline soft">! ${T('pb_missing')}</div>` : ''}
         ${mt.old ? `<div class="banner small">${T('pb_known', { tour: mt.oldTour ? mt.oldTour.title + ', ' + fmtDay(mt.oldTour.date) : '—' })}</div>` : ''}
         <div class="bar">${pb.status === 'cancel' && mt.old ? `<button class="btn primary" data-act="pbgo" data-m="cancel">${T('pb_do_cancel')}</button>` : `<button class="btn primary" data-act="pbgo" data-m="add">${mt.old ? T('pb_do_update') : mt.tour ? T('pb_do_add', { tour: mt.tour.title + (mt.tour.start_time ? ' ' + mt.tour.start_time : '') }) : T('pb_do_new')}</button>`}</div>
@@ -2164,12 +2176,12 @@
     fsize(el) { try { localStorage.setItem('fs-fsize', el.dataset.v); } catch (e) { /* private mode */ } applyDisplay(); render(); },
     theme(el) { try { localStorage.setItem('fs-theme', el.dataset.v); } catch (e) { /* private mode */ } applyDisplay(); render(); },
     payshow() { state.payEdit = !state.payEdit; render(); },
-    pbread() { const v = ($('#pb-text') || {}).value || ''; if (!v.trim()) return; if (/New order of|trekksoft/i.test(v) && !/getyourguide|viator/i.test(v)) { state.pb = null; run(() => forms.mail({ get: () => v })); return; } state.pb = parseBooking(v); render(); },
+    pbread() { const v = ($('#pb-text') || {}).value || ''; if (!v.trim()) return; if (/New order of/i.test(v) && /Booked At/i.test(v) && !/getyourguide|viator/i.test(v)) { state.pb = null; run(() => forms.mail({ get: () => v })); return; } state.pb = parseBooking(v); render(); },
     pbclear() { state.pb = null; render(); },
     pbgo(el) {
       const pb = state.pb, mt = pbMatch(pb); if (!pb) return;
       if (el.dataset.m === 'cancel') { run(async () => { const b = mt.old; await S.remove('bookings', b.id); const t = mt.oldTour; if (t) { const rest = db.bookings.filter(x => x.tour_id === t.id); await S.save('tours', { ...t, adults: rest.reduce((n, x) => n + (+x.adults || 0), 0), children: rest.reduce((n, x) => n + (+x.children || 0), 0), pax: rest.reduce((n, x) => n + (+x.pax || 0), 0) }); } logAct(`Booking cancelled from email: ${pb.ref} (${b.guest})`); state.pb = null; }, T('pb_cancelled')); return; }
-      const bk = { id: mt.old ? mt.old.id : S.uid(), client_id: mt.old ? mt.old.client_id : null, guest: pb.guest || (mt.old || {}).guest || '', adults: pb.adults, children: pb.children, phone: pb.phone || (mt.old || {}).phone || '', email: pb.email || (mt.old || {}).email || '', ref: pb.ref, lang: pb.lang, source: pb.src || null, marks: [...new Set([...((mt.old || {}).marks || []), ...pb.marks])], pickup_addr: pb.marks.includes('pickup') ? pb.pickup : '', notes: (mt.old || {}).notes || '', payment: (mt.old || {}).payment || 'prepaid', currency: pb.pcur || (mt.old || {}).currency || guestCur(), price: pb.pnum ?? (mt.old || {}).price ?? null, history: (mt.old || {}).history || [] };
+      const bk = { id: mt.old ? mt.old.id : S.uid(), client_id: mt.old ? mt.old.client_id : null, guest: pb.guest || (mt.old || {}).guest || '', adults: pb.adults, children: pb.children, phone: pb.phone || (mt.old || {}).phone || '', email: pb.email || (mt.old || {}).email || '', ref: pb.ref, lang: pb.lang, source: pb.src || null, marks: [...new Set([...((mt.old || {}).marks || []), ...pb.marks])], pickup_addr: pb.marks.includes('pickup') ? pb.pickup : '', notes: [(mt.old || {}).notes, pb.others ? T('pb_others') + ': ' + pb.others : ''].filter(Boolean).join(' · '), payment: (mt.old || {}).payment || 'prepaid', currency: pb.pcur || (mt.old || {}).currency || guestCur(), price: pb.pnum ?? (mt.old || {}).price ?? null, history: (mt.old || {}).history || [] };
       const target = mt.old && mt.oldTour && (!pb.date || pb.date === mt.oldTour.date) && (!pb.time || pb.time === mt.oldTour.start_time) ? mt.oldTour : mt.tour;
       state.pb = null; state.view = 'calendar';
       if (target) { openTour(target.id); const d = state.modal.draft; d.bookings = d.bookings.filter(b => b.id !== bk.id); d.bookings.push(bk); state.modal.edit = true; renderModal(); }
