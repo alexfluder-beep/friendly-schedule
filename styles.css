@@ -75,7 +75,7 @@ button.barcol.sel i{background:var(--ink)}
 .btn:active,.iconbtn:active,.chip:active,button.card:active{transform:scale(.97)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .btn.danger{color:var(--danger);border-color:var(--danger)}
-.btn.sm{padding:4px 12px;font-size:var(--t-sm);min-height:34px}
+
 .btn:disabled{opacity:.5;cursor:default}
 .banner{background:var(--accent-soft);border:1px solid var(--line);border-radius:var(--r);padding:10px 14px;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
 .banner select{padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:var(--surface)}
@@ -96,10 +96,10 @@ button.barcol.sel i{background:var(--ink)}
 .cell .add{position:absolute;right:3px;bottom:3px;width:22px;height:22px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--muted);line-height:1;padding:0;opacity:0}
 .cell:hover .add,.cell .add:focus-visible{opacity:1}
 .chip{display:block;width:100%;text-align:left;border:1px solid color-mix(in srgb,var(--k) 35%,var(--line));background:color-mix(in srgb,var(--k) 11%,var(--surface));border-radius:7px;padding:4px 6px;font-size:var(--t-sm);line-height:1.25;overflow-wrap:anywhere}
-.chip b{color:var(--k)}
+
 .chip .w{color:var(--danger);font-weight:700}
-.k-transfer{--k:var(--transfer)}.t-transfer{--c:var(--transfer)}
-.k-private{--k:var(--private)}.k-group{--k:var(--group)}.k-custom{--k:var(--custom)}
+.t-transfer{--c:var(--transfer)}
+
 .tag{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:2px 8px;font-size:var(--t-cap);font-weight:700;border:1px solid color-mix(in srgb,var(--c) 40%,var(--line));color:var(--c);background:color-mix(in srgb,var(--c) 10%,var(--surface));white-space:nowrap}
 .t-off{--c:var(--off)}.t-sick{--c:var(--sick)}.t-hol{--c:var(--holiday)}.t-ok{--c:var(--ok)}.t-warn{--c:var(--warn)}.t-danger{--c:var(--danger)}.t-private{--c:var(--private)}.t-group{--c:var(--group)}.t-custom{--c:var(--custom)}.t-muted{--c:var(--muted)}
 /* agenda (phone) */
@@ -149,7 +149,7 @@ form.f,.f{display:flex;flex-direction:column;gap:12px}
 .checks{display:flex;flex-wrap:wrap;gap:6px}
 .checks label{flex-direction:row;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:4px 10px;color:var(--ink);background:var(--surface)}
 .checks input{width:auto}
-.brow{display:grid;grid-template-columns:minmax(0,2fr) 64px minmax(0,1.3fr) minmax(0,1.2fr) 34px;gap:6px;align-items:center}
+
 .overlay{position:fixed;inset:0;background:rgba(8,14,20,.55);z-index:20;display:flex;align-items:flex-end;justify-content:center;padding-top:env(safe-area-inset-top,0px)}
 .sheet{background:var(--bg);width:min(640px,100%);max-height:92%;overflow:auto;border-radius:16px 16px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px}
 .sheet .hdr{display:flex;align-items:center;gap:10px}
@@ -179,7 +179,7 @@ form.f,.f{display:flex;flex-direction:column;gap:12px}
 .ib{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:var(--surface);display:inline-flex;align-items:center;justify-content:center;color:var(--ink);padding:0;flex:none;transition:transform .15s}
 .ib:active{transform:scale(.94)}
 .lnk{display:inline-flex;gap:4px;align-items:center;font-size:var(--t-sm);color:var(--muted);text-decoration:underline;text-underline-offset:3px;background:none;border:0;padding:4px 0}
-.tag{font-size:var(--t-micro);padding:1px 7px}
+
 .glist{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);overflow:hidden}
 .grow{padding:10px 12px;display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--line)}
 .grow:first-child{border-top:0}
@@ -200,7 +200,7 @@ details.more[open]{display:flex;flex-direction:column;gap:6px}
 /* tour emblems: each tour has its own colour and short code */
 .emb{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:18px;padding:0 4px;border-radius:6px;color:#fff;font-size:var(--t-micro);font-weight:700;letter-spacing:.03em;vertical-align:middle;margin-right:4px;flex:none}
 .emb.big{min-width:34px;height:28px;font-size:var(--t-sm);border-radius:8px;margin-right:0}
-.embs{display:flex;flex-wrap:wrap;gap:2px;align-items:center}.embs .emb{margin:0}
+.embs .emb{margin:0}
 .chip b{color:var(--ink)}
 .hdr .emb{flex:none}
 
@@ -224,17 +224,17 @@ details.more[open]{display:flex;flex-direction:column;gap:6px}
 .nothing{padding:2px 0 4px}
 .acard{display:flex;flex-direction:column;gap:5px;width:100%;text-align:left;border:1px solid color-mix(in srgb,var(--k) 30%,var(--line));background:color-mix(in srgb,var(--k) 10%,var(--surface));border-radius:12px;padding:10px 12px;color:var(--ink);transition:transform .15s}
 .acard:active{transform:scale(.98)}
-.acard .ttl{font-weight:700;overflow-wrap:anywhere}.acard .cnt{font-weight:600}
+.acard .ttl{font-weight:700;overflow-wrap:anywhere}
 .acard .row{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center}
 .acard .p{display:inline-flex;align-items:center;gap:6px;font-size:var(--t-body)}
 .acard .w{color:var(--danger);font-weight:700}
-.acard.off{--k:var(--off);border-style:dashed}
+
 .avatar.ini{background:var(--surface2);color:var(--ink);border:1px solid var(--line)}
 .avatar.xl{width:84px;height:84px;font-size:var(--t-h1)}
 button.grow{width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);color:var(--ink)}
 button.grow:first-child{border-top:0}
 .grow .gname{text-decoration:none}
-.chev{color:var(--muted);font-size:var(--t-h2);line-height:1;flex:none}
+
 .alist{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);overflow:hidden;display:flex;flex-direction:column}
 .arow{display:flex;gap:12px;align-items:center;padding:13px 14px;border:0;border-top:1px solid var(--line);background:none;color:var(--ink);text-decoration:none;text-align:left;font-size:var(--t-body);width:100%}
 .arow:first-child{border-top:0}
@@ -370,7 +370,7 @@ input::-webkit-date-and-time-value{text-align:left}
 .homebar h2{font-size:var(--t-h2)}
 .dayhd.my{margin-top:14px;border:0;padding:0}.dayhd.my b{font-weight:600;color:var(--muted);font-size:var(--t-body)}.dayhd.my.tdy b{color:var(--ink)}
 .acard.mycard{display:flex;flex-direction:column;gap:3px;width:100%;text-align:left;border:0;border-left:5px solid var(--k);background:color-mix(in srgb,var(--k) 12%,var(--surface));border-radius:8px 12px 12px 8px;padding:10px 12px;color:var(--ink);transition:transform .12s}
-.mycard .ttl{font-weight:700;font-size:var(--t-body)}.mycard .tm{font-size:var(--t-body)}.mycard .cnt{font-weight:600}
+.mycard .tm{font-size:var(--t-body)}.mycard .cnt{font-weight:600}
 .acard.mycard.off{border-style:solid;background:color-mix(in srgb,var(--private) 10%,var(--surface))}
 .mycard.cancelled{opacity:.7}.mycard.cancelled .tname{text-decoration:line-through}
 .nothing2{display:flex;gap:14px;align-items:center;justify-content:space-between;padding:2px 2px 4px}
@@ -382,7 +382,7 @@ input::-webkit-date-and-time-value{text-align:left}
 
 /* v2.0: guests who stay at the destination, share list, move and drag-and-drop */
 .t-stay{--c:var(--group)}
-.stayline{display:flex;gap:6px;align-items:center;font-weight:600;color:var(--group)}
+
 .shgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.shgrid .btn{justify-content:center}
 [data-drag]{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 @media (hover:hover){[data-drag]{cursor:grab}}
@@ -520,3 +520,36 @@ details.sect summary{font-size:var(--t-h3)}
 .acard .ttl{font-size:var(--t-h3);line-height:1.3}
 .acard .wx,.acard .row .muted{font-size:var(--t-sm)}
 .agenda h3,.dayhd{letter-spacing:-.005em}
+/* 3.5 Options tick list: tick box on the left, text next to it (the form label rule made them a centred column) */
+.msel .mslist label{flex-direction:row;justify-content:flex-start;align-items:center;text-align:left;color:var(--ink);font-size:var(--t-body);font-weight:500;min-height:48px;gap:12px}
+.msel .mslist input{width:22px;height:22px;margin:0}
+.msel .mspanel .inp{min-height:44px}
+/* 3.5 Easier for everyone, also 50+: 44px touch targets, 16px for what a guide must read, fewer colours per card */
+.ib{width:44px;height:44px}
+.btn.sm{min-height:44px;font-size:var(--t-body);padding:6px 16px}
+.iconbtn{min-width:44px;height:44px}
+.lnk{min-height:44px;font-size:var(--t-body)}
+.att button{min-height:48px;font-size:var(--t-body)}
+.seg button{min-height:44px}
+.tag{font-size:var(--t-cap);padding:3px 10px}
+.warnline{font-size:var(--t-body)}
+.grow{padding:12px 0;gap:6px}
+.grow .gtxt{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0}
+.grow .gname{font-size:var(--t-body);font-weight:700}
+.gsum{font-size:var(--t-body);color:var(--ink);overflow-wrap:anywhere}
+.due{color:var(--warn);font-weight:700}
+.grow .gaddr{font-size:var(--t-body);color:var(--muted)}
+.grow .gaddr>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tsum{background:var(--surface2);border-radius:12px;padding:12px 16px;display:flex;flex-direction:column;gap:4px;font-size:var(--t-body)}
+.acard .wx:not(.rough){display:none}
+.acard .chk,.chip .chk{display:inline-flex;align-items:center;border:1px solid var(--warn);color:var(--warn);border-radius:999px;padding:1px 10px;font-size:var(--t-sm);font-weight:700;vertical-align:middle}
+.acard .p{font-size:var(--t-body)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr))}
+.stat{min-width:0}
+.gcard+.gcard{margin-top:16px}
+.wgrid .chip{font-size:var(--t-body);padding:6px 8px}
+@media (max-width:760px){.tiles{grid-template-columns:1fr 1fr;gap:8px}.tiles .card{padding:12px}}
+/* the month chart is "bars two": the form rule ".f .two" made it 2 columns on every screen */
+.card.f .bars.two{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:2px}
+.card .stats{grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}
+@media (max-width:760px){.wkmost{display:none}}

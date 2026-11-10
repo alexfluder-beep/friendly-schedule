@@ -39,7 +39,7 @@
   const saveCache = () => { if (mode !== 'supabase' || !me || !me.active) return; clearTimeout(cacheTimer); cacheTimer = setTimeout(() => { idb.set('cache', { me, db, at: new Date().toISOString() }); idb.set('outbox', outbox); }, 800); };
   const isNetErr = e => !navigator.onLine || /fetch|network|load failed|abort|timed? ?out/i.test(String((e && e.message) || e) + ' ' + ((e && e.name) || ''));
   // Weak internet: a request that hangs is stopped after 15 seconds, and the change waits on the phone instead.
-  const slowFetch = (url, o) => { const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 30000); if (o && o.signal) o.signal.addEventListener('abort', () => ac.abort()); return fetch(url, { ...(o || {}), signal: ac.signal }).finally(() => clearTimeout(tm)); };
+  const slowFetch = (url, o) => { const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 30000); if (o && o.signal) o.signal.addEventListener('abort', () => ac.abort(), { once: true }); return fetch(url, { ...(o || {}), signal: ac.signal }).finally(() => clearTimeout(tm)); };
   async function sendOp(o) {
     const q = o.op === 'remove' ? sb.from(o.table).delete().eq('id', o.id) : o.insert ? sb.from(o.table).insert(o.row) : sb.from(o.table).update(o.row).eq('id', o.row.id);
     const { error } = await q; if (error) throw error;
@@ -162,7 +162,8 @@
         const have = new Set(db.clients.map(c => c.id)), need = [...new Set(bookings.map(b => b.client_id).filter(c => c && !have.has(c)))];
         for (let i = 0; i < need.length; i += 100) { const { data } = await sb.from('clients').select('*').in('id', need.slice(i, i + 100)); if (data && data.length) { db.clients = db.clients.concat(data); changed = true; } }
       }
-      for (const t of HOT) { const rows = await fetchTable(t); if (rows && sig(rows) !== sig(db[t])) { db[t] = rows; changed = true; } }
+      const fresh = await Promise.all(HOT.map(t => fetchTable(t))); // the small tables load side by side, not one after another
+      HOT.forEach((t, i) => { const rows = fresh[i]; if (rows && sig(rows) !== sig(db[t])) { db[t] = rows; changed = true; } });
       const mine = db.profiles.find(p => p.id === me.id); if (mine) me = { ...me, ...mine };
       store.syncedAt = new Date().toISOString();
       if (changed) { saveCache(); emit(null, null, 'BULK', true); }
