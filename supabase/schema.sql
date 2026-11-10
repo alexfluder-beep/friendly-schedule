@@ -17,6 +17,7 @@ create table if not exists public.profiles (
   work_from text, work_to text, -- usual working hours
   languages text,              -- tour languages this guide can lead, e.g. "EN, RU"
   telegram text,               -- Telegram username without @, shown as a one-tap button to colleagues
+  badges_seen text[],          -- badges already celebrated, so the welcome badge shows once per account
   active boolean not null default false,
   telegram_id bigint unique,   -- set by the crew bot when the person sends it /link with the code below
   link_code text,              -- one-time code the person creates in the app (Me > Telegram bot)
@@ -61,7 +62,10 @@ create table if not exists public.bookings (
   attendance text check (attendance in ('arrived','noshow')),
   source text, payment text check (payment in ('prepaid','cash','unpaid')), amount_due numeric,
   pickup_addr text, pickup_url text,       -- this guest's own pick-up or drop-off address and its map link
-  marks text[] not null default '{}'      -- wine, private_room, front_seat, bear_food, pickup, dropoff, stays (stays at the destination after the tour), or your own
+  marks text[] not null default '{}',     -- wine, private_room, front_seat, bear_food, pickup, dropoff, stays (stays at the destination after the tour), or your own
+  email text, lang text, currency text,   -- guest email, the language the guest asked for, currency of amount_due
+  history jsonb not null default '[]',    -- booked, changed, moved, cancelled: time, who, what
+  created_at timestamptz not null default now()
 );
 create index if not exists bookings_client_idx on public.bookings(client_id);
 create index if not exists tours_guide_idx on public.tours(guide_id, date);
@@ -183,6 +187,11 @@ create table if not exists public.invites (            -- people the admin has a
   role text not null default 'guide' check (role in ('admin','guide','driver')),
   phone text, languages text, telegram text, color text, vehicle text, work_week jsonb, work_days text, work_from text, work_to text, skills text[] not null default '{}',
   created_by uuid references public.profiles(id) on delete set null, created_at timestamptz not null default now()
+);
+create table if not exists public.app_errors (          -- problem log: errors, failed saves and lost connections, sent by the phones
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.profiles(id) on delete set null,
+  at timestamptz not null default now(), kind text, message text, detail text, page text, version text, device text
 );
 create table if not exists public.push_subscriptions (
   id uuid primary key default gen_random_uuid(),
@@ -316,7 +325,7 @@ language plpgsql security definer set search_path = public as $$
 declare n int;
 begin
   if not public.is_admin() then raise exception 'Only an admin can remove guest data'; end if;
-  update public.bookings set guest = 'Guest', phone = null, notes = null, ref = null where client_id = any(ids);
+  update public.bookings set guest = 'Guest', phone = null, email = null, notes = null, ref = null, pickup_addr = null, pickup_url = null where client_id = any(ids);
   update public.client_ratings set note = null where client_id = any(ids);
   update public.clients set name = 'Guest', phone = null, email = null, notes = null, anonymised_at = now() where id = any(ids) and anonymised_at is null;
   get diagnostics n = row_count;
@@ -328,6 +337,17 @@ begin
   if months is null or months < 3 then raise exception 'Keep guest details for at least 3 months'; end if;
   return public.erase_guests(array(select public.stale_guests(months)));
 end $$;
+-- Admin joins duplicate guests: every booking and rating moves to one guest, the others are removed.
+create or replace function public.merge_clients(target uuid, others uuid[]) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_admin() then raise exception 'Only an admin can merge guests'; end if;
+  update public.bookings set client_id = target where client_id = any(others);
+  update public.client_ratings set client_id = target where client_id = any(others);
+  delete from public.clients where id = any(others) and id <> target;
+end $$;
+revoke all on function public.merge_clients(uuid, uuid[]) from public;
+grant execute on function public.merge_clients(uuid, uuid[]) to authenticated;
 revoke all on function public.erase_guests(uuid[]) from public;
 revoke all on function public.purge_old_guests(int) from public;
 grant execute on function public.stale_guests(int) to authenticated;
@@ -429,6 +449,7 @@ revoke all on function public.weekly_check() from public, authenticated, anon;
 
 -- ---------- row level security ----------
 alter table public.profiles enable row level security;
+alter table public.app_errors enable row level security;
 alter table public.tours enable row level security;
 alter table public.bookings enable row level security;
 alter table public.clients enable row level security;
@@ -480,6 +501,10 @@ create policy scores_insert on public.tour_ratings for insert to authenticated w
 create policy scores_update on public.tour_ratings for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 create policy scores_admin on public.tour_ratings for all to authenticated using (public.is_admin()) with check (public.is_admin());
 -- bank details: own row and admins only
+-- problem log: everyone signed in can add their own entries; only admins read and clear the list
+create policy app_errors_add on public.app_errors for insert to authenticated with check (user_id = auth.uid());
+create policy app_errors_admin_read on public.app_errors for select to authenticated using (public.is_admin());
+create policy app_errors_admin_clear on public.app_errors for delete to authenticated using (public.is_admin());
 create policy payout_own on public.payout_details for all to authenticated using (id = auth.uid()) with check (id = auth.uid());
 create policy payout_admin on public.payout_details for select to authenticated using (public.is_admin());
 -- change log: anyone with access adds entries, only admins read them, nobody edits them

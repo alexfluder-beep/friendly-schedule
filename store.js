@@ -255,6 +255,15 @@
       // nothing about guests or the team stays on a phone after sign-out
       await idb.set('cache', null); outbox = []; store.pending = 0; await idb.set('outbox', []); subscribed = false; try { sb.removeAllChannels(); } catch (e) { /* no channel yet */ }
     },
+    async mergeClients(target, others) {
+      if (mode !== 'demo') { const { error } = await sb.rpc('merge_clients', { target, others }); if (error) throw error; await pulse(); return; }
+      db.bookings.forEach(b => { if (others.includes(b.client_id)) b.client_id = target; }); db.client_ratings.forEach(r => { if (others.includes(r.client_id)) r.client_id = target; });
+      db.clients = db.clients.filter(c => !others.includes(c.id)); persistDemo();
+    },
+    // Problem log: errors and lost connections from every phone, so the admin can see what went wrong and when.
+    async reportErrors(rows) { if (mode === 'demo') { db.app_errors = [...rows, ...(db.app_errors || [])].slice(0, 300); return; } const { error } = await sb.from('app_errors').insert(rows); if (error) throw error; },
+    async fetchErrors() { if (mode === 'demo') return (db.app_errors || []).slice(); const { data, error } = await sb.from('app_errors').select('*').order('at', { ascending: false }).limit(300); if (error) throw error; return data || []; },
+    async clearErrors() { if (mode === 'demo') { db.app_errors = []; return; } const { error } = await sb.from('app_errors').delete().lt('at', new Date().toISOString()); if (error) throw error; },
     // Returning guests: only counts come back, never the old bookings themselves.
     async guestVisits(ids, uid) {
       if (mode !== 'demo') { if (store.offline) return []; const { data, error } = await sb.rpc('guest_visits', { ids }); if (error) throw error; return data || []; }

@@ -162,4 +162,24 @@ To let people in without an email confirmation step, turn off **Authentication >
 
 - Each person can have a Telegram username. The admin types it in **Edit person** (`@nino`, `nino` or a `t.me/nino` link all work), or in the 5th column of **Add several people at once**. Each person can also set or change their own on the **Me** screen.
 - Colleagues then get a Telegram button next to WhatsApp and Call: on the tour card, in the tour view and in the contacts list. The team list shows `@username`.
-- Database: run `supabase/update-2.4.sql` once (safe to run again).
+- Database: included in `supabase/update-2.8.sql`.
+
+## Versions 2.5 to 2.8 (feedback round of 10 Nov)
+
+Database: run `supabase/update-2.8.sql` once in Supabase > SQL Editor (safe to run again). It covers 2.4 to 2.8.
+
+- **Problems log** (Back office > Problems): errors, failed saves, connection drops longer than 30 seconds and "app could not start", from every phone, with person, screen, phone type and version. Phones without internet keep them and send later. People can also type a short report in the "Test version" window.
+- **Driver list**: drivers first, then guides who drive (own car or Delica), then others; says so when there are no drivers yet.
+- **Badges**: the seen list is saved on the account, so the welcome badge shows once per person, not once per phone. Only the welcome badge and region titles take the full screen; other badges come as a small note at the bottom.
+- **Guests**: email and language on each booking and on the guest card (admin can edit name, phone, email, notes). Typing a name, phone, email or booking code shows guests already in the base ("Already in the base") with a Use button. Local Georgian numbers get +995; phones show the country flag.
+- **Duplicates**: Back office > Guests lists possible duplicates (same phone, email or name) with Merge; merging is done on the server so old bookings move too.
+- **Money**: currency per booking (GEL, USD, EUR, AMD, RUB, GBP); "Cash to collect" adds up per currency.
+- **Options** as a checklist; **address** field takes a hotel name, a Google Maps link or coordinates (decimal or degrees) and makes the map link itself; earlier addresses are suggested.
+- **Booking history** in the guest sheet: booked, changed (which fields), moved (from/to), tour cancelled or restored, moved to the second car, with who and when.
+- **Display** (Me screen): text size small/normal/big and colours like the phone/light/dark, saved per phone.
+- **Days off** in a clear blue; holidays have a gold top line; month view on computers lists tours per day like Setmore (time, title, guide colour).
+- **Help**: tasks explained, levels explained (points per tour, guest, km, badge), Telegram steps, how day-off dates are suggested. **Busy periods** (Rules): New Year, Chinese New Year, Nowruz, Easter, Eid, Golden Week; suggestions avoid them and requests for them get a warning. Moon-based dates are estimates.
+- **Bank details** are shown hidden (•••• 1234) after saving; only the person and admins can read them.
+- **Telegram code** card only shows once the admin has set the bot link in Rules (the bot itself still needs the bridge from `bot/`).
+- **Paste a booking** (Back office > Booking from email): paste any booking email (GetYourGuide, Viator, Klook, Trip.com, Airbnb, TrekkSoft...). It reads the code, tour, date, time, guest, people, phone, email, language, pick-up and options, finds the matching tour (or a catalogue tour) and opens it for checking; a cancellation email offers to remove the guest. TrekkSoft "New order" emails go to the TrekkSoft reader.
+- **Setmore guest contacts** (Back office > Setmore import): upload the Customers export (CSV or Excel); new guests are added, existing ones get missing phone/email/notes. CSV files are read without the online Excel library.

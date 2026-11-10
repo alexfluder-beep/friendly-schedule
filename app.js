@@ -4,7 +4,19 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '2.4';
+  const APP_VERSION = '2.8';
+  // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
+  const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
+2027-01-05..2027-01-08 Orthodox Christmas
+2027-02-05..2027-02-14 Chinese New Year
+2027-03-08..2027-03-14 Eid al-Fitr (date depends on the moon)
+2027-03-20..2027-04-02 Nowruz
+2027-03-26..2027-03-29 Easter
+2027-04-30..2027-05-05 Orthodox Easter and May holidays
+2027-05-15..2027-05-20 Eid al-Adha (date depends on the moon)
+2027-10-01..2027-10-07 Golden Week (China)`;
+  const peaks = () => String(rules().peaks ?? DEFAULT_PEAKS).split('\n').map(l => l.trim().match(/^(\d{4}-\d\d-\d\d)\s*\.\.\s*(\d{4}-\d\d-\d\d)\s*(.*)$/)).filter(Boolean).map(x => ({ from: x[1], to: x[2], name: x[3] || '' }));
+  const peakOn = d => peaks().find(p => p.from <= d && p.to >= d);
   const DEFAULT_RULES = { maxStreak: 6, carSeats: 6, seasonFrom: 6, seasonTo: 10, maxSeasonBlock: 5, minNoticeDays: 14 };
   const LOCALES = { en: 'en-GB', ru: 'ru-RU', ka: 'ka-GE' };
 
@@ -113,13 +125,43 @@
   // Country of a phone number from its dialling code. It shows where the number is registered, not the guest's nationality.
   const DIAL = { 1: 'US', 20: 'EG', 27: 'ZA', 30: 'GR', 31: 'NL', 32: 'BE', 33: 'FR', 34: 'ES', 36: 'HU', 39: 'IT', 40: 'RO', 41: 'CH', 43: 'AT', 44: 'GB', 45: 'DK', 46: 'SE', 47: 'NO', 48: 'PL', 49: 'DE', 52: 'MX', 54: 'AR', 55: 'BR', 60: 'MY', 61: 'AU', 62: 'ID', 63: 'PH', 64: 'NZ', 65: 'SG', 66: 'TH', 7: 'RU', 76: 'KZ', 77: 'KZ', 81: 'JP', 82: 'KR', 84: 'VN', 86: 'CN', 90: 'TR', 91: 'IN', 92: 'PK', 94: 'LK', 98: 'IR', 351: 'PT', 352: 'LU', 353: 'IE', 354: 'IS', 356: 'MT', 357: 'CY', 358: 'FI', 359: 'BG', 370: 'LT', 371: 'LV', 372: 'EE', 373: 'MD', 374: 'AM', 375: 'BY', 380: 'UA', 381: 'RS', 385: 'HR', 386: 'SI', 420: 'CZ', 421: 'SK', 852: 'HK', 886: 'TW', 961: 'LB', 962: 'JO', 964: 'IQ', 965: 'KW', 966: 'SA', 968: 'OM', 971: 'AE', 972: 'IL', 973: 'BH', 974: 'QA', 992: 'TJ', 993: 'TM', 994: 'AZ', 995: 'GE', 996: 'KG', 998: 'UZ' };
   function phoneCountry(phone) {
-    const p = String(phone || '').trim(); if (!/^(\+|00)/.test(p)) return '';
-    const d = p.replace(/^00/, '').replace(/\D/g, ''); let iso = '';
-    for (const n of [3, 2, 1]) { if (DIAL[d.slice(0, n)]) { iso = DIAL[d.slice(0, n)]; break; } }
-    if (!iso) return '';
+    const iso = phoneIso(phone); if (!iso) return '';
     try { return new Intl.DisplayNames([LOCALES[lang()]], { type: 'region' }).of(iso) || iso; } catch (e) { return iso; }
   }
   const guestCur = () => rules().guestCurrency || 'USD';
+  const CURRENCIES = ['GEL', 'USD', 'EUR', 'AMD', 'RUB', 'GBP'];
+  function phoneIso(phone) {
+    const p = String(phone || '').trim(); if (!/^(\+|00)/.test(p)) return '';
+    const d = p.replace(/^00/, '').replace(/\D/g, '');
+    for (const n of [3, 2, 1]) if (DIAL[d.slice(0, n)]) return DIAL[d.slice(0, n)];
+    return '';
+  }
+  // Flag picture from the country code, e.g. GE -> flag of Georgia (the phone's own emoji font draws it).
+  const flagOf = iso => (iso && iso.length === 2 ? String.fromCodePoint(...[...iso.toUpperCase()].map(ch => 127397 + ch.charCodeAt(0))) : '');
+  const phoneFlag = phone => { const iso = phoneIso(phone); return iso ? `${flagOf(iso)} ${phoneCountry(phone)}` : ''; };
+  // Local Georgian mobile numbers get +995; 00 becomes +.
+  function normPhone(v) {
+    const p = String(v || '').trim(); if (!p) return ''; const d = p.replace(/\D/g, '');
+    if (/^00/.test(p)) return '+' + d.slice(2); if (p.startsWith('+')) return '+' + d;
+    if (/^5\d{8}$/.test(d)) return '+995' + d; if (/^995\d{9}$/.test(d)) return '+' + d; return p;
+  }
+  // An address field also takes a Google Maps link or coordinates (41.6938, 44.8015 or 41°41'37"N 44°48'05"E).
+  function parseLoc(text) {
+    const t = String(text || '').trim(); if (!t) return { addr: '', url: '' };
+    if (/^https?:\/\//i.test(t)) {
+      if (!/google\.[a-z.]+\/maps|maps\.app\.goo\.gl|goo\.gl\/maps|maps\.google|yandex\.[a-z]+\/maps|2gis\./i.test(t)) return { addr: t, url: '' };
+      const pl = (t.match(/\/place\/([^/@?]+)/) || [])[1], ll = t.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) || t.match(/[?&](?:q|ll|query)=(-?\d+\.\d+),\s*(-?\d+\.\d+)/);
+      let name = ''; try { name = pl ? decodeURIComponent(pl.replace(/\+/g, ' ')) : ''; } catch (e) { name = ''; }
+      return { addr: name || (ll ? `${(+ll[1]).toFixed(5)}, ${(+ll[2]).toFixed(5)}` : T('map_pin')), url: t };
+    }
+    const dec = t.match(/^(-?\d{1,2}\.\d{3,})\s*[,; ]\s*(-?\d{1,3}\.\d{3,})$/);
+    if (dec) return { addr: t, url: `https://www.google.com/maps?q=${dec[1]},${dec[2]}` };
+    const dms = [...t.matchAll(/(\d{1,3})\s*°\s*(\d{1,2})\s*['′]\s*(\d{1,2}(?:[.,]\d+)?)?\s*(?:"|″|'')?\s*([NSEW])/gi)];
+    if (dms.length === 2) { const v = m => { let x = +m[1] + +m[2] / 60 + (+(String(m[3] || 0).replace(',', '.'))) / 3600; if (/[SW]/i.test(m[4])) x = -x; return x.toFixed(6); }; return { addr: t, url: `https://www.google.com/maps?q=${v(dms[0])},${v(dms[1])}` }; }
+    return { addr: t, url: '' };
+  }
+  const knownAddrs = () => [...new Set([...db.bookings.map(b => b.pickup_addr), ...db.tours.map(t => t.pickup)].filter(x => x && !/^https?:/i.test(x)))].sort().slice(0, 300);
+  const GUEST_LANGS = ['EN', 'RU', 'KA', 'DE', 'FR', 'ES', 'IT', 'HE', 'ZH', 'AR', 'TR', 'UK', 'PL', 'NL', 'JA', 'KO'];
   const tourMap = t => t.pickup_url || (t.pickup ? mapsLink(t.pickup) : '');
   const allMarks = () => [...MARKS, ...String(rules().customMarks || '').split(',').map(x => x.trim()).filter(Boolean)];
   const markLabel = m => (MARKS.includes(m) ? T('mark_' + m) : m);
@@ -197,6 +239,8 @@
   const staffBtns = (p, copy) => { if (!p) return ''; const tg = tgLink(p.telegram); return p.phone || tg ? `<span class="cbtns">${p.phone ? ib('wa', 'WhatsApp', waLink(p.phone)) + ib('call', T('call'), 'tel:' + p.phone) : ''}${tg ? ib('tg', 'Telegram', tg) : ''}${copy && p.phone ? ibCopy(p.phone, T('copy')) : ''}</span>` : ''; };
   const contactBtns = (phone, email) => `<span class="cbtns">${phone ? ib('wa', 'WhatsApp', waLink(phone)) + ib('call', T('call'), 'tel:' + phone) : ''}${email ? ib('mail', T('email'), 'mailto:' + email) : ''}${phone ? ibCopy(phone, T('copy')) : ''}</span>`;
   const cashDue = bk => bk.filter(b => b.payment === 'cash' || b.payment === 'unpaid').reduce((a, b) => a + (Number(b.amount_due) || 0), 0);
+  // Money to collect, added up per currency: "120 GEL + 40 USD".
+  const cashText = bk => { const m = {}; bk.filter(b => b.payment === 'cash' || b.payment === 'unpaid').forEach(b => { const cu = b.currency || guestCur(); m[cu] = (m[cu] || 0) + (Number(b.amount_due) || 0); }); return Object.entries(m).filter(x => x[1]).map(([k, v]) => `${nf(v)} ${k}`).join(' + '); };
   function tourText(t) {
     const bk = t.bookings || tourBookings(t.id), L = [t.title, `${dateText(t)}${t.start_time ? ', ' + t.start_time : ''}${t.end_time ? '–' + t.end_time : ''}`];
     if (t.pickup) L.push(`${T('pickup')}: ${t.pickup}`, tourMap(t));
@@ -204,7 +248,7 @@
     bk.forEach(b => L.push(`- ${b.guest} (${acText(b)})${(b.marks || []).length ? ' · ' + b.marks.map(markLabel).join(', ') : ''}`));
     bk.filter(b => b.pickup_addr).forEach(b => L.push(`  ${b.guest}: ${b.pickup_addr}`));
     if (staysN(bk)) L.push(T('stay_line', { n: staysN(bk), back: Math.max(0, (t.pax || 0) - staysN(bk)) }));
-    if (cashDue(bk)) L.push(`${T('cash_collect')}: ${cashDue(bk)} ${guestCur()}`);
+    if (cashDue(bk)) L.push(`${T('cash_collect')}: ${cashText(bk)}`);
     if (t.notes) L.push(`${T('notes')}: ${t.notes}`);
     return L.join('\n');
   }
@@ -272,6 +316,7 @@
     if (booked) w.push(T('w_booked', { n: booked }));
     const others = new Set(db.time_off.filter(x => x.id !== o.id && x.user_id !== o.user_id && x.status === 'approved' && x.date_from <= o.date_to && x.date_to >= o.date_from).map(x => x.user_id)).size;
     if (others) w.push(T('w_othersoff', { n: others }));
+    const pk = peaks().find(p => p.from <= o.date_to && p.to >= o.date_from); if (pk) w.push(T('w_peak', { name: pk.name || fmtDay(pk.from) }));
     return w;
   }
 
@@ -312,6 +357,31 @@
   }
 
   // ---------- small UI helpers ----------
+  // ---------- problem log ----------
+  // Errors, failed saves and lost connections are kept on the phone and sent to the admin's Problems list when online.
+  const ERRQ = 'fs-errq';
+  const deviceName = () => `${/Android/i.test(navigator.userAgent) ? 'Android' : /iPhone|iPad/i.test(navigator.userAgent) ? 'iPhone' : /Mac/i.test(navigator.userAgent) ? 'Mac' : /Windows/i.test(navigator.userAgent) ? 'Windows' : 'other'} · ${/CriOS|Chrome/i.test(navigator.userAgent) ? 'Chrome' : /Safari/i.test(navigator.userAgent) ? 'Safari' : /Firefox/i.test(navigator.userAgent) ? 'Firefox' : 'browser'} · ${window.innerWidth}px`;
+  let errBusy = false;
+  function logErr(kind, message, detail) {
+    try {
+      const msg = String(message || '').slice(0, 500); if (!msg || /ResizeObserver loop|^Script error\.?$/i.test(msg)) return;
+      const q = JSON.parse(localStorage.getItem(ERRQ) || '[]');
+      if (q.length && q[q.length - 1].message === msg && Date.now() - new Date(q[q.length - 1].at).getTime() < 60000) return; // same error again within a minute
+      q.push({ id: S.uid(), at: new Date().toISOString(), kind, message: msg, detail: String(detail || '').slice(0, 2000), page: `${state.view}${state.view === 'calendar' ? '/' + state.mode : state.view === 'admin' ? '/' + (state.adminTab || '') : ''}`, version: APP_VERSION, device: deviceName() });
+      localStorage.setItem(ERRQ, JSON.stringify(q.slice(-60)));
+    } catch (e) { /* storage full or blocked */ }
+    setTimeout(flushErr, 500);
+  }
+  async function flushErr() {
+    if (errBusy || !me() || !me().active || S.offline) return; let q = [];
+    try { q = JSON.parse(localStorage.getItem(ERRQ) || '[]'); } catch (e) { q = []; } if (!q.length) return;
+    errBusy = true; try { localStorage.setItem(ERRQ, '[]'); await S.reportErrors(q.map(x => ({ ...x, user_id: me().id }))); } catch (e) { try { const now = JSON.parse(localStorage.getItem(ERRQ) || '[]'); localStorage.setItem(ERRQ, JSON.stringify([...q, ...now].slice(-60))); } catch (e2) { /* blocked */ } } errBusy = false;
+  }
+  window.addEventListener('error', ev => logErr('error', ev.message, [ev.filename && ev.filename.split('/').pop() + ':' + ev.lineno, ev.error && ev.error.stack].filter(Boolean).join('\n')));
+  window.addEventListener('unhandledrejection', ev => { const r = ev.reason || {}; logErr('error', r.message || String(r), r.stack || ''); });
+  // When the connection drops for more than 30 seconds, write down for how long.
+  let offSince = null;
+  function watchConn() { if (S.mode === 'demo') return; if (S.offline && !offSince) offSince = Date.now(); else if (!S.offline && offSince) { const sec = Math.round((Date.now() - offSince) / 1000), from = new Date(offSince); offSince = null; if (sec >= 30) logErr('offline', `No connection for ${sec >= 120 ? Math.round(sec / 60) + ' min' : sec + ' s'}, from ${from.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`, navigator.onLine ? 'phone was online: database or network did not answer' : 'phone had no internet'); else flushErr(); } }
   function toast(text) {
     const el = document.createElement('div'); el.className = 'toast'; el.textContent = text;
     $('#toasts').appendChild(el); setTimeout(() => el.remove(), 3500);
@@ -331,9 +401,13 @@
   const paxText = t => t.capacity > 0 ? `${t.pax || 0}/${t.capacity}` : `${t.pax || 0}`;
   const offTag = o => `<span class="tag ${o.type === 'sick' ? 't-sick' : 't-off'}">${T(o.type === 'sick' ? 'sick' : o.type === 'half' ? 'halfday' : 'dayoff')}${o.status === 'pending' ? ' · ' + T('pending') : ''}</span>`;
   const opt = (v, label, sel) => `<option value="${esc(v)}"${String(v) === String(sel ?? '') ? ' selected' : ''}>${esc(label)}</option>`;
-  const peopleOpts = (role, sel) => opt('', '—', sel) + staff().filter(p => !role || p.role === role || p.role === 'admin').map(p => opt(p.id, p.name, sel)).join('');
+  const peopleOpts = (role, sel) => {
+    const st = staff(), grp = (label, list) => (list.length ? `<optgroup label="${esc(label)}">${list.map(p => opt(p.id, p.name, sel)).join('')}</optgroup>` : '');
+    if (role === 'driver') return opt('', st.some(p => p.role === 'driver') ? '—' : T('no_drivers'), sel) + grp(T('role_driver'), st.filter(p => p.role === 'driver')) + grp(T('guides_driving'), st.filter(p => p.role === 'guide' && p.vehicle)) + grp(T('others'), st.filter(p => p.role === 'admin' || (p.role === 'guide' && !p.vehicle)));
+    return opt('', '—', sel) + grp(T('role_guide'), st.filter(p => p.role === 'guide')) + grp(T('others'), st.filter(p => p.role !== 'guide'));
+  };
   async function run(fn, okText) {
-    try { await fn(); if (okText) toast(okText); } catch (e) { console.error(e); const m = String((e && e.message) || ''); toast(/invalid login/i.test(m) ? T('err_login') : /already registered|already exists/i.test(m) ? T('err_exists') : T('err_save') + (m ? ': ' + m : '')); }
+    try { await fn(); if (okText) toast(okText); } catch (e) { console.error(e); const m = String((e && e.message) || ''); logErr('save', m || 'Save failed', e && e.stack); toast(/invalid login/i.test(m) ? T('err_login') : /already registered|already exists/i.test(m) ? T('err_exists') : T('err_save') + (m ? ': ' + m : '')); }
     render();
   }
 
@@ -366,7 +440,7 @@
   function offMark(d) {
     const mine = offOn(me().id, d), n = state.mine ? 0 : offCount(d);
     if (!mine && !n) return '';
-    return `<span class="offm ${mine ? 'me' : ''}" title="${esc(T('off_today'))}">${ico('sun')}${state.mine || (mine && n === 1) ? esc(T('off_n')) : n}</span>`;
+    return `<span class="offm ${mine ? 'me' : ''}" title="${esc(T('off_today'))}">${ico('sun')}${mine ? esc(T('off_mine')) : n}</span>`;
   }
   function dayBlock(d) {
     const td = today(), ho = holidayOn(d), ev = eventOn(d);
@@ -426,7 +500,7 @@
   function guestRowsHtml(t) {
     const bks = tourBookings(t.id); if (!bks.length) return `<div class="empty">${guestsHidden(t) ? T('pv_hidden', { n: pv().guideDays }) : T('no_guests')}</div>`;
     const quick = phone => (phone ? `<span class="cbtns">${ib('wa', 'WhatsApp', waLink(phone))}${ib('call', T('call'), 'tel:' + phone)}</span>` : '');
-    return `<div class="glist">${bks.map(b => `<div class="grow"><span class="row nw"><button class="gbtn" data-act="guest" data-id="${b.id}"><span class="avatar ini">${esc(initials(cleanName(b.guest) || b.guest))}</span><span class="grow-l" style="flex-direction:column;align-items:flex-start;gap:0"><span class="gname">${esc(b.guest)}</span><span class="muted small num">${esc(acText(b))}</span></span></button>${b.attendance ? `<span class="tag ${b.attendance === 'arrived' ? 't-ok' : 't-danger'}">${T('att_' + b.attendance)}</span>` : ''}${quick(b.phone)}</span>${addrLine(b)}${isVip(b.client_id) || isFree(b) || (b.marks || []).length || (b.payment && b.payment !== 'prepaid') ? `<span class="row">${vipTag(b.client_id)}${freeTag(b)}${(b.marks || []).map(x => `<span class="tag ${x === 'stays' ? 't-stay' : 't-custom'}">${esc(markLabel(x))}</span>`).join('')}${b.payment && b.payment !== 'prepaid' ? `<span class="tag t-warn">${T('pay_' + b.payment)}${b.amount_due ? ' ' + esc(b.amount_due) + ' ' + esc(guestCur()) : ''}</span>` : ''}</span>` : ''}</div>`).join('')}</div>`;
+    return `<div class="glist">${bks.map(b => `<div class="grow"><span class="row nw"><button class="gbtn" data-act="guest" data-id="${b.id}"><span class="avatar ini">${esc(initials(cleanName(b.guest) || b.guest))}</span><span class="grow-l" style="flex-direction:column;align-items:flex-start;gap:0"><span class="gname">${esc(b.guest)}</span><span class="muted small num">${esc(acText(b))}</span></span></button>${b.lang && !/^EN/i.test(b.lang) ? `<span class="tag t-group">${esc(b.lang)}</span>` : ''}${b.attendance ? `<span class="tag ${b.attendance === 'arrived' ? 't-ok' : 't-danger'}">${T('att_' + b.attendance)}</span>` : ''}${quick(b.phone)}</span>${addrLine(b)}${isVip(b.client_id) || isFree(b) || (b.marks || []).length || (b.payment && b.payment !== 'prepaid') ? `<span class="row">${vipTag(b.client_id)}${freeTag(b)}${(b.marks || []).map(x => `<span class="tag ${x === 'stays' ? 't-stay' : 't-custom'}">${esc(markLabel(x))}</span>`).join('')}${b.payment && b.payment !== 'prepaid' ? `<span class="tag t-warn">${T('pay_' + b.payment)}${b.amount_due ? ' ' + esc(b.amount_due) + ' ' + esc(b.currency || guestCur()) : ''}</span>` : ''}</span>` : ''}</div>`).join('')}</div>`;
   }
   function nowCardHtml(t) {
     const bks = tourBookings(t.id), other = t.guide_id === me().id ? t.driver_id : t.guide_id, op = person(other);
@@ -436,7 +510,7 @@
       <div class="row"><b>${T('guests_title')} (${bks.length})</b><span class="muted small num">${esc(acText(t))}${bks.length ? ' · ' + T('att_sum', { a: bks.filter(b => b.attendance === 'arrived').length, n: bks.length, x: bks.filter(b => b.attendance === 'noshow').length }) : ''}</span></div>
       ${guestRowsHtml(t)}
       ${op ? `<div class="row nw">${avatar(other)}<span class="grow-l"><b>${esc(op.name)}</b>&nbsp;<span class="muted small">${T('role_' + (t.guide_id === other ? 'guide' : 'driver'))}</span></span>${staffBtns(op)}</div>` : ''}
-      ${cashDue(bks) ? `<div><span class="tag t-warn num">${T('cash_collect')}: ${cashDue(bks)} ${esc(guestCur())}</span></div>` : ''}</div>`;
+      ${cashDue(bks) ? `<div><span class="tag t-warn num">${T('cash_collect')}: ${esc(cashText(bks))}</span></div>` : ''}</div>`;
   }
   function myDayHtml(d) {
     const td = today(), id = me().id, ho = holidayOn(d), ev = eventOn(d), o = offOn(id, d);
@@ -494,7 +568,7 @@
     for (let i = 0; i < 42; i++) {
       const d = addDays(start, i); if (i % 7 === 0 && i >= 28 && d.slice(0, 7) !== mo) break;
       const all = toursOnDay(d), ts = state.mine ? all.filter(t => involves(t, my)) : all, myOff = offOn(my, d), ho = holidayOn(d);
-      cells += `<button class="${d.slice(0, 7) !== mo ? 'out' : ''} ${d === td ? 'today' : ''} ${d === sel ? 'sel' : ''} ${myOff ? 'myoff' : ''} ${ho ? 'hol' : ''}" data-act="pickday" data-date="${d}" data-drop="${d}" aria-pressed="${d === sel}" aria-label="${esc(fmtDay(d))}: ${ts.length} ${T('tours_n')}"><b class="num">${D(d).getDate()}</b><span class="dots">${ts.slice(0, 4).map(t => `<i style="background:${esc(tourStyle(t.title).color)}"></i>`).join('')}${ts.length > 4 ? `<span class="num">+${ts.length - 4}</span>` : ''}</span>${offMark(d)}</button>`;
+      cells += `<button class="${d.slice(0, 7) !== mo ? 'out' : ''} ${d === td ? 'today' : ''} ${d === sel ? 'sel' : ''} ${myOff ? 'myoff' : ''} ${ho ? 'hol' : ''}" data-act="pickday" data-date="${d}" data-drop="${d}" aria-pressed="${d === sel}" aria-label="${esc(fmtDay(d))}: ${ts.length} ${T('tours_n')}"><b class="num">${D(d).getDate()}</b><span class="dots">${ts.slice(0, 4).map(t => `<i style="background:${esc(tourStyle(t.title).color)}"></i>`).join('')}${ts.length > 4 ? `<span class="num">+${ts.length - 4}</span>` : ''}</span><span class="mrows">${ts.slice().sort((x, y) => (x.start_time || '').localeCompare(y.start_time || '')).slice(0, 4).map(t => `<span class="mrow${live(t) ? '' : ' cx'}" data-act="tour" data-id="${t.id}"><i style="background:${esc((person(t.guide_id) || {}).color || tourStyle(t.title).color)}"></i><span class="num">${esc(t.start_time || '')}</span> ${esc(t.title)} <span class="num muted">${paxText(t)}</span></span>`).join('')}${ts.length > 4 ? `<span class="mrow more">${T('more_n', { n: ts.length - 4 })}</span>` : ''}</span>${offMark(d)}</button>`;
     }
     const legend = `<div class="row small muted lgrow"><span class="lg"><i class="dotk"></i>${T('lg_tour')}</span><span class="lg"><i class="sq myoff"></i>${T('lg_myoff')}</span><span class="lg"><i class="sq hol"></i>${T('holidays')}</span></div>`;
     return `<div class="mgrid">${wd}${cells}</div>${legend}<div class="list">${dayBlock(sel)}</div>`;
@@ -524,14 +598,14 @@
     const can = (involves(t, me().id) || isAdmin()) && t.date <= today() && live(t);
     const row = (icon, label, attrs) => `<${attrs.href ? 'a' : 'button'} class="arow" ${Object.entries(attrs).map(([k, v]) => `${k}="${esc(v)}"`).join(' ')}>${icon ? ico(icon) : '<span style="width:16px"></span>'}<span>${esc(label)}</span></${attrs.href ? 'a' : 'button'}>`;
     return `<div class="hdr"><span class="avatar big ini">${esc(initials(cleanName(b.guest) || b.guest))}</span><h2>${esc(b.guest)}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>
-      <div class="muted small">${esc([acText(b), phoneCountry(b.phone), sourceOf(b), b.ref, b.notes].filter(Boolean).join(' · '))}</div>${isVip(b.client_id) ? (v => `<div class="banner small">${vipTag(b.client_id)}<span>${T('vip_text', { n: v.total, y: v.years || 1, a: v.addons || 0 })}</span></div>`)(guestStats(b.client_id)) : ''}${isFree(b) ? `<div class="banner small">${freeTag(b)}<span>${T('free_text')}</span>${tipUrl(t) ? `<button class="btn sm" data-act="tipqr" data-id="${t.id}">${T('tip_btn')}</button>` : ''}</div>` : ''}
+      <div class="muted small">${esc([acText(b), phoneFlag(b.phone), b.lang && T('guest_lang') + ' ' + b.lang, sourceOf(b), b.ref, b.notes].filter(Boolean).join(' · '))}</div>${isVip(b.client_id) ? (v => `<div class="banner small">${vipTag(b.client_id)}<span>${T('vip_text', { n: v.total, y: v.years || 1, a: v.addons || 0 })}</span></div>`)(guestStats(b.client_id)) : ''}${isFree(b) ? `<div class="banner small">${freeTag(b)}<span>${T('free_text')}</span>${tipUrl(t) ? `<button class="btn sm" data-act="tipqr" data-id="${t.id}">${T('tip_btn')}</button>` : ''}</div>` : ''}
       ${can ? `<div class="att"><button class="${b.attendance === 'arrived' ? 'on ok' : ''}" data-act="attend" data-id="${b.id}" data-s="arrived" aria-pressed="${b.attendance === 'arrived'}">${T('att_arrived')}</button><button class="${b.attendance === 'noshow' ? 'on no' : ''}" data-act="attend" data-id="${b.id}" data-s="noshow" aria-pressed="${b.attendance === 'noshow'}">${T('att_noshow')}</button></div>` : ''}
       <div class="alist">${b.client_id ? row('', T('open_client') + ' ›', { 'data-act': 'client', 'data-id': b.client_id }) : ''}
         ${rl ? (b.phone ? row('wa', T('review_wa'), { href: waLink(b.phone, msg), target: '_blank', rel: 'noopener' }) : '') + row('copy', T('review_copy'), { 'data-act': 'copy', 'data-v': msg }) : ''}
         ${b.pickup_addr ? row('pin', T('guest_addr') + ': ' + b.pickup_addr, { href: mapFor(b.pickup_addr, b.pickup_url), target: '_blank', rel: 'noopener' }) : ''}
         ${b.phone ? row('wa', 'WhatsApp ' + b.phone, { href: waLink(b.phone), target: '_blank', rel: 'noopener' }) + row('call', T('call') + ' ' + b.phone, { href: 'tel:' + b.phone }) + row('copy', T('copy') + ' ' + b.phone, { 'data-act': 'copy', 'data-v': b.phone }) : ''}
-        ${cl.email ? row('mail', cl.email, { href: 'mailto:' + cl.email }) : ''}
-        ${canOffer() ? row('', T('offer_title') + ' ›', { 'data-act': 'offer', 'data-b': b.id }) : ''}</div>`;
+        ${(b.email || cl.email) ? row('mail', b.email || cl.email, { href: 'mailto:' + (b.email || cl.email) }) : ''}
+        ${canOffer() ? row('', T('offer_title') + ' ›', { 'data-act': 'offer', 'data-b': b.id }) : ''}</div>${historyHtml(b)}`;
   }
   const canOffer = () => me().role !== 'driver';
   function offerList() {
@@ -574,10 +648,10 @@
         ${d.pickup ? `<div class="meet">${ico('pin')}<span class="grow-l">${esc(d.pickup)}</span><a class="btn sm" href="${esc(tourMap(d))}" target="_blank" rel="noopener" aria-label="${T('open_map')}">${T('map')}</a></div>` : ''}
         ${d.notes ? `<div class="small"><span class="muted">${T('notes')}:</span> ${esc(d.notes)}</div>` : ''}
         ${staysN(d.bookings) ? `<div class="stayline num">${ico('pin')}<span>${T('stay_line', { n: staysN(d.bookings), back: Math.max(0, (d.pax || 0) - staysN(d.bookings)) })}</span></div>` : ''}
-        ${cashDue(d.bookings) ? `<div><span class="tag t-warn num">${T('cash_collect')}: ${cashDue(d.bookings)} ${esc(guestCur())}</span></div>` : ''}
+        ${cashDue(d.bookings) ? `<div><span class="tag t-warn num">${T('cash_collect')}: ${esc(cashText(d.bookings))}</span></div>` : ''}
         ${isAdmin() ? warnHtml : ''}${isAdmin() && live(d) && (d.pax || 0) > (rules().carSeats || 6) && kmOf(d.title) > 0 ? `<div><button class="btn sm" data-act="car2" data-id="${d.id}">${ico('car')}${T('car2_btn')}</button></div>` : ''}${isAdmin() && costOf(d.id).total ? `<div class="muted small num">${T('cost_title')}: <b>${nf(costOf(d.id).total)} ${esc(rules().currency || 'GEL')}</b></div>` : ''}
         <h3>${T('guests_title')} (${d.bookings.length}) <span class="muted small num" style="font-weight:400">${esc(acText(d))}</span>${d.bookings.some(isFree) ? ` <span class="tag t-free num">${T('free_n', { n: d.bookings.filter(isFree).reduce((n, b) => n + (Number(b.pax) || 1), 0) })}</span>` : ''}</h3>${canCheck && d.bookings.length ? `<div class="muted small num">${T('att_sum', { a: d.bookings.filter(b => b.attendance === 'arrived').length, n: d.bookings.length, x: d.bookings.filter(b => b.attendance === 'noshow').length })}</div>` : ''}
-        ${d.bookings.length ? `<div class="glist">${d.bookings.map(b => `<div class="grow"><span class="row nw"><button class="gbtn" data-act="guest" data-id="${b.id}"><span class="avatar ini">${esc(initials(cleanName(b.guest) || b.guest))}</span><span class="grow-l" style="flex-direction:column;align-items:flex-start;gap:0"><span class="gname">${esc(b.guest)}</span><span class="muted small num">${esc([acText(b), phoneCountry(b.phone), b.phone].filter(Boolean).join(' · '))}</span></span></button>${b.attendance ? `<span class="tag ${b.attendance === 'arrived' ? 't-ok' : 't-danger'}">${T('att_' + b.attendance)}</span>` : ''}${quick(b.phone)}</span>${addrLine(b)}${isFree(b) || visTag(b) || isVip(b.client_id) || (b.marks || []).length || (b.payment && b.payment !== 'prepaid') || (clientRating(b.client_id) || {}).rating === 'trouble' ? `<span class="row">${vipTag(b.client_id)}${freeTag(b)}${visTag(b)}${(b.marks || []).map(x => `<span class="tag ${x === 'stays' ? 't-stay' : 't-custom'}">${esc(markLabel(x))}</span>`).join('')}${b.payment && b.payment !== 'prepaid' ? `<span class="tag t-warn">${T('pay_' + b.payment)}${b.amount_due ? ' ' + esc(b.amount_due) + ' ' + esc(guestCur()) : ''}</span>` : ''}${(clientRating(b.client_id) || {}).rating === 'trouble' ? ratingTag(b.client_id) : ''}</span>` : ''}</div>`).join('')}</div>` : guestsHidden(d) ? `<div class="empty">${T('pv_hidden', { n: pv().guideDays })}</div>` : `<div class="empty">${T('no_guests')}${isAdmin() ? ` <button class="btn sm" data-act="touredit">${T('add_guests')}</button>` : ''}</div>`}
+        ${d.bookings.length ? `<div class="glist">${d.bookings.map(b => `<div class="grow"><span class="row nw"><button class="gbtn" data-act="guest" data-id="${b.id}"><span class="avatar ini">${esc(initials(cleanName(b.guest) || b.guest))}</span><span class="grow-l" style="flex-direction:column;align-items:flex-start;gap:0"><span class="gname">${esc(b.guest)}</span><span class="muted small num">${esc([acText(b), phoneCountry(b.phone), b.phone].filter(Boolean).join(' · '))}</span></span></button>${b.lang && !/^EN/i.test(b.lang) ? `<span class="tag t-group">${esc(b.lang)}</span>` : ''}${b.attendance ? `<span class="tag ${b.attendance === 'arrived' ? 't-ok' : 't-danger'}">${T('att_' + b.attendance)}</span>` : ''}${quick(b.phone)}</span>${addrLine(b)}${isFree(b) || visTag(b) || isVip(b.client_id) || (b.marks || []).length || (b.payment && b.payment !== 'prepaid') || (clientRating(b.client_id) || {}).rating === 'trouble' ? `<span class="row">${vipTag(b.client_id)}${freeTag(b)}${visTag(b)}${(b.marks || []).map(x => `<span class="tag ${x === 'stays' ? 't-stay' : 't-custom'}">${esc(markLabel(x))}</span>`).join('')}${b.payment && b.payment !== 'prepaid' ? `<span class="tag t-warn">${T('pay_' + b.payment)}${b.amount_due ? ' ' + esc(b.amount_due) + ' ' + esc(b.currency || guestCur()) : ''}</span>` : ''}${(clientRating(b.client_id) || {}).rating === 'trouble' ? ratingTag(b.client_id) : ''}</span>` : ''}</div>`).join('')}</div>` : guestsHidden(d) ? `<div class="empty">${T('pv_hidden', { n: pv().guideDays })}</div>` : `<div class="empty">${T('no_guests')}${isAdmin() ? ` <button class="btn sm" data-act="touredit">${T('add_guests')}</button>` : ''}</div>`}
         <div class="glist crew">${[['guide', d.guide_id], ['driver', d.driver_id]].filter(x => x[1]).map(([r, id]) => `<div class="grow" style="--k:${esc((person(id) || {}).color || '#66737f')}"><span class="row nw">${avatar(id)}<span class="grow-l" style="flex-direction:column;align-items:flex-start;gap:0"><b>${esc(pname(id))}</b><span class="muted small">${esc([T('role_' + r), ...titlesOf(id)].join(' · '))}</span></span>${staffBtns(person(id))}</span></div>`).join('') || `<div class="grow"><span class="tag t-warn">${T('unassigned')}</span></div>`}</div>
         <div class="bar"><button class="btn sm" data-act="share" data-title="${esc(d.title)}" data-v="${esc(tourText(d))}">${ico('share')}${T('share')}</button><a class="btn sm" href="${esc(gcalLink(d))}" target="_blank" rel="noopener">${ico('cal')}${T('cal_short')}</a><button class="btn sm" data-act="copy" data-v="${esc(tourText(d))}">${ico('copy')}${T('copy')}</button>${tipUrl(d) && (mine || isAdmin()) ? `<button class="btn sm" data-act="tipqr" data-id="${d.id}">${T('tip_btn')}</button>` : ''}</div>
         <details class="sect"><summary>${T('more')}</summary><div class="f">
@@ -606,16 +680,19 @@
       <label>${T('date_to')}<input id="t-dateto" data-f="date_to" type="date" value="${esc(d.date_to || '')}"></label>
       <div class="two"><label>${T('guide_pay')}<input id="t-gpay" data-f="guide_pay" type="number" min="0" step="any" value="${esc(d.guide_pay ?? '')}" placeholder="${esc(r['guide_' + d.kind] || 0)}"></label>
         <label>${T('driver_pay')}<input id="t-dpay" data-f="driver_pay" type="number" min="0" step="any" value="${esc(d.driver_pay ?? '')}" placeholder="${esc(r['driver_' + d.kind] || 0)}"></label></div>
-      <label>${T('pickup')}<input id="t-pickup" data-f="pickup" value="${esc(d.pickup || '')}"></label><label>${T('map_link')}<input id="t-pickurl" data-f="pickup_url" type="url" value="${esc(d.pickup_url || '')}" placeholder="https://maps.app.goo.gl/..."></label>
+      <label>${T('pickup')}<input id="t-pickup" data-f="pickup" list="fs-addrs" value="${esc(d.pickup || '')}" placeholder="${T('addr_hint')}" autocomplete="off"></label><label>${T('map_link')}<input id="t-pickurl" data-f="pickup_url" type="url" value="${esc(d.pickup_url || '')}" placeholder="https://maps.app.goo.gl/..."></label>
       <label>${T('notes')}<textarea id="t-notes" data-f="notes">${esc(d.notes || '')}</textarea></label></div></details>
       <details class="sect"><summary>${T('cost_title')}${costOf(d.id).total ? ` · ${nf(costOf(d.id).total)} ${esc(rules().currency || 'GEL')}` : ''}</summary><div class="f"><span class="muted small">${T('cost_text')}</span><div class="two">${COSTS.map(k => `<label>${T('cost_' + k)}<input type="number" min="0" step="any" inputmode="decimal" data-cost="${k}" value="${esc((d.costs || costOf(d.id).items)[k] ?? '')}"></label>`).join('')}</div><label>${T('cost_note')}<input data-cost="note" value="${esc(d.costNote ?? costOf(d.id).note)}"></label></div></details>
       <div class="f"><b>${T('guest_list')}</b>
-        ${d.bookings.map((b, i) => `<div class="card"><div class="row"><input class="inp" style="flex:1" aria-label="${T('guest')}" placeholder="${T('guest')}" data-bi="${i}" data-bf="guest" value="${esc(b.guest || '')}"><button type="button" class="iconbtn" data-act="bdel" data-i="${i}" aria-label="${T('remove')}">✕</button></div>
-          <div class="four"><label>${T('adults')}<input type="number" min="0" data-bi="${i}" data-bf="adults" value="${esc(b.adults ?? 1)}"></label><label>${T('children')}<input type="number" min="0" data-bi="${i}" data-bf="children" value="${esc(b.children ?? 0)}"></label><label>${T('phone')}<input data-bi="${i}" data-bf="phone" value="${esc(b.phone || '')}"></label><label>${T('ref')}<input data-bi="${i}" data-bf="ref" value="${esc(b.ref || '')}"></label></div>
-          <div class="three"><label>${T('payment')}<select data-bi="${i}" data-bf="payment">${opt('', '—', b.payment)}${['prepaid', 'cash', 'unpaid'].map(x => opt(x, T('pay_' + x), b.payment)).join('')}</select></label><label>${T('amount_due')}<input type="number" min="0" step="any" data-bi="${i}" data-bf="amount_due" value="${esc(b.amount_due ?? '')}"></label><label>${T('source')}<select data-bi="${i}" data-bf="source">${opt('', sourceOf({ ref: b.ref }) ? T('auto') + ': ' + sourceOf({ ref: b.ref }) : '—', b.source)}${SOURCES.map(x => opt(x, x, b.source)).join('')}</select></label></div>
-          <div class="checks">${marks.map(mk => `<label><input type="checkbox" data-bi="${i}" data-bm="${esc(mk)}" ${(b.marks || []).includes(mk) ? 'checked' : ''}>${esc(markLabel(mk))}</label>`).join('')}</div>
-          ${needsAddr(b) ? `<div class="two"><label>${T('guest_addr')}<input data-bi="${i}" data-bf="pickup_addr" value="${esc(b.pickup_addr || '')}" placeholder="${T('guest_addr_hint')}"></label><label>${T('map_link')}<input type="url" data-bi="${i}" data-bf="pickup_url" value="${esc(b.pickup_url || '')}" placeholder="https://maps.app.goo.gl/..."></label></div>` : ''}
+        ${d.bookings.map((b, i) => `<div class="card gcard"><div class="row"><input class="inp" style="flex:1" aria-label="${T('guest')}" placeholder="${T('guest_ph')}" data-bi="${i}" data-bf="guest" value="${esc(b.guest || '')}" autocomplete="off"><button type="button" class="iconbtn" data-act="bdel" data-i="${i}" aria-label="${T('remove')}">✕</button></div>
+          <div class="gsug" id="gsug-${i}">${suggHtml(b, i)}</div>
+          <div class="four"><label>${T('adults')}<input type="number" min="0" data-bi="${i}" data-bf="adults" value="${esc(b.adults ?? 1)}"></label><label>${T('children')}<input type="number" min="0" data-bi="${i}" data-bf="children" value="${esc(b.children ?? 0)}"></label><label>${T('ref')}<input data-bi="${i}" data-bf="ref" value="${esc(b.ref || '')}" autocomplete="off"></label><label>${T('guest_lang')}<input data-bi="${i}" data-bf="lang" list="fs-langs" value="${esc(b.lang || '')}" placeholder="EN" autocomplete="off"></label></div>
+          <div class="two"><label><span>${T('phone')} <span class="pflag" id="pflag-${i}">${esc(phoneFlag(normPhone(b.phone)))}</span></span><input type="tel" inputmode="tel" data-bi="${i}" data-bf="phone" value="${esc(b.phone || '')}" placeholder="+995 5…" autocomplete="off"></label><label>${T('email')}<input type="email" inputmode="email" data-bi="${i}" data-bf="email" value="${esc(b.email || '')}" autocomplete="off"></label></div>
+          <div class="four"><label>${T('payment')}<select data-bi="${i}" data-bf="payment">${opt('', '—', b.payment)}${['prepaid', 'cash', 'unpaid'].map(x => opt(x, T('pay_' + x), b.payment)).join('')}</select></label><label>${T('amount_due')}<input type="number" min="0" step="any" inputmode="decimal" data-bi="${i}" data-bf="amount_due" value="${esc(b.amount_due ?? '')}"></label><label>${T('currency')}<select data-bi="${i}" data-bf="currency">${CURRENCIES.map(x => opt(x, x, b.currency || guestCur())).join('')}</select></label><label>${T('source')}<select data-bi="${i}" data-bf="source">${opt('', sourceOf({ ref: b.ref }) ? T('auto') + ': ' + sourceOf({ ref: b.ref }) : '—', b.source)}${SOURCES.map(x => opt(x, x, b.source)).join('')}</select></label></div>
+          <div class="f"><span class="muted small">${T('options')}</span><div class="checks col opts">${marks.map(mk => `<label><input type="checkbox" data-bi="${i}" data-bm="${esc(mk)}" ${(b.marks || []).includes(mk) ? 'checked' : ''}>${esc(markLabel(mk))}</label>`).join('')}</div></div>
+          ${needsAddr(b) ? `<label>${T('guest_addr')}<input data-bi="${i}" data-bf="pickup_addr" list="fs-addrs" value="${esc(b.pickup_addr || '')}" placeholder="${T('addr_hint')}" autocomplete="off"></label><span class="muted small">${T('addr_auto')}</span>` : ''}
           <input class="inp" aria-label="${T('note')}" placeholder="${T('other_marks')}" data-bi="${i}" data-bf="notes" value="${esc(b.notes || '')}"></div>`).join('')}
+        <datalist id="fs-addrs">${knownAddrs().map(x => `<option value="${esc(x)}">`).join('')}</datalist><datalist id="fs-langs">${GUEST_LANGS.map(x => `<option value="${x}">`).join('')}</datalist>
         <div class="bar"><button type="button" class="btn sm" data-act="badd">+ ${T('guest')}</button></div>
         ${d.bookings.length ? '' : `<div class="two"><label>${T('adults')}<input id="t-adults" data-f="adults" type="number" min="0" value="${esc(d.adults ?? d.pax ?? 0)}"></label><label>${T('children')}<input id="t-children" data-f="children" type="number" min="0" value="${esc(d.children ?? 0)}"></label></div>`}</div>
       <div id="t-warn"></div>
@@ -627,23 +704,65 @@
     const d = { ...m.draft, ...draftCounts(m.draft), capacity: Number(m.draft.capacity) || 0 };
     el.innerHTML = tourWarnings(d).map(x => `<div class="warnline ${x.lv === 'warn' ? 'soft' : ''}">! ${esc(x.tx)}</div>`).join('');
   }
+  // ---------- guests already in the base ----------
+  function guestMatches(b) {
+    const ph = digits(normPhone(b.phone)), em = (b.email || '').trim().toLowerCase(), nm = cleanName(b.guest || '').toLowerCase().trim(), ref = (b.ref || '').trim().toLowerCase(), out = new Map();
+    const add = (cl, why) => { if (cl && !cl.anonymised_at && cl.id !== b.client_id && !out.has(cl.id)) out.set(cl.id, why); };
+    if (ph.length >= 7) db.clients.forEach(x => { const d = digits(x.phone); if (d.length >= 7 && (d === ph || d.slice(-9) === ph.slice(-9))) add(x, 'phone'); });
+    if (/@/.test(em)) db.clients.forEach(x => { if ((x.email || '').toLowerCase() === em) add(x, 'email'); });
+    if (ref.length >= 4) db.bookings.forEach(x => { if (x.id !== b.id && x.client_id && (x.ref || '').toLowerCase() === ref) add(db.clients.find(y => y.id === x.client_id), 'ref'); });
+    if (nm.length >= 3 && !b.client_id) db.clients.forEach(x => { if ((x.name || '').toLowerCase().includes(nm)) add(x, 'name'); });
+    return [...out].slice(0, 5).map(([id, why]) => ({ cl: db.clients.find(x => x.id === id), why }));
+  }
+  function suggHtml(b, i) {
+    const ms = guestMatches(b); if (!ms.length) return '';
+    const strong = ms.some(x => x.why !== 'name'), n = id => db.bookings.filter(x => x.client_id === id).length;
+    return `<div class="${strong ? 'inbase' : ''}"><span class="small">${strong ? '<b>' + T('in_base') + '</b>' : T('maybe_same')}</span>${ms.map(x => `<button type="button" class="sgrow" data-act="gpick" data-i="${i}" data-c="${x.cl.id}"><span class="grow-l"><b>${esc(x.cl.name)}</b><span class="muted small">${esc([phoneFlag(x.cl.phone).split(' ')[0] + ' ' + (x.cl.phone || ''), x.cl.email, T('bookings_n') + ': ' + n(x.cl.id), T('match_' + x.why)].filter(v => v && v.trim()).join(' · '))}</span></span><span class="btn sm">${T('use')}</span></button>`).join('')}</div>`;
+  }
   function findClient(b) {
     const ph = digits(b.phone), nm = cleanName(b.guest).toLowerCase();
     return (b.client_id && db.clients.find(x => x.id === b.client_id)) || (ph.length >= 7 && db.clients.find(x => digits(x.phone) === ph)) || db.clients.find(x => (x.name || '').toLowerCase() === nm && !digits(x.phone) && ph.length < 7) || null;
   }
+  // Booking history: when it was made, what changed, when the tour moved or was cancelled.
+  const HFIELDS = ['guest', 'adults', 'children', 'phone', 'email', 'ref', 'payment', 'amount_due', 'currency', 'pickup_addr', 'lang', 'marks'];
+  function bookHistory(prev, br, oldTour, row) {
+    const now = new Date().toISOString(), by = me().id, h = prev && Array.isArray(prev.history) ? prev.history.slice() : [];
+    if (!prev) h.push({ at: now, by, w: 'created' });
+    else {
+      const val = (o, k) => (k === 'marks' ? (o.marks || []).slice().sort().join(',') : String(o[k] ?? ''));
+      const f = HFIELDS.filter(k => val(prev, k) !== val(br, k) && !(k === 'currency' && !prev.currency)); if (f.length) h.push({ at: now, by, w: 'changed', f });
+      const was = prev.tour_id && prev.tour_id !== br.tour_id ? db.tours.find(x => x.id === prev.tour_id) : null; if (was) h.push({ at: now, by, w: 'moved', from: `${was.date} ${was.start_time || ''}`.trim(), to: `${row.date} ${row.start_time || ''}`.trim() });
+      else if (oldTour && row && (oldTour.date !== row.date || (oldTour.start_time || '') !== (row.start_time || ''))) h.push({ at: now, by, w: 'moved', from: `${oldTour.date} ${oldTour.start_time || ''}`.trim(), to: `${row.date} ${row.start_time || ''}`.trim() });
+    }
+    return h.slice(-40);
+  }
+  async function addHistory(tourId, entry) { const at = new Date().toISOString(); for (const b of db.bookings.filter(x => x.tour_id === tourId)) await S.save('bookings', { ...b, history: [...(Array.isArray(b.history) ? b.history : []), { at, by: me().id, ...entry }].slice(-40) }); }
+  function historyHtml(b) {
+    const h = Array.isArray(b.history) ? b.history.slice() : []; if (!h.length && b.created_at) h.push({ at: b.created_at, w: 'created' }); if (!h.length) return '';
+    const when = x => new Intl.DateTimeFormat(LOCALES[lang()], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(x));
+    const dt = v => { const [d, tm] = String(v || '').split(' '); return d ? fmt(d, { day: 'numeric', month: 'short' }) + (tm ? ' ' + tm : '') : ''; };
+    const FL = { guest: 'guest', adults: 'adults', children: 'children', phone: 'phone', email: 'email', ref: 'ref', payment: 'payment', amount_due: 'amount_due', currency: 'currency', pickup_addr: 'guest_addr', lang: 'guest_lang', marks: 'options' };
+    const txt = x => x.w === 'created' ? T('h_created') : x.w === 'changed' ? T('h_changed') + ': ' + (x.f || []).map(k => T(FL[k] || k).toLowerCase()).join(', ') : x.w === 'moved' ? T('h_moved', { from: dt(x.from), to: dt(x.to) }) : x.w === 'cancelled' ? T('h_cancelled') + (x.reason ? ': ' + x.reason : '') : x.w === 'restored' ? T('h_restored') : x.w === 'car2' ? T('h_car2') : x.w;
+    return `<details class="sect"><summary>${T('bk_history')} (${h.length})</summary><ol class="hist">${h.slice().reverse().map(x => `<li><span class="num muted small">${esc(when(x.at))}</span><span>${esc(txt(x))}${x.by ? ` <span class="muted small">· ${esc(pname(x.by))}</span>` : ''}</span></li>`).join('')}</ol></details>`;
+  }
   const numOrNull = v => (v === '' || v === null || v === undefined ? null : Number(v));
   async function saveTour() {
     const d = state.modal.draft, old = db.tours.find(t => t.id === d.id), cnt = draftCounts(d);
+    const tloc = parseLoc(d.pickup); if (tloc.url) { d.pickup = tloc.addr; d.pickup_url = tloc.url; }
     const row = { id: d.id, date: d.date, date_to: d.date_to && d.date_to > d.date ? d.date_to : null, start_time: d.start_time || null, end_time: d.end_time || null, title: (d.title || '').trim(), kind: d.kind, capacity: Number(d.capacity) || 0, pax: cnt.pax, adults: cnt.adults, children: cnt.children, language: d.language || null, pickup: d.pickup || null, pickup_url: d.pickup_url || null, notes: d.notes || null, status: d.status, guide_id: d.guide_id || null, driver_id: d.driver_id || null, guide_pay: numOrNull(d.guide_pay), driver_pay: numOrNull(d.driver_pay), external_id: d.external_id || null };
     if (!row.title) { toast(T('need_title')); return; }
     await S.save('tours', row);
     const keep = new Set();
     for (const b of d.bookings) {
       if (!(b.guest || '').trim()) continue;
-      let c = findClient(b);
-      if (!c) { c = { id: S.uid(), name: cleanName(b.guest) || b.guest.trim(), phone: b.phone || null, email: null, notes: null }; await S.save('clients', c); }
+      b.phone = normPhone(b.phone); const em = (b.email || '').trim().toLowerCase() || null;
+      let c = findClient(b) || (em && db.clients.find(x => (x.email || '').toLowerCase() === em)) || null;
+      if (!c) { c = { id: S.uid(), name: cleanName(b.guest) || b.guest.trim(), phone: b.phone || null, email: em, notes: null }; await S.save('clients', c); }
+      else if ((em && !c.email) || (b.phone && !c.phone)) { c = { ...c, email: c.email || em, phone: c.phone || b.phone || null }; await S.save('clients', c); }
+      const loc = needsAddr(b) ? parseLoc(b.pickup_addr) : { addr: '', url: '' };
       const a = Number(b.adults) || 0, ch = Number(b.children) || 0;
-      const br = { id: b.id || S.uid(), tour_id: row.id, client_id: c.id, guest: b.guest.trim(), adults: a, children: ch, pax: a + ch, phone: b.phone || null, ref: b.ref || null, notes: b.notes || null, marks: b.marks || [], source: b.source || null, payment: b.payment || null, amount_due: numOrNull(b.amount_due), attendance: b.attendance || null, pickup_addr: needsAddr(b) ? ((b.pickup_addr || '').trim() || null) : null, pickup_url: needsAddr(b) && /^https:\/\//i.test(b.pickup_url || '') ? b.pickup_url.trim() : null };
+      const br = { id: b.id || S.uid(), tour_id: row.id, client_id: c.id, guest: b.guest.trim(), adults: a, children: ch, pax: a + ch, phone: b.phone || null, ref: b.ref || null, notes: b.notes || null, marks: b.marks || [], source: b.source || null, payment: b.payment || null, amount_due: numOrNull(b.amount_due), attendance: b.attendance || null, pickup_addr: loc.addr || null, pickup_url: loc.url || (needsAddr(b) && loc.addr && b.pickup_url && b.pickup_addr === (db.bookings.find(x => x.id === b.id) || {}).pickup_addr ? b.pickup_url : null), email: em, lang: (b.lang || '').trim().toUpperCase().slice(0, 12) || null, currency: b.currency || guestCur() };
+      br.history = bookHistory(db.bookings.find(x => x.id === br.id), br, old, row);
       keep.add(br.id); await S.save('bookings', br);
     }
     for (const b of db.bookings.filter(b => b.tour_id === row.id && !keep.has(b.id))) await S.remove('bookings', b.id);
@@ -666,7 +785,7 @@
     const sum = (list, k) => list.reduce((n, b) => n + (Number(b[k]) || 0), 0), stay = bks.filter(b => !move.includes(b));
     const copy = { ...t, id: S.uid(), guide_id: null, driver_id: null, guide_pay: null, driver_pay: null, external_id: null, capacity: seats, notes: [T('car2_note'), t.notes].filter(Boolean).join(' · '), adults: sum(move, 'adults'), children: sum(move, 'children'), pax: sum(move, 'pax') };
     await S.save('tours', copy);
-    for (const b of move) await S.save('bookings', { ...b, tour_id: copy.id });
+    for (const b of move) await S.save('bookings', { ...b, tour_id: copy.id, history: [...(Array.isArray(b.history) ? b.history : []), { at: new Date().toISOString(), by: me().id, w: 'car2' }] });
     if (bks.length) await S.save('tours', { ...t, adults: sum(stay, 'adults'), children: sum(stay, 'children'), pax: sum(stay, 'pax') });
     logAct(`Second car added: ${t.title}, ${t.date} (${move.length} bookings moved)`);
     return copy.id;
@@ -683,6 +802,7 @@
   async function setCancelled(t, on, reason) {
     const row = { ...t, status: on ? 'cancelled' : 'confirmed', cancel_reason: on ? (reason || null) : null, cancelled_at: on ? new Date().toISOString() : null };
     await S.save('tours', row);
+    if (isAdmin()) await addHistory(t.id, on ? { w: 'cancelled', reason: reason || '' } : { w: 'restored' });
     await notify([t.guide_id, t.driver_id], on ? 'tour_cancelled' : 'tour_restored', { title: t.title, date: t.date, reason: reason || '' });
     logAct(`${on ? 'Cancelled' : 'Restored'} tour: ${t.title}, ${t.date}${on && reason ? ' (' + reason + ')' : ''}`);
   }
@@ -756,10 +876,11 @@
     if (c.anonymised_at) c = { ...c, name: T('guest_removed') };
     return `<div class="hdr"><span class="spacer"></span><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>
       <div class="ccard"><span class="avatar xl ini">${esc(initials(c.name))}</span><h2>${esc(c.name)}</h2>${contactBtns(c.phone, c.email)}<div class="row">${vipTag(c.id)}${ratingTag(c.id)}${bks.some(x => x.b.attendance === 'noshow') ? `<span class="tag t-danger num">${T('att_noshow')}: ${bks.filter(x => x.b.attendance === 'noshow').length}</span>` : ''}</div></div>
-      <dl class="fields"><dt>${T('phone')}</dt><dd class="num">${esc(c.phone || '—')}</dd>${phoneCountry(c.phone) ? `<dt>${T('phone_country')}</dt><dd>${esc(phoneCountry(c.phone))}</dd>` : ''}${c.email ? `<dt>${T('email')}</dt><dd>${esc(c.email)}</dd>` : ''}<dt>${T('ref')}</dt><dd>${esc(last.ref || '—')}</dd><dt>${T('guests_cap')}</dt><dd class="num">${esc(last.pax ? acText(last) : '—')}</dd><dt>${T('bookings_cap')}</dt><dd class="num">${bks.length}</dd></dl>
+      <dl class="fields"><dt>${T('phone')}</dt><dd class="num">${esc(c.phone || '—')}</dd>${phoneCountry(c.phone) ? `<dt>${T('phone_country')}</dt><dd>${esc(phoneFlag(c.phone))}</dd>` : ''}<dt>${T('email')}</dt><dd>${esc(c.email || '—')}</dd>${last.lang ? `<dt>${T('guest_lang')}</dt><dd>${esc(last.lang)}</dd>` : ''}<dt>${T('ref')}</dt><dd>${esc(last.ref || '—')}</dd><dt>${T('guests_cap')}</dt><dd class="num">${esc(last.pax ? acText(last) : '—')}</dd><dt>${T('bookings_cap')}</dt><dd class="num">${bks.length}</dd></dl>
       <details class="sect"><summary>${T('rate_guest')}</summary><div class="card f"><b>${T('like_title')}</b><span class="muted small">${T('anon')}</span><div class="bar"><button class="btn sm" data-act="rate" data-id="${c.id}" data-r="like">${T('like')} · ${rs.filter(r => r.rating === 'like').length}</button><button class="btn sm" data-act="rate" data-id="${c.id}" data-r="dislike">${T('dislike')} · ${rs.filter(r => r.rating === 'dislike').length}</button></div><b>${T('rate_guest')}</b><div class="bar">${Object.keys(RATINGS).map(k => `<button class="btn sm" data-act="rate" data-id="${c.id}" data-r="${k}"><span class="tag ${RATINGS[k]}">${T('rate_' + k)}</span></button>`).join('')}</div><input class="inp" id="rate-note" placeholder="${T('note')}">
         ${rs.filter(r => RATINGS[r.rating]).map(r => `<div class="row small"><span class="tag ${RATINGS[r.rating] || 't-muted'}">${T('rate_' + r.rating)}</span><span class="muted">${esc((r.created_at || '').slice(0, 10))}</span>${r.note ? `<span>${esc(r.note)}</span>` : ''}</div>`).join('')}</div></details>
       <details class="sect" open><summary>${T('history')} (${bks.length})</summary><div class="list">${bks.length ? bks.map(({ b, t }) => `<button class="card" data-act="tour" data-id="${t.id}"><span class="row"><b class="num">${esc(dateText(t))}</b><span class="tag t-${esc(t.kind)}">${T('kind_' + t.kind)}</span>${live(t) ? '' : `<span class="tag t-danger">${T('cancelled')}</span>`}${b.attendance === 'noshow' ? `<span class="tag t-danger">${T('att_noshow')}</span>` : b.attendance === 'arrived' ? `<span class="tag t-ok">${T('att_arrived')}</span>` : ''}<span class="tag t-muted num">${esc(acText(b))}</span>${(b.marks || []).map(x => `<span class="tag ${x === 'stays' ? 't-stay' : 't-custom'}">${esc(markLabel(x))}</span>`).join('')}</span><span class="ttl">${esc(t.title)}</span><span class="muted small">${esc([pname(t.guide_id), b.ref].filter(x => x && x !== '—').join(' · '))}</span></button>`).join('') : `<div class="empty">${T('no_history')}</div>`}</div></details>
+      ${isAdmin() && !c.anonymised_at ? `<details class="sect"><summary>${T('edit')}</summary><form class="f" data-form="cedit" data-id="${c.id}"><label>${T('name')}<input name="name" value="${esc(c.name || '')}" required></label><div class="two"><label>${T('phone')}<input name="phone" type="tel" value="${esc(c.phone || '')}"></label><label>${T('email')}<input name="email" type="email" value="${esc(c.email || '')}"></label></div><label>${T('notes')}<input name="notes" value="${esc(c.notes || '')}"></label><div class="actions"><button class="btn primary">${T('save')}</button></div></form></details>` : ''}
       ${isAdmin() && !c.anonymised_at ? `<details class="sect"><summary>${T('a_privacy')}</summary><div class="bar"><button class="btn sm" data-act="gexport" data-id="${c.id}">${T('pv_export')}</button><button class="btn sm danger" data-act="gerase" data-id="${c.id}">${T('pv_delete')}</button></div></details>` : ''}`;
   }
 
@@ -892,14 +1013,25 @@
     clearTimeout(celeTimer);
     celeTimer = setTimeout(() => {
       if (!me() || !me().active || state.modal || window.__noCelebrate) return;
-      const done = game(me().id).list.filter(b => b.done).map(b => b.k); let seen = null;
-      try { seen = JSON.parse(S.ls.get(seenKey()) || 'null'); } catch (e) { seen = null; }
-      // first time on this phone: celebrate only the welcome badge, not everything earned before
-      if (!Array.isArray(seen)) seen = done.filter(k => k !== 'welcome');
-      const fresh = done.filter(k => !seen.includes(k)); if (!fresh.length) return;
-      S.ls.set(seenKey(), JSON.stringify([...seen, fresh[0]]));
-      state.modal = { type: 'celebrate', k: fresh[0], more: fresh.length - 1 }; renderModal(); track('badge');
+      const list = game(me().id).list, done = list.filter(b => b.done).map(b => b.k); let local = null;
+      try { local = JSON.parse(S.ls.get(seenKey()) || 'null'); } catch (e) { local = null; }
+      // Seen badges live on the account, so the welcome badge shows once per person, not once per phone.
+      const acct = Array.isArray(me().badges_seen) ? me().badges_seen : null;
+      let seen = acct || local ? [...new Set([...(acct || []), ...(local || [])])] : done.filter(k => k !== 'welcome');
+      const fresh = done.filter(k => !seen.includes(k)); if (!fresh.length) { if (!acct && local) saveSeen(seen); return; }
+      seen = [...seen, ...fresh]; S.ls.set(seenKey(), JSON.stringify(seen)); saveSeen(seen); track('badge');
+      // Only the welcome badge and region titles get the full screen; other badges arrive as a small note.
+      const big = fresh.find(k => k === 'welcome' || (list.find(b => b.k === k) || {}).track === 'titles');
+      if (big) { state.modal = { type: 'celebrate', k: big, more: fresh.length - 1 }; renderModal(); }
+      else badgeNote(fresh.map(k => list.find(b => b.k === k)).filter(Boolean));
     }, 900);
+  }
+  function saveSeen(seen) { if (S.mode === 'demo' && !me()) return; S.save('profiles', { ...stripEmail(me()), badges_seen: seen }).catch(() => { /* kept on this phone until next time */ }); }
+  function badgeNote(bs) {
+    if (!bs.length) return; const old = document.querySelector('.bnote'); if (old) old.remove();
+    const el = document.createElement('div'); el.className = 'bnote'; el.setAttribute('role', 'status');
+    el.innerHTML = `<span class="mdl done" data-t="${esc(bs[0].track)}" style="--p:100"><span class="ring"><span class="in">${ico(bs[0].icon)}</span></span></span><span class="grow-l"><b>${esc(bs.length > 1 ? T('bn_many', { n: bs.length }) : T('bn_one'))}</b><span class="small">${esc(bs.map(bName).join(', '))}</span></span><button class="btn sm" data-act="bnview">${T('bn_view')}</button>`;
+    document.body.appendChild(el); requestAnimationFrame(() => el.classList.add('in')); setTimeout(() => { el.classList.remove('in'); setTimeout(() => el.remove(), 400); }, 7000);
   }
   function celebrateHtml(m) {
     const b = game(me().id).list.find(x => x.k === m.k); if (!b) return '';
@@ -981,6 +1113,7 @@
     const m = state.modal, x = moveRow(m); if (!x) return; const { t, row } = x;
     if (row.date === t.date && (row.start_time || '') === (t.start_time || '') && row.guide_id === t.guide_id && row.driver_id === t.driver_id) { closeModal(); return; }
     await S.save('tours', row);
+    if (row.date !== t.date || (row.start_time || '') !== (t.start_time || '')) await addHistory(t.id, { w: 'moved', from: `${t.date} ${t.start_time || ''}`.trim(), to: `${row.date} ${row.start_time || ''}`.trim() });
     const before = [t.guide_id, t.driver_id].filter(Boolean), after = [row.guide_id, row.driver_id].filter(Boolean), np = { title: row.title, date: row.date, time: row.start_time || '' };
     if (live(row)) { await notify(after.filter(p => !before.includes(p)), 'tour_assigned', np); await notify(before.filter(p => !after.includes(p)), 'tour_removed', { title: t.title, date: t.date, time: t.start_time || '' }); if (row.date !== t.date || row.start_time !== t.start_time) await notify(after.filter(p => before.includes(p)), 'tour_changed', np); }
     logAct(`Moved tour: ${t.title}, ${t.date} ${t.start_time || ''} → ${row.date} ${row.start_time || ''}`);
@@ -1065,7 +1198,7 @@
         if (days.some(d => offOn(p.id, d))) continue;
         const cand = days.filter(d => !workDays(p.id).has(d) && !holidayOn(d));
         if (!cand.length) continue;
-        const score = d => toursOnDay(d).length * 2 + (hist[(D(d).getDay() + 6) % 7] / hmax) * 2 + (taken[d] || 0) * 5;
+        const score = d => toursOnDay(d).length * 2 + (hist[(D(d).getDay() + 6) % 7] / hmax) * 2 + (taken[d] || 0) * 5 + (peakOn(d) ? 8 : 0);
         const best = cand.slice().sort((a, b) => score(a) - score(b))[0];
         (res[p.id] = res[p.id] || []).push(best); taken[best] = (taken[best] || 0) + 1;
       }
@@ -1176,11 +1309,32 @@
       return { p, days: days.length, off: t.off, sick: t.sick, best, heavy: Object.values(weeks).filter(n => n >= 6).length };
     });
   }
+  // Same guest saved twice (same phone, same email, or same name where one has no phone): offer to join them.
+  function dupGroups() {
+    const par = {}, f = x => (par[x] === x ? x : (par[x] = f(par[x]))), u = (x, y) => { par[f(x)] = f(y); }, by = {};
+    const cs = db.clients.filter(c => !c.anonymised_at); cs.forEach(c => { par[c.id] = c.id; });
+    cs.forEach(c => { const d = digits(c.phone).slice(-9), e = (c.email || '').toLowerCase(), n = (c.name || '').toLowerCase().trim(); if (d.length >= 7) (by['p' + d] = by['p' + d] || []).push(c); if (e) (by['e' + e] = by['e' + e] || []).push(c); if (n.length > 3) (by['n' + n] = by['n' + n] || []).push(c); });
+    Object.entries(by).forEach(([k, l]) => { if (l.length < 2) return; if (k[0] === 'n' && new Set(l.map(c => digits(c.phone).slice(-9)).filter(Boolean)).size > 1) return; l.slice(1).forEach(c => u(c.id, l[0].id)); });
+    const g = {}; cs.forEach(c => { (g[f(c.id)] = g[f(c.id)] || []).push(c); });
+    return Object.values(g).filter(l => l.length > 1);
+  }
+  function dupHtml(cnt) {
+    const gs = dupGroups(); if (!gs.length) return '';
+    return `<details class="sect"><summary>${T('dup_title')} (${gs.length})</summary><p class="muted small">${T('dup_text')}</p><div class="list">${gs.slice(0, 30).map(l => { const ids = l.map(c => c.id).join(','), ask = state.mergeAsk === ids; return `<div class="card f"><div class="list">${l.map(c => `<div class="row small"><b>${esc(c.name)}</b><span class="muted num">${esc([c.phone, c.email, T('bookings_n') + ': ' + (cnt[c.id] || 0)].filter(Boolean).join(' · '))}</span></div>`).join('')}</div><div class="bar">${ask ? `<span class="small">${T('dup_sure')}</span><button class="btn sm" data-act="mergeno">${T('close')}</button><button class="btn sm primary" data-act="mergedo" data-ids="${ids}">${T('dup_merge')}</button>` : `<button class="btn sm" data-act="mergeask" data-ids="${ids}">${T('dup_merge')}</button>`}</div></div>`; }).join('')}</div></details>`;
+  }
   function adminHtml() {
     const tab = state.adminTab, r = rules(), y = state.year;
-    const tabs = ['tours', 'requests', 'clients', 'email', 'catalog', 'usage', 'team', 'plan', 'pay', 'holidays', 'reports', 'log', 'rules', 'privacy', 'import', 'backup'];
+    const tabs = ['tours', 'requests', 'clients', 'email', 'catalog', 'usage', 'team', 'plan', 'pay', 'holidays', 'reports', 'log', 'rules', 'privacy', 'import', 'backup', 'problems'];
     if (!tab) return `<div class="bar"><h2>${T('nav_admin')}</h2><span class="spacer"></span>${helpBtn()}</div>${helpBox('admin')}<div class="tiles">${tabs.map(x => `<button class="card" data-act="admintab" data-v="${x}"><span class="ttl">${T('a_' + x)}${x === 'requests' && db.change_requests.some(q => q.status === 'pending') ? ` <span class="badge">${db.change_requests.filter(q => q.status === 'pending').length}</span>` : ''}${x === 'pay' && db.pay_disputes.some(q => q.status === 'open') ? ` <span class="badge">${db.pay_disputes.filter(q => q.status === 'open').length}</span>` : ''}</span><span class="muted small">${T('ad_' + x)}</span></button>`).join('')}</div>`;
     let h = `<div class="bar"><button class="btn sm" data-act="admintab" data-v="">‹ ${T('nav_admin')}</button><h2>${T('a_' + tab)}</h2><span class="spacer"></span>${helpBtn()}</div>${helpBox('admin')}`;
+    if (tab === 'problems') {
+      if (!state.errs) { S.fetchErrors().then(r => { state.errs = r; render(); }).catch(e => { state.errs = []; toast(T('err_save') + ': ' + e.message); render(); }); return h + `<p class="muted">${T('loading')}</p>`; }
+      const kinds = { error: T('pr_error'), save: T('pr_save'), offline: T('pr_offline'), report: T('pr_report') };
+      const when = x => new Intl.DateTimeFormat(LOCALES[lang()], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(x));
+      return h + `<p class="muted small">${T('pr_text')}</p><div class="bar"><button class="btn sm" data-act="errreload">${T('refresh')}</button>${state.errs.length ? `<button class="btn sm" data-act="errclear">${T('pr_clear')}</button>` : ''}</div>
+        <div class="list">${state.errs.map(x => `<details class="card f"><summary class="row nw"><span class="tag ${x.kind === 'offline' ? 't-muted' : x.kind === 'report' ? 't-group' : 't-warn'}">${esc(kinds[x.kind] || x.kind)}</span><span class="grow-l small">${esc(x.message)}</span><span class="muted small num">${esc(when(x.at))}</span></summary>
+          <div class="muted small">${esc([x.user_id ? pname(x.user_id) : '', x.page, x.device, x.version && 'v' + x.version].filter(Boolean).join(' · '))}</div>${x.detail ? `<pre class="pre small">${esc(x.detail)}</pre>` : ''}</details>`).join('') || `<div class="empty">${T('pr_none')}</div>`}</div>`;
+    }
     const cur = r.currency || 'GEL';
     if (tab === 'tours') {
       const mo = state.listMonth || today().slice(0, 7), q = (state.q || '').toLowerCase();
@@ -1193,14 +1347,15 @@
     }
     if (tab === 'clients') {
       const q = (state.q || '').toLowerCase(), cnt = {}; db.bookings.forEach(b => { if (b.client_id) cnt[b.client_id] = (cnt[b.client_id] || 0) + 1; });
-      const list = db.clients.filter(c => (!q || ((c.name || '') + ' ' + (c.phone || '')).toLowerCase().includes(q)) && (!state.vipOnly || isVip(c.id))).sort((a, b) => (cnt[b.id] || 0) - (cnt[a.id] || 0) || (a.name || '').localeCompare(b.name || '')).slice(0, 100);
-      h += `<div class="bar"><input class="inp" id="cq" data-ch="q" value="${esc(state.q || '')}" placeholder="${T('search')}" style="max-width:280px"><button class="btn sm" data-act="viponly" aria-pressed="${!!state.vipOnly}">${T('vip_only')}</button><span class="muted small num">${db.clients.length} ${T('clients_n')}</span></div><p class="muted small">${T('vip_rule')}</p>
+      const refs = {}; db.bookings.forEach(b => { if (b.client_id && b.ref) refs[b.client_id] = (refs[b.client_id] || '') + ' ' + b.ref; });
+      const list = db.clients.filter(c => (!q || ((c.name || '') + ' ' + (c.phone || '') + ' ' + digits(c.phone) + ' ' + (c.email || '') + (refs[c.id] || '')).toLowerCase().includes(q)) && (!state.vipOnly || isVip(c.id))).sort((a, b) => (cnt[b.id] || 0) - (cnt[a.id] || 0) || (a.name || '').localeCompare(b.name || '')).slice(0, 100);
+      h += `<div class="bar"><input class="inp" id="cq" data-ch="q" value="${esc(state.q || '')}" placeholder="${T('search')}" style="max-width:280px"><button class="btn sm" data-act="viponly" aria-pressed="${!!state.vipOnly}">${T('vip_only')}</button><span class="muted small num">${db.clients.length} ${T('clients_n')}</span></div><p class="muted small">${T('vip_rule')}</p>${dupHtml(cnt)}
         <div class="tablewrap"><table><tr><th>${T('name')}</th><th>${T('phone')}</th><th>${T('phone_country')}</th><th class="n">${T('bookings_n')}</th><th>${T('rating')}</th></tr>${list.map(c => `<tr><td><button class="btn sm" data-act="client" data-id="${c.id}">${esc(c.name)}</button> ${vipTag(c.id)}</td><td class="num">${esc(c.phone || '')}</td><td>${esc(phoneCountry(c.phone))}</td><td class="n">${cnt[c.id] || 0}</td><td>${ratingTag(c.id)}</td></tr>`).join('') || `<tr><td colspan="5" class="muted">${T('no_clients')}</td></tr>`}</table></div>`;
     }
     if (tab === 'plan') {
       const se = seasonByMonth(), sug = suggestDaysOff(4);
       h += `<div class="card"><b>${T('season_title')}</b><span class="muted small">${T('season_text')}</span><div class="bars">${se.months.map(x => `<div class="barcol"><span class="num small">${x.has ? Math.round(x.avg) : ''}</span><i class="${x.peak ? 'peak' : x.low ? 'low' : ''}" style="height:${Math.round(x.avg / se.max * 100)}%"></i><span class="small">${esc(fmt(`2024-${p2(x.m)}-01`, { month: 'short' }))}</span></div>`).join('')}</div><div class="row small"><span class="tag t-custom">${T('peak')}</span><span class="tag t-ok">${T('quiet')}</span></div></div>
-        <div class="card"><b>${T('sug_title')}</b><span class="muted small">${T('sug_admin')}</span>
+        <div class="card"><b>${T('sug_title')}</b><span class="muted small">${T('sug_admin')}</span><details class="sect"><summary>${T('sug_how')}</summary><ul class="small"><li>${T('sug_r1')}</li><li>${T('sug_r2')}</li><li>${T('sug_r3')}</li><li>${T('sug_r4')}</li><li>${T('sug_r5')}</li></ul><b class="small">${T('peaks_title')}</b><ul class="small">${peaks().map(p => `<li class="num">${esc(fmtDay(p.from))} – ${esc(fmtDay(p.to))}: ${esc(p.name)}</li>`).join('')}</ul></details>
         <div class="tablewrap"><table><tr><th>${T('name')}</th><th>${T('sug_dates')}</th></tr>${crew().filter(p => p.role !== 'admin').map(p => `<tr><td>${avatar(p.id)} ${esc(p.name)}</td><td style="white-space:normal">${(sug[p.id] || []).map(d => `<button class="btn sm" data-act="offnew" data-date="${d}" data-who="${p.id}">${esc(fmtDay(d))}</button>`).join(' ') || `<span class="muted">${T('sug_none')}</span>`}</td></tr>`).join('')}</table></div></div>`;
     }
     if (tab === 'pay') {
@@ -1236,7 +1391,7 @@
     }
     if (tab === 'email') {
       const mm = state.mail;
-      h += `<form class="f card" data-form="mail"><b>${T('mail_title')}</b><span class="muted small">${T('mail_text')}</span><textarea id="mail-text" name="text" style="min-height:160px" required></textarea><div class="actions"><button class="btn primary">${T('mail_read')}</button></div></form>`;
+      h += pasteHtml() + `<details class="sect"><summary>${T('mail_title')}</summary><form class="f card" data-form="mail"><b>${T('mail_title')}</b><span class="muted small">${T('mail_text')}</span><textarea id="mail-text" name="text" style="min-height:160px" required></textarea><div class="actions"><button class="btn primary">${T('mail_read')}</button></div></form></details>`;
       if (mm) h += `<div class="card"><b>${esc(mm.title)}</b><div class="row"><span class="tag t-${mm.kind}">${T('kind_' + mm.kind)}</span><b class="num">${esc(fmtDay(mm.date))} ${esc(mm.start)}</b><span class="tag t-muted">${esc(acText(mm))}</span><span class="tag t-muted">${esc(mm.source)}</span><span class="tag ${mm.payment === 'prepaid' ? 't-ok' : 't-warn'}">${T('pay_' + mm.payment)}${mm.due ? ' ' + esc(mm.cur + ' ' + mm.due) : ''}</span></div>
         <div class="small">${esc(mm.guest)} · ${esc(mm.phone || '')} · ${esc(mm.email || '')} · ${esc(mm.ref)}</div>
         <div class="muted small">${mm.dup ? T('mail_dup') : mm.tour ? T('mail_join', { title: mm.tour.title }) : T('mail_new')}</div>
@@ -1272,7 +1427,7 @@
     }
     if (tab === 'rules') {
       const f = (k, label) => `<label>${label}<input id="r-${k}" name="${k}" type="number" min="0" value="${esc(r[k])}"></label>`;
-      h += `<form class="f" data-form="rules" style="max-width:560px">${f('maxStreak', T('r_streak'))}${f('carSeats', T('r_car'))}<div class="two">${f('seasonFrom', T('r_season_from'))}${f('seasonTo', T('r_season_to'))}</div>${f('maxSeasonBlock', T('r_block'))}${f('minNoticeDays', T('r_notice'))}${['reviewGoogle', 'reviewGyg', 'reviewViator'].map(k => `<label>${T('r_' + k)}<input id="r-${k}" name="${k}" type="url" value="${esc(r[k] || '')}"></label>`).join('')}<label>${T('r_tipUrl')}<input id="r-tipUrl" name="tipUrl" type="url" value="${esc(r.tipUrl || '')}" placeholder="https://"></label><label>${T('r_botUrl')}<input id="r-botUrl" name="botUrl" type="url" value="${esc(r.botUrl || '')}" placeholder="https://t.me/..."></label><label>${T('r_offerPromo')}<input id="r-offerPromo" name="offerPromo" value="${esc(r.offerPromo || '')}"></label><label>${T('r_guestcur')}<input id="r-guestCurrency" name="guestCurrency" value="${esc(r.guestCurrency || 'USD')}" style="max-width:120px"></label><label>${T('r_marks')}<input id="r-customMarks" name="customMarks" value="${esc(r.customMarks || '')}"></label><div class="actions"><button class="btn primary">${T('save')}</button></div></form>`;
+      h += `<form class="f" data-form="rules" style="max-width:560px">${f('maxStreak', T('r_streak'))}${f('carSeats', T('r_car'))}<div class="two">${f('seasonFrom', T('r_season_from'))}${f('seasonTo', T('r_season_to'))}</div>${f('maxSeasonBlock', T('r_block'))}${f('minNoticeDays', T('r_notice'))}${['reviewGoogle', 'reviewGyg', 'reviewViator'].map(k => `<label>${T('r_' + k)}<input id="r-${k}" name="${k}" type="url" value="${esc(r[k] || '')}"></label>`).join('')}<label>${T('r_tipUrl')}<input id="r-tipUrl" name="tipUrl" type="url" value="${esc(r.tipUrl || '')}" placeholder="https://"></label><label>${T('r_botUrl')}<input id="r-botUrl" name="botUrl" type="url" value="${esc(r.botUrl || '')}" placeholder="https://t.me/..."></label><label>${T('r_offerPromo')}<input id="r-offerPromo" name="offerPromo" value="${esc(r.offerPromo || '')}"></label><label>${T('r_guestcur')}<input id="r-guestCurrency" name="guestCurrency" value="${esc(r.guestCurrency || 'USD')}" style="max-width:120px"></label><label>${T('r_marks')}<input id="r-customMarks" name="customMarks" value="${esc(r.customMarks || '')}"></label><label>${T('peaks_title')}<textarea id="r-peaks" name="peaks" rows="6" spellcheck="false">${esc(r.peaks ?? DEFAULT_PEAKS)}</textarea></label><span class="muted small">${T('peaks_text')}</span><div class="actions"><button class="btn primary">${T('save')}</button></div></form>`;
     }
     if (tab === 'reports') {
       const rows = report(y);
@@ -1282,7 +1437,7 @@
     }
     if (tab === 'import') {
       const im = state.imp;
-      h += `<div class="card"><b>${T('imp_title')}</b><p class="muted small">${T('imp_text')}</p><input class="inp" type="file" id="imp-file" accept=".xlsx,.xls,.csv" data-ch="impfile"></div>`;
+      h += contactsImpHtml() + `<div class="card"><b>${T('imp_title')}</b><p class="muted small">${T('imp_text')}</p><input class="inp" type="file" id="imp-file" accept=".xlsx,.xls,.csv" data-ch="impfile"></div>`;
       if (im) h += `<div class="card"><b>${T('imp_found', { tours: im.tours.length, guests: im.bookings.length, offs: im.offs.length, skipped: im.skipped })}</b>
         <div class="f">${im.members.map((n, i) => `<label>${esc(n)}<select id="im-${i}" data-ch="impmap" data-name="${esc(n)}">${opt('', T('imp_skip'), im.map[n])}${S.mode === 'demo' ? opt('new', T('imp_create'), im.map[n]) : ''}${staff().map(p => opt(p.id, p.name, im.map[n])).join('')}</select></label>`).join('')}</div>
         <div class="actions"><button class="btn primary" data-act="impgo">${T('imp_go')}</button></div></div>`;
@@ -1366,8 +1521,100 @@
     out.members.forEach(n => { const p = staff().find(p => norm(p.name) === norm(n) || norm(p.name).startsWith(norm(n))); out.map[n] = p ? p.id : (S.mode === 'demo' ? 'new' : ''); });
     return out;
   }
+  // ---------- paste a booking email (GetYourGuide, Viator, Klook, Trip.com, TrekkSoft, Airbnb and others) ----------
+  const MON3 = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+  function parseWhen(v) {
+    const s = String(v || ''); let date = '', time = '';
+    let m = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/); if (m) date = `${m[1]}-${p2(+m[2])}-${p2(+m[3])}`;
+    if (!date && (m = s.match(/([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})/)) && MON3[m[1].slice(0, 3).toLowerCase()]) date = `${m[3]}-${p2(MON3[m[1].slice(0, 3).toLowerCase()])}-${p2(+m[2])}`;
+    if (!date && (m = s.match(/(\d{1,2})(?:st|nd|rd|th)?\.?\s+([A-Za-z]{3,9})\.?,?\s+(\d{4})/)) && MON3[m[2].slice(0, 3).toLowerCase()]) date = `${m[3]}-${p2(MON3[m[2].slice(0, 3).toLowerCase()])}-${p2(+m[1])}`;
+    if (!date && (m = s.match(/\b(\d{1,2})[./](\d{1,2})[./](\d{4})\b/))) date = `${m[3]}-${p2(+m[2])}-${p2(+m[1])}`;
+    if ((m = s.match(/\b(\d{1,2}):(\d{2})\s*([AaPp][Mm])?/))) { let h = +m[1]; if (m[3] && /p/i.test(m[3]) && h < 12) h += 12; if (m[3] && /a/i.test(m[3]) && h === 12) h = 0; time = `${p2(h)}:${m[2]}`; }
+    return { date, time };
+  }
+  const LANG_CODES = { english: 'EN', russian: 'RU', german: 'DE', french: 'FR', spanish: 'ES', italian: 'IT', georgian: 'KA', hebrew: 'HE', chinese: 'ZH', arabic: 'AR', polish: 'PL', ukrainian: 'UK', turkish: 'TR', dutch: 'NL', japanese: 'JA', korean: 'KO' };
+  function parseBooking(raw) {
+    const t = String(raw || '').replace(/\[[^\]]*\]\([^)]*\)/g, ' ').replace(/https?:\/\/\S+/g, ' ').replace(/\|/g, '\n').replace(/[ \t\u00a0]+/g, ' ').replace(/\n\s*\n+/g, '\n');
+    const get = re => { const m = t.match(re); return m ? m[1].trim() : ''; };
+    const src = /getyourguide/i.test(t) ? 'GetYourGuide' : /viator|tripadvisor/i.test(t) ? 'Viator' : /klook/i.test(t) ? 'Klook' : /trip\.com|ctrip/i.test(t) ? 'Trip.com' : /airbnb/i.test(t) ? 'Airbnb' : /civitatis/i.test(t) ? 'Civitatis' : /freetour/i.test(t) ? 'FreeTour' : /tourradar/i.test(t) ? 'TourRadar' : /trekksoft/i.test(t) ? 'Website' : '';
+    const ref = get(/\b(GYG[A-Z0-9]{8,})\b/) || get(/\b(BR-\d{6,})\b/) || get(/(?:Booking (?:Reference|ID|number|No\.?|code)|Reference (?:number|no\.?)|Order (?:number|ID|No\.?)|Confirmation (?:number|code)|Voucher (?:number|code))\s*[:#]?\s*([A-Z0-9][A-Z0-9-]{4,})/i) || get(/order[^#\n]{0,80}#\s?(\d{6,})/i);
+    let title = get(/(?:Tour Name|Activity(?: name)?|Product(?: name)?|Package(?: name)?|Experience)\s*:\s*([^\n]+)/i) || get(/has been booked:?\s*\n\s*([^\n]+)/i) || get(/new reservation for ([^.\n]+)/i);
+    title = title.replace(/\s+Reference number.*$/i, '').trim();
+    let when = parseWhen(get(/(?:Travel Date|Activity Date|Tour date|Date of (?:the )?(?:tour|activity)|Departure date)\s*:?\s*([^\n]+)/i) || get(/\bDate\s*:?\s*([^\n]+)/));
+    if (!when.time) when.time = parseWhen(get(/(?:Tour Grade|Start time|Time|Option)\s*:?\s*([^\n]*\d{1,2}:\d{2}[^\n]*)/i)).time;
+    let guest = get(/(?:Lead Traveler Name|Lead traveller(?: name)?|Main customer|Customer name|Contact (?:name|person)|Guest name|Booked by|Traveler name)\s*:?\s*([^\n]+)/i);
+    guest = guest.replace(/\S+@\S+.*$/, '').replace(/\s*(Phone|Tel|Mobile)\b.*$/i, '').trim();
+    const num = re => { const m = t.match(re); return m ? Number(m[1]) : 0; };
+    let adults = num(/(\d+)\s*x?\s*Adults?\b/i), children = num(/(\d+)\s*x?\s*(?:Child|Children|Kids?)\b/i) + num(/(\d+)\s*x?\s*Youths?\b/i) + num(/(\d+)\s*x?\s*Infants?\b/i);
+    if (!adults && !children) adults = num(/(?:Travell?ers|Participants|Persons|People|Guests|Number of (?:participants|people|guests))\s*:?\s*(\d+)/i) || 1;
+    const phone = normPhone((get(/(?:Phone|Mobile|Tel(?:ephone)?)\s*(?:number)?\s*:?\s*(?:\([^)]*\))?\s*(?:[A-Z]{2}\s*)?(\+?\d[\d\s()-]{6,}\d)/i) || '').replace(/[\s()-]/g, ''));
+    const email = (t.match(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g) || []).find(e => !/reply|expmessaging|tripadvisor|notification|no-?reply|friendly\.ge|klook\.com|trip\.com|viator|getyourguide|trekksoft|airbnb|example/i.test(e)) || '';
+    const lw = (get(/(?:Tour Language|Guide language|Language)\s*:?\s*([A-Za-z]+)/i) || '').toLowerCase(), lang = LANG_CODES[lw] || '';
+    const pickup = get(/(?:Pick-?up(?: point| location| address)?|Meeting Point|Hotel(?: name)?)\s*:?\s*([^\n]+)/i).replace(/\s*Open in Google Maps.*$/i, '').trim();
+    const marks = []; if (/wine tasting/i.test(t)) marks.push('wine'); if (/front seat/i.test(t)) marks.push('front_seat'); if (/\bPick-?up\b/i.test(t) && pickup && !/Meeting Point/i.test(t)) marks.push('pickup'); if (src === 'FreeTour') marks.push('freetour');
+    const price = get(/(?:Price|Net Rate|Total(?: price)?|Amount(?: paid)?|Sales Price)\s*:?\s*((?:USD|EUR|GEL|\$|€|₾)\s*\$?\s*[\d,.]+)/i);
+    const status = /cancell?ed|cancellation/i.test(t.slice(0, 600)) ? 'cancel' : /amended|changed|modified|rescheduled|has been updated/i.test(t.slice(0, 600)) ? 'change' : 'new';
+    const kind = /private/i.test(title) ? 'private' : /group|shared|small-group/i.test(title) ? 'group' : '';
+    return { src, ref, title, date: when.date, time: when.time, guest, adults, children, phone, email: email.toLowerCase(), lang, pickup, marks, price, status, kind };
+  }
+  // Similar tour names: shared words count, ignoring small words.
+  const words = s => new Set(String(s || '').toLowerCase().replace(/[^a-z0-9\u10a0-\u10ff\u0400-\u04ff ]+/g, ' ').split(/\s+/).filter(w => w.length > 3 && !/^(tour|tours|from|with|tbilisi|day|trip|private|group|small|guided|hours|full|half|georgia|the|and)$/.test(w)));
+  const simil = (x, y) => { const A = words(x), B = words(y); if (!A.size || !B.size) return 0; let n = 0; A.forEach(w => { if (B.has(w)) n++; }); return n / Math.min(A.size, B.size); };
+  function pbMatch(pb) {
+    const old = pb.ref ? db.bookings.find(b => (b.ref || '').toUpperCase() === pb.ref.toUpperCase()) : null;
+    const cat = catalog().map(x => ({ x, s: simil(pb.title, x.title) + (pb.kind && x.kind === pb.kind ? 0.2 : 0) })).sort((p, q) => q.s - p.s)[0];
+    const tours = pb.date ? db.tours.filter(x => x.date === pb.date && live(x)).map(x => ({ x, s: simil(pb.title, x.title) + (cat && cat.s >= 0.4 && x.title === cat.x.title ? 1 : 0) + (pb.time && x.start_time === pb.time ? 0.5 : 0) })).filter(y => y.s >= 0.5).sort((p, q) => q.s - p.s) : [];
+    return { old, oldTour: old ? db.tours.find(x => x.id === old.tour_id) : null, cat: cat && cat.s >= 0.4 ? cat.x : null, tour: tours[0] ? tours[0].x : null };
+  }
+  function pasteHtml() {
+    const pb = state.pb, mt = pb && pbMatch(pb);
+    const row = (k, v) => (v ? `<dt>${T(k)}</dt><dd>${esc(v)}</dd>` : '');
+    return `<div class="card f"><b>${T('pb_title')}</b><span class="muted small">${T('pb_text')}</span><textarea class="inp" id="pb-text" rows="6" placeholder="${T('pb_ph')}"></textarea><div class="bar"><button class="btn primary" data-act="pbread">${T('pb_read')}</button>${pb ? `<button class="btn" data-act="pbclear">${T('close')}</button>` : ''}</div>
+      ${pb ? `<div class="f"><b>${esc(pb.status === 'cancel' ? T('pb_cancel') : pb.status === 'change' ? T('pb_change') : T('pb_new'))}${pb.src ? ' · ' + esc(pb.src) : ''}</b><dl class="fields">${row('ref', pb.ref)}${row('tour', pb.title)}${row('date', pb.date ? fmtDay(pb.date) : '')}${row('start', pb.time)}${row('guest', pb.guest)}${row('guests_cap', acText({ adults: pb.adults, children: pb.children, pax: pb.adults + pb.children }))}${row('phone', pb.phone ? phoneFlag(pb.phone).split(' ')[0] + ' ' + pb.phone : '')}${row('email', pb.email)}${row('guest_lang', pb.lang)}${row('guest_addr', pb.pickup)}${row('options', pb.marks.map(markLabel).join(', '))}${row('pb_price', pb.price)}</dl>
+        ${!pb.date || !pb.guest ? `<div class="warnline soft">! ${T('pb_missing')}</div>` : ''}
+        ${mt.old ? `<div class="banner small">${T('pb_known', { tour: mt.oldTour ? mt.oldTour.title + ', ' + fmtDay(mt.oldTour.date) : '—' })}</div>` : ''}
+        <div class="bar">${pb.status === 'cancel' && mt.old ? `<button class="btn primary" data-act="pbgo" data-m="cancel">${T('pb_do_cancel')}</button>` : `<button class="btn primary" data-act="pbgo" data-m="add">${mt.old ? T('pb_do_update') : mt.tour ? T('pb_do_add', { tour: mt.tour.title + (mt.tour.start_time ? ' ' + mt.tour.start_time : '') }) : T('pb_do_new')}</button>`}</div>
+        <span class="muted small">${T('pb_check')}</span></div>` : ''}</div>`;
+  }
+  // ---------- guest contacts from Setmore (Customers export) or any table with name, phone, email ----------
+  // CSV without any library: commas or semicolons, quoted fields with commas or new lines inside.
+  function csvRows(text) {
+    const s = String(text || '').replace(/^\ufeff/, ''), first = s.split('\n')[0], sep = (first.match(/;/g) || []).length > (first.match(/,/g) || []).length ? ';' : ',';
+    const rows = []; let row = [], cell = '', q = false;
+    for (let k = 0; k < s.length; k++) { const ch = s[k];
+      if (q) { if (ch === '"') { if (s[k + 1] === '"') { cell += '"'; k++; } else q = false; } else cell += ch; }
+      else if (ch === '"') q = true; else if (ch === sep) { row.push(cell); cell = ''; } else if (ch === '\n' || ch === '\r') { if (ch === '\r' && s[k + 1] === '\n') k++; row.push(cell); rows.push(row); row = []; cell = ''; } else cell += ch; }
+    if (cell || row.length) { row.push(cell); rows.push(row); }
+    return rows;
+  }
+  async function loadXlsx() { if (!window.XLSX) await new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; s.onload = res; s.onerror = () => rej(new Error('xlsx')); document.head.appendChild(s); }); }
+  async function readContacts(file) {
+    let rows;
+    if (/\.csv$/i.test(file.name) || /csv|text\/plain/.test(file.type)) rows = csvRows(await file.text());
+    else { await loadXlsx(); const wb = window.XLSX.read(await file.arrayBuffer(), { type: 'array' }); rows = window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: '' }); }
+    const hi = rows.findIndex(r => r.some(x => /name/i.test(x)) && r.some(x => /phone|mobile|email|e-mail/i.test(x))); if (hi < 0) throw new Error(T('ct_nohead'));
+    const H = rows[hi].map(x => String(x).toLowerCase().trim()), col = re => H.findIndex(x => re.test(x));
+    const cF = col(/^first/), cL = col(/^last|surname/), cN = col(/^(full |customer |client )?name$/), cP = col(/phone|mobile|cell/), cE = col(/e-?mail/), cC = col(/comment|note/);
+    const out = []; let skipped = 0;
+    for (const r of rows.slice(hi + 1)) {
+      const name = (cN >= 0 ? r[cN] : [r[cF] || '', r[cL] || ''].join(' ')).replace(/\s+/g, ' ').trim(); if (!name) { skipped++; continue; }
+      out.push({ name: cleanName(name) || name, phone: normPhone(cP >= 0 ? r[cP] : '') || null, email: String(cE >= 0 ? r[cE] : '').trim().toLowerCase() || null, notes: String(cC >= 0 ? r[cC] : '').trim() || null });
+    }
+    let fresh = 0, upd = 0; const plan = out.map(x => { const d = digits(x.phone).slice(-9), hit = db.clients.find(c => (d.length >= 7 && digits(c.phone).slice(-9) === d) || (x.email && (c.email || '').toLowerCase() === x.email)); if (hit) upd++; else fresh++; return { x, hit }; });
+    state.ct = { plan, fresh, upd, skipped }; render();
+  }
+  async function importContacts() {
+    const ct = state.ct; if (!ct) return; const add = [], up = [];
+    ct.plan.forEach(({ x, hit }) => { if (!hit) add.push({ id: S.uid(), ...x }); else { const m = { ...hit }; let ch = false; ['phone', 'email', 'notes'].forEach(k => { if (!m[k] && x[k]) { m[k] = x[k]; ch = true; } }); if (ch) up.push(m); } });
+    await S.saveMany('clients', [...add, ...up]); logAct(`Imported guest contacts: ${add.length} new, ${up.length} updated`); state.ct = null; toast(T('ct_done', { n: add.length, u: up.length }));
+  }
+  function contactsImpHtml() {
+    const ct = state.ct;
+    return `<div class="card f"><b>${T('ct_title')}</b><span class="muted small">${T('ct_text')}</span><input class="inp" type="file" id="ct-file" accept=".xlsx,.xls,.csv" data-ch="ctfile">${ct ? `<b>${T('ct_found', { n: ct.fresh, u: ct.upd, s: ct.skipped })}</b><div class="bar"><button class="btn primary" data-act="ctgo">${T('ct_go')}</button></div>` : ''}</div>`;
+  }
   async function readImport(file) {
-    if (!window.XLSX) await new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; s.onload = res; s.onerror = () => rej(new Error('xlsx')); document.head.appendChild(s); });
+    if (/\.csv$/i.test(file.name)) { state.imp = parseSetmore(csvRows(await file.text())); render(); return; }
+    await loadXlsx();
     const wb = window.XLSX.read(await file.arrayBuffer(), { type: 'array' });
     state.imp = parseSetmore(window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: '' }));
   }
@@ -1519,7 +1766,7 @@
     const next = g.list.filter(b => !b.done && !b.hidden && b.track !== 'master' && b.have > 0).sort((x, y) => y.have / y.goal - x.have / x.goal).slice(0, 3);
     const tracks = [['titles', T('tr_titles')], ['all', ''], ['master', T('tr_master')], ['guide', T('tr_guide')], ['driver', T('tr_driver')], ['own', T('tr_own')], ['delica', 'Delica'], ['new', T('tr_new')], ['now', T('tr_now')], ['geo', T('tr_geo')], ['fun', T('tr_fun')], ['secret', T('tr_secret')]];
     const pals = Object.entries(g.partners).sort((x, y) => y[1] - x[1]).slice(0, 3);
-    return `<div class="card lvl"><div class="row nw">${avatar(id, true)}<div class="grow-l" style="flex-direction:column;align-items:stretch;gap:4px;min-width:0"><b class="lvn">${T('level')} ${g.level}</b><span class="meter"><i style="width:${Math.round((g.xp - g.base) / (g.next - g.base) * 100)}%"></i></span><span class="muted small num">${T('g_xp', { xp: nf(g.xp), next: nf(g.next) })} · ${g.done}/${g.list.length} ${T('badges').toLowerCase()}</span></div></div></div>
+    return `<div class="card lvl"><div class="row nw">${avatar(id, true)}<div class="grow-l" style="flex-direction:column;align-items:stretch;gap:4px;min-width:0"><b class="lvn">${T('level')} ${g.level}</b><details class="lvhelp"><summary class="lnk small">${T('lv_how')}</summary><p class="small">${T('lv_text')}</p><ul class="small"><li>${T('lv_tour')}</li><li>${T('lv_guest')}</li><li>${T('lv_km')}</li><li>${T('lv_badge')}</li></ul><p class="small muted">${T('lv_steps')}</p></details><span class="meter"><i style="width:${Math.round((g.xp - g.base) / (g.next - g.base) * 100)}%"></i></span><span class="muted small num">${T('g_xp', { xp: nf(g.xp), next: nf(g.next) })} · ${g.done}/${g.list.length} ${T('badges').toLowerCase()}</span></div></div></div>
       <h3>${T('g_month')}</h3><div class="stats"><div class="stat"><b>${g.weekNow}</b>${T('g_week')}</div><div class="stat"><b>${g.cur.tours}</b>${T('g_thismonth')}${delta(g.cur.tours, g.prev.tours)}</div><div class="stat"><b>${g.yearNow}</b>${T('g_year')}</div><div class="stat"><b>${nf(g.cur.guests)}</b>${T('guests')}${delta(g.cur.guests, g.prev.guests)}</div>${g.isD ? `<div class="stat"><b>${nf(g.cur.km)}</b>km${delta(g.cur.km, g.prev.km)}</div>` : ''}<div class="stat"><b>${Math.round(g.regs.size / REGIONS.length * 100)}%</b>${T('g_geo')}</div></div>
       ${next.length ? `<h3>${T('g_next')}</h3><div class="medals">${next.map(b => medal(b)).join('')}</div>` : ''}
       ${tracks.map(([k, label]) => { const bs = g.list.filter(b => b.track === k).sort((x, y) => (k === 'secret' ? y.done - x.done : 0)); return bs.length ? `${label ? `<h3>${esc(label)}</h3>` : ''}<div class="medals">${bs.map(b => medal(b)).join('')}</div>` : ''; }).join('')}
@@ -1537,15 +1784,19 @@
     return h + `<div class="cols"><div class="card f">
       <div class="row">${avatar(m.id, true)}<div><b>${esc(m.name)}</b> <span class="tag t-muted">${T('role_' + m.role)}</span>${m.email ? `<div class="muted small">${esc(m.email)}</div>` : ''}</div></div>
       <label>${T('photo')}<input type="file" id="me-photo" accept="image/*" data-ch="avatar"></label>
+      <div class="f"><b>${T('ds_title')}</b><span class="muted small">${T('ds_size')}</span><div class="seg">${[['s', T('ds_small')], ['', T('ds_normal')], ['l', T('ds_big')]].map(([k, l]) => `<button data-act="fsize" data-v="${k}" aria-pressed="${(document.documentElement.dataset.fs || '') === k}">${l}</button>`).join('')}</div>
+        <span class="muted small">${T('ds_theme')}</span><div class="seg">${[['', T('ds_system')], ['light', T('ds_light')], ['dark', T('ds_dark')]].map(([k, l]) => `<button data-act="theme" data-v="${k}" aria-pressed="${(document.documentElement.dataset.theme || '') === k}">${l}</button>`).join('')}</div></div>
       <label>${T('language')}<select id="me-lang" data-ch="lang">${opt('en', 'English', lang())}${opt('ru', 'Русский', lang())}${opt('ka', 'ქართული', lang())}</select></label>
       <div class="f"><b>${T('notifications')}</b><span class="muted small">${T(perm === 'granted' ? 'push_state_on' : perm === 'unsupported' ? 'push_unsupported' : 'push_state_off')}</span>
         ${perm !== 'granted' && perm !== 'unsupported' ? `<button class="btn" data-act="push">${T('push_enable')}</button>` : ''}<span class="muted small">${T('push_ios')}</span>
         <span class="muted small">${T('note_pick')}</span><div class="checks col">${Object.keys(NOTE_GROUPS).map(g => `<label><input type="checkbox" id="mute-${g}" data-ch="mutepref" data-g="${g}" ${(m.mute || []).includes(g) ? '' : 'checked'}>${T('note_' + g)}</label>`).join('')}</div></div>
       <form class="f" data-form="mytg"><b>Telegram</b><span class="muted small">${T('tg_mine_text')}</span><div class="bar"><input class="inp" id="me-tg" name="telegram" value="${esc(m.telegram ? '@' + m.telegram : '')}" placeholder="@username" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1;min-width:150px"><button class="btn">${T('save')}</button></div></form>
-      <div class="f"><b>${T('tg_title')}</b>${m.telegram_id ? `<span class="row"><span class="tag t-ok">${T('tg_on')}</span><span class="muted small">${T('tg_on_text')}</span></span>` : `<span class="muted small">${T('tg_text')}</span>${m.link_code ? `<div class="row"><b class="num tgcode">/link ${esc(m.link_code)}</b><button class="btn sm" data-act="copy" data-v="/link ${esc(m.link_code)}">${ico('copy')}${T('copy')}</button></div>` : ''}<div class="bar"><button class="btn sm" data-act="tgcode">${T(m.link_code ? 'tg_new' : 'tg_get')}</button>${/^https:\/\/t\.me\//.test(rules().botUrl || '') ? `<a class="btn sm" href="${esc(rules().botUrl)}" target="_blank" rel="noopener">${T('tg_open')}</a>` : ''}</div>`}</div>
+      ${/^https:\/\/t\.me\//.test(rules().botUrl || '') || m.telegram_id ? `<div class="f"><b>${T('tg_title')}</b>${m.telegram_id ? `<span class="row"><span class="tag t-ok">${T('tg_on')}</span><span class="muted small">${T('tg_on_text')}</span></span>` : `<span class="muted small">${T('tg_text')}</span>${m.link_code ? `<div class="row"><b class="num tgcode">/link ${esc(m.link_code)}</b><button class="btn sm" data-act="copy" data-v="/link ${esc(m.link_code)}">${ico('copy')}${T('copy')}</button></div>` : ''}<div class="bar"><button class="btn sm" data-act="tgcode">${T(m.link_code ? 'tg_new' : 'tg_get')}</button>${/^https:\/\/t\.me\//.test(rules().botUrl || '') ? `<a class="btn sm" href="${esc(rules().botUrl)}" target="_blank" rel="noopener">${T('tg_open')}</a>` : ''}</div>`}</div>` : ''}
       <details class="sect"><summary>${T('privacy_link')}</summary><p class="muted small">${T('privacy_text', { n: pv().guideDays })}</p></details>
       <button class="btn" data-act="signout">${T('signout')}</button><span class="muted small num">${T('version')} ${APP_VERSION}${S.syncedAt ? ' · ' + T('updated_at', { time: new Intl.DateTimeFormat(LOCALES[lang()], { hour: '2-digit', minute: '2-digit' }).format(new Date(S.syncedAt)) }) : ''}</span></div>
-      <div class="list"><form class="card f" data-form="payout"><b>${T('payout')}</b><span class="muted small">${T('payout_text')}</span><label>${T('bank_name')}<input id="pd-bank" name="bank_name" value="${esc(pd.bank_name || '')}"></label><label>${T('holder')}<input id="pd-holder" name="holder" value="${esc(pd.holder || '')}"></label><label>${T('account')}<input id="pd-acc" name="account" value="${esc(pd.account || '')}" autocomplete="off"></label><div class="actions"><button class="btn primary">${T('save')}</button></div></form>
+      <div class="list">${(() => { const acc = String(pd.account || ''), has = !!(pd.bank_name || pd.holder || acc), mask = acc ? '•••• ' + acc.replace(/\s/g, '').slice(-4) : '—';
+        return has && !state.payEdit ? `<div class="card f"><b>${T('payout')}</b><span class="muted small">${T('payout_safe')}</span><dl class="fields"><dt>${T('bank_name')}</dt><dd>${esc(pd.bank_name || '—')}</dd><dt>${T('holder')}</dt><dd>${esc(pd.holder || '—')}</dd><dt>${T('account')}</dt><dd class="num">${esc(mask)}</dd></dl><div class="actions"><button class="btn" data-act="payshow">${T('edit')}</button></div></div>`
+        : `<form class="card f" data-form="payout"><b>${T('payout')}</b><span class="muted small">${T('payout_safe')}</span><label>${T('bank_name')}<input id="pd-bank" name="bank_name" value="${esc(pd.bank_name || '')}" autocomplete="off"></label><label>${T('holder')}<input id="pd-holder" name="holder" value="${esc(pd.holder || '')}" autocomplete="off"></label><label>${T('account')}<input id="pd-acc" name="account" value="${esc(acc)}" autocomplete="off" autocapitalize="characters" spellcheck="false"></label><div class="actions">${has ? `<button type="button" class="btn" data-act="payshow">${T('close')}</button>` : ''}<button class="btn primary">${T('save')}</button></div></form>`; })()}
       <form class="card f" data-form="worksched"><b>${T('ws_title')}</b><span class="muted small">${T('ws_text')}</span>${weekEditor(m)}<div class="actions"><button class="btn primary">${T('save')}</button></div></form>
       <div class="card f"><b>${T('pd_title')}</b><span class="muted small">${T('pd_text')}</span>${db.personal_dates.filter(x => x.user_id === m.id).sort((x, y) => x.date.slice(5).localeCompare(y.date.slice(5))).map(x => `<div class="row"><span class="tag t-group">${esc(x.title)}</span><span class="num">${esc(fmt(x.date, x.yearly ? { day: 'numeric', month: 'long' } : { day: 'numeric', month: 'long', year: 'numeric' }))}</span>${x.yearly ? `<span class="muted small">${T('pd_yearly')}</span>` : ''}<span class="spacer"></span><button class="btn sm" data-act="pdel" data-id="${x.id}">${T('remove')}</button></div>`).join('')}
         <form class="bar" data-form="pdate"><input class="inp" id="pd-title" name="title" placeholder="${T('pd_name')}" required style="flex:1;min-width:140px"><input class="inp" id="pd-date" name="date" type="date" required style="max-width:170px"><label style="flex-direction:row;align-items:center;gap:6px;color:var(--ink)"><input type="checkbox" id="pd-yearly" name="yearly" style="width:auto">${T('pd_yearly')}</label><button class="btn">+ ${T('add')}</button></form></div>
@@ -1614,7 +1865,7 @@
       <main data-key="v-${state.view}-${state.view === 'admin' ? (state.adminTab || '') : state.view === 'me' ? state.meTab : ''}">${demo}${body}</main><nav class="tabs" aria-label="Main">${nav}</nav>`;
     const t1 = performance.now(); morph(app, shell + '<div id="modal"></div><div id="toasts"></div>');
     const hd = app.querySelector('header.top'); if (hd) document.documentElement.style.setProperty('--toph', hd.offsetHeight + 'px');
-    window.__rt = { build: Math.round(t1 - t0), patch: Math.round(performance.now() - t1) }; syncNotice();
+    window.__rt = { build: Math.round(t1 - t0), patch: Math.round(performance.now() - t1) }; syncNotice(); watchConn();
   }
   // ---------- one line that says how fresh the schedule is and whether my changes were delivered ----------
   const hm = iso => new Intl.DateTimeFormat(LOCALES[lang()], { hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
@@ -1634,7 +1885,7 @@
     const who = CFG.reportTo || 'Alex', ph = String(CFG.reportWhatsApp || '').replace(/\D/g, '');
     const msg = `Friendly Schedule ${APP_VERSION} · ${state.view}${state.view === 'calendar' ? '/' + state.mode : ''} · ${lang()} · ${/Android/i.test(navigator.userAgent) ? 'Android' : /iPhone|iPad/i.test(navigator.userAgent) ? 'iPhone' : 'computer'} ${window.innerWidth}px\n`;
     return `<div class="hdr"><h2>${T('tb_title')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>
-      <p>${T('tb_text', { name: who })}</p><ol class="small muted tbsteps"><li>${T('tb_s1')}</li><li>${T('tb_s2', { name: who })}</li><li>${T('tb_s3')}</li></ol>
+      <p>${T('tb_text', { name: who })}</p><ol class="small muted tbsteps"><li>${T('tb_s1')}</li><li>${T('tb_s2', { name: who })}</li><li>${T('tb_s3')}</li></ol><form class="f" data-form="bugnote"><label>${T('pr_note')}<textarea name="note" rows="2" placeholder="${T('pr_note_ph')}"></textarea></label><button class="btn sm">${T('pr_send')}</button></form>
       <div class="actions"><button class="btn" data-act="close">${T('close')}</button>${ph ? `<a class="btn primary" href="${esc(waLink(ph, msg))}" target="_blank" rel="noopener">${T('tb_send', { name: who })}</a>` : ''}</div>`;
   }
   let modalKey = '';
@@ -1736,6 +1987,41 @@
     pvrun() { confirmDo(T('pv_run_q', { n: state.staleN }), T('pv_run'), async () => { const n = await S.purgeGuests(pv().keepMonths); logAct(`Privacy clean-up: contact details of ${n} old guests removed`); state.staleN = 0; toast(T('pv_done', { n })); }); },
     gexport(el) { exportGuest(el.dataset.id); },
     gerase(el) { const c = db.clients.find(x => x.id === el.dataset.id); if (!c) return; const back = state.modal; confirmDo(T('pv_delete_q', { name: c.name }), T('pv_delete'), async () => { await S.eraseGuests([c.id]); logAct('Guest data erased on request'); toast(T('pv_done', { n: 1 })); }); },
+    gpick(el) {
+      const m = state.modal, i = Number(el.dataset.i), b = m.draft.bookings[i], cl = db.clients.find(x => x.id === el.dataset.c); if (!b || !cl) return;
+      b.client_id = cl.id; const last = db.bookings.filter(x => x.client_id === cl.id).slice(-1)[0] || {};
+      const fill = { guest: b.guest && cleanName(b.guest).length > 2 ? b.guest : cl.name, phone: b.phone || cl.phone || '', email: b.email || cl.email || '', lang: b.lang || last.lang || '' };
+      Object.entries(fill).forEach(([k, v]) => { b[k] = v; const inp = document.querySelector(`[data-bi="${i}"][data-bf="${k}"]`); if (inp) inp.value = v; });
+      const f = $('#pflag-' + i); if (f) f.textContent = phoneFlag(normPhone(b.phone)); const box = $('#gsug-' + i); if (box) box.innerHTML = '';
+      toast(T('linked_guest', { name: cl.name }));
+    },
+    mergeask(el) { state.mergeAsk = el.dataset.ids; render(); },
+    mergeno() { state.mergeAsk = null; render(); },
+    mergedo(el) {
+      const ids = el.dataset.ids.split(','), cnt = id => db.bookings.filter(b => b.client_id === id).length, cs = ids.map(id => db.clients.find(c => c.id === id)).filter(Boolean);
+      const target = cs.slice().sort((x, y) => cnt(y.id) - cnt(x.id))[0], others = cs.filter(c => c.id !== target.id);
+      const merged = { ...target }; others.forEach(o => { ['phone', 'email', 'notes'].forEach(k => { if (!merged[k] && o[k]) merged[k] = o[k]; }); });
+      state.mergeAsk = null;
+      run(async () => { await S.save('clients', merged); await S.mergeClients(target.id, others.map(o => o.id)); logAct(`Merged guests into ${target.name}: ${others.map(o => o.name).join(', ')}`); }, T('dup_done', { name: target.name }));
+    },
+    fsize(el) { try { localStorage.setItem('fs-fsize', el.dataset.v); } catch (e) { /* private mode */ } applyDisplay(); render(); },
+    theme(el) { try { localStorage.setItem('fs-theme', el.dataset.v); } catch (e) { /* private mode */ } applyDisplay(); render(); },
+    payshow() { state.payEdit = !state.payEdit; render(); },
+    pbread() { const v = ($('#pb-text') || {}).value || ''; if (!v.trim()) return; if (/New order of|trekksoft/i.test(v) && !/getyourguide|viator/i.test(v)) { state.pb = null; run(() => forms.mail({ get: () => v })); return; } state.pb = parseBooking(v); render(); },
+    pbclear() { state.pb = null; render(); },
+    pbgo(el) {
+      const pb = state.pb, mt = pbMatch(pb); if (!pb) return;
+      if (el.dataset.m === 'cancel') { run(async () => { const b = mt.old; await S.remove('bookings', b.id); const t = mt.oldTour; if (t) { const rest = db.bookings.filter(x => x.tour_id === t.id); await S.save('tours', { ...t, adults: rest.reduce((n, x) => n + (+x.adults || 0), 0), children: rest.reduce((n, x) => n + (+x.children || 0), 0), pax: rest.reduce((n, x) => n + (+x.pax || 0), 0) }); } logAct(`Booking cancelled from email: ${pb.ref} (${b.guest})`); state.pb = null; }, T('pb_cancelled')); return; }
+      const bk = { id: mt.old ? mt.old.id : S.uid(), client_id: mt.old ? mt.old.client_id : null, guest: pb.guest || (mt.old || {}).guest || '', adults: pb.adults, children: pb.children, phone: pb.phone || (mt.old || {}).phone || '', email: pb.email || (mt.old || {}).email || '', ref: pb.ref, lang: pb.lang, source: pb.src || null, marks: [...new Set([...((mt.old || {}).marks || []), ...pb.marks])], pickup_addr: pb.marks.includes('pickup') ? pb.pickup : '', notes: [(mt.old || {}).notes, pb.price && !mt.old ? pb.price : ''].filter(Boolean).join(' · '), payment: (mt.old || {}).payment || 'prepaid', currency: (mt.old || {}).currency || guestCur(), history: (mt.old || {}).history || [] };
+      const target = mt.old && mt.oldTour && (!pb.date || pb.date === mt.oldTour.date) && (!pb.time || pb.time === mt.oldTour.start_time) ? mt.oldTour : mt.tour;
+      state.pb = null; state.view = 'calendar';
+      if (target) { openTour(target.id); const d = state.modal.draft; d.bookings = d.bookings.filter(b => b.id !== bk.id); d.bookings.push(bk); state.modal.edit = true; renderModal(); }
+      else { const cat = mt.cat || {}, dur = cat.days > 1 ? 0 : (parseFloat(cat.duration) || 0); const start = pb.time || cat.start || '10:00';
+        openTour(null, { title: cat.title || pb.title || '', kind: cat.kind || pb.kind || 'private', date: pb.date || today(), start_time: start, end_time: dur ? hhmm(mins(start) + dur * 60) : '', date_to: cat.days > 1 && pb.date ? addDays(pb.date, cat.days - 1) : null, capacity: cat.capacity || 0, pickup: cat.pickup || '', pickup_url: cat.pickup_url || null, language: pb.lang || 'EN' });
+        state.modal.draft.bookings.push(bk); renderModal(); }
+      toast(T('pb_opened'));
+    },
+    ctgo() { run(importContacts); },
     badd() { state.modal.draft.bookings.push({ id: S.uid(), guest: '', adults: 1, children: 0, phone: '', ref: '', notes: '', marks: [] }); renderModal(); },
     bdel(el) { state.modal.draft.bookings.splice(Number(el.dataset.i), 1); renderModal(); },
     close() { closeModal(); },
@@ -1749,7 +2035,10 @@
     taskedit(el) { const k = db.tasks.find(x => x.id === el.dataset.id); state.modal = { type: 'task', isNew: false, draft: { ...k, assignees: [...(k.assignees || [])] } }; renderModal(); },
     taskdel() { const id = state.modal.draft.id; confirmDo(T('confirm_remove'), T('remove'), () => S.remove('tasks', id)); },
     confirmyes() { const fn = state.modal.fn; state.modal = null; renderModal(); run(fn); },
-    admintab(el) { state.adminTab = el.dataset.v || null; state.q = ''; render(); window.scrollTo(0, 0); },
+    admintab(el) { state.adminTab = el.dataset.v || null; state.q = ''; state.errs = null; render(); window.scrollTo(0, 0); },
+    bnview() { const n = document.querySelector('.bnote'); if (n) n.remove(); state.view = 'me'; state.meTab = 'badges'; render(); window.scrollTo(0, 0); },
+    errreload() { state.errs = null; flushErr().then(render); },
+    errclear() { run(async () => { await S.clearErrors(); state.errs = []; }); },
     year(el) { state.year += Number(el.dataset.d); render(); if (S.loadedFrom && String(state.year) < S.loadedFrom.slice(0, 4)) { toast(T('loading_older')); S.loadOlder(`${state.year}-01-01`).then(() => render()).catch(() => {}); } },
     pactive(el) { const p = person(el.dataset.id); logAct(`${p.active === false ? 'Gave access to' : 'Removed access from'} ${p.name}`); if (state.modal && state.modal.type === 'person') state.modal = null; run(() => S.save('profiles', { ...stripEmail(p), active: p.active === false })).then(renderModal); },
     holdel(el) { run(() => S.remove('holidays', el.dataset.id)); },
@@ -1787,6 +2076,7 @@
     demoas(el) { S.demoViewAs(el.value); state.mine = !isAdmin(); state.mode = 'week'; render(); weekCheck(); },
     taskdone(el) { track('taskdone'); const k = db.tasks.find(x => x.id === el.dataset.id), done = el.checked; run(async () => { await S.save('tasks', { ...k, status: done ? 'done' : 'open', done_by: done ? me().id : null, done_at: done ? new Date().toISOString() : null }); if (done) await notify([k.created_by], 'task_done', { name: me().name, title: k.title }); }); },
     impfile(el) { const f = el.files && el.files[0]; if (f) run(() => readImport(f)); },
+    ctfile(el) { const f = el.files && el.files[0]; if (f) run(() => readContacts(f)); },
     impmap(el) { state.imp.map[el.dataset.name] = el.value; },
     listmonth(el) { if (el.value) { state.listMonth = el.value; render(); } },
     q(el) { state.q = el.value; render(); },
@@ -1815,8 +2105,10 @@
     async adjust(fd) { await S.save('pay_adjustments', { id: S.uid(), user_id: fd.get('user_id'), month: fd.get('month'), amount: Number(fd.get('amount')) || 0, note: fd.get('note') || '', created_by: me().id, created_at: new Date().toISOString() }); await notify([fd.get('user_id')], 'adjusted', { title: fd.get('month'), time: fd.get('note') || '' }); logAct(`Pay correction for ${pname(fd.get('user_id'))}, ${fd.get('month')}: ${fd.get('amount')}`); renderModal(); },
     async worksched(fd) { await S.save('profiles', { ...stripEmail(me()), ...weekFields(weekFrom(fd)) }); toast(T('saved')); },
     async pdate(fd) { await S.save('personal_dates', { id: S.uid(), user_id: me().id, title: fd.get('title'), date: fd.get('date'), yearly: !!fd.get('yearly') }); },
-    async payout(fd) { await S.save('payout_details', { id: me().id, bank_name: fd.get('bank_name') || null, holder: fd.get('holder') || null, account: fd.get('account') || null }); toast(T('saved')); },
+    async payout(fd) { state.payEdit = false; await S.save('payout_details', { id: me().id, bank_name: fd.get('bank_name') || null, holder: fd.get('holder') || null, account: fd.get('account') || null }); toast(T('saved')); },
     async move() { await moveSubmit(); },
+    async cedit(fd, form) { const cl = db.clients.find(x => x.id === (form || document.querySelector('form[data-form=cedit]')).dataset.id); if (!cl) return; const em = String(fd.get('email') || '').trim().toLowerCase(); if (em && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { toast(T('err_email')); return; } await S.save('clients', { ...cl, name: String(fd.get('name') || '').trim() || cl.name, phone: normPhone(fd.get('phone')) || null, email: em || null, notes: String(fd.get('notes') || '').trim() || null }); logAct(`Edited guest: ${cl.name}`); toast(T('saved')); },
+    async bugnote(fd) { const n = String(fd.get('note') || '').trim(); if (!n) return; logErr('report', n, ''); toast(T('pr_thanks')); closeModal(); },
     async mytg(fd) { const raw = String(fd.get('telegram') || '').trim(), u = tgUser(raw); if (raw && !u) { toast(T('tg_bad')); return; } await S.save('profiles', { ...stripEmail(me()), telegram: u || null }); toast(T('saved')); },
     async cancel(fd) { await cancelSubmit((fd.get('reason') || '').trim()); },
     async bulkteam(fd) {
@@ -1832,7 +2124,7 @@
     },
     async person(fd) { await savePerson(fd.has('wf0') ? weekFields(weekFrom(fd)) : {}); renderModal(); },
     async privacy(fd) { const v = { ...rules() }; v.privacy = { guideDays: Math.min(365, Math.max(1, Number(fd.get('guideDays')) || 14)), keepMonths: Math.min(120, Math.max(3, Number(fd.get('keepMonths')) || 24)), auto: !!fd.get('auto') }; await S.save('settings', { id: 'rules', value: v }); state.staleN = null; toast(T('saved')); },
-    async rules(fd) { const v = { ...rules() }; for (const k of Object.keys(DEFAULT_RULES)) v[k] = Number(fd.get(k)) || 0; v.customMarks = fd.get('customMarks') || ''; v.guestCurrency = (fd.get('guestCurrency') || 'USD').trim().toUpperCase(); for (const k of ['reviewGoogle', 'reviewGyg', 'reviewViator', 'offerPromo', 'tipUrl', 'botUrl']) v[k] = (fd.get(k) || '').trim(); await S.save('settings', { id: 'rules', value: v }); toast(T('saved')); },
+    async rules(fd) { const v = { ...rules() }; for (const k of Object.keys(DEFAULT_RULES)) v[k] = Number(fd.get(k)) || 0; v.customMarks = fd.get('customMarks') || ''; v.peaks = String(fd.get('peaks') || '').trim(); v.guestCurrency = (fd.get('guestCurrency') || 'USD').trim().toUpperCase(); for (const k of ['reviewGoogle', 'reviewGyg', 'reviewViator', 'offerPromo', 'tipUrl', 'botUrl']) v[k] = (fd.get(k) || '').trim(); await S.save('settings', { id: 'rules', value: v }); toast(T('saved')); },
     async pay(fd) { const v = { ...rules() }, p = {}; for (const k of ['guide_private', 'guide_group', 'guide_custom', 'driver_private', 'driver_group', 'driver_custom']) p[k] = Number(fd.get(k)) || 0; v.pay = p; v.currency = (fd.get('currency') || 'GEL').trim(); v.payNote = (fd.get('payNote') || '').trim(); await S.save('settings', { id: 'rules', value: v }); toast(T('saved')); }
   };
   document.addEventListener('click', ev => {
@@ -1851,7 +2143,9 @@
       const et = $('#t-endtxt'); if (et) et.textContent = d.end_time || '—';
     } else if (el.dataset.f) m.draft[el.dataset.f] = el.value;
     else if (el.dataset.bm) { const b = m.draft.bookings[Number(el.dataset.bi)], st = new Set(b.marks || []); el.checked ? st.add(el.dataset.bm) : st.delete(el.dataset.bm); b.marks = [...st]; if (el.dataset.bm === 'pickup' || el.dataset.bm === 'dropoff' || el.dataset.bm === 'stays') setTimeout(renderModal, 0); }
-    else if (el.dataset.bi) m.draft.bookings[Number(el.dataset.bi)][el.dataset.bf] = el.value;
+    else if (el.dataset.bi) { const bi = Number(el.dataset.bi), b = m.draft.bookings[bi]; b[el.dataset.bf] = el.value;
+      if (['guest', 'phone', 'email', 'ref'].includes(el.dataset.bf)) { const box = $('#gsug-' + bi); if (box) box.innerHTML = suggHtml(b, bi); }
+      if (el.dataset.bf === 'phone') { const f = $('#pflag-' + bi); if (f) f.textContent = phoneFlag(normPhone(el.value)); } }
     else if (el.dataset.cq) m.draft[el.dataset.cq] = el.checked;
     else if (el.dataset.cost) { const d = m.draft; if (!d.costs) { d.costs = { ...costOf(d.id).items }; d.costNote = costOf(d.id).note; } if (el.dataset.cost === 'note') d.costNote = el.value; else d.costs[el.dataset.cost] = el.value === '' ? null : Number(el.value); }
     else if (el.dataset.rg) { const s = new Set(m.draft.regions || []); el.checked ? s.add(el.dataset.rg) : s.delete(el.dataset.rg); m.draft.regions = [...s]; }
@@ -1956,9 +2250,11 @@
     if (me() && me().active) checkBadges();
   });
   S.authEvent = ev => { if (ev === 'PASSWORD_RECOVERY') { state.auth = 'newpass'; render(); } };
+  function applyDisplay() { try { const r = document.documentElement, fs = localStorage.getItem('fs-fsize') || '', th = localStorage.getItem('fs-theme') || ''; if (fs) r.dataset.fs = fs; else delete r.dataset.fs; if (th) r.dataset.theme = th; else delete r.dataset.theme; } catch (e) { /* private mode */ } }
+  applyDisplay();
   (async () => {
     const v = location.hash.slice(1); if (['calendar', 'timeoff', 'tasks', 'admin', 'me'].includes(v)) state.view = v;
-    try { await S.init(); } catch (e) { console.error(e); $('#app').innerHTML = `<main><div class="banner">${esc(T('err_connect'))}</div></main>`; return; }
+    try { await S.init(); } catch (e) { console.error(e); logErr('offline', 'App could not start: ' + ((e && e.message) || e), navigator.onLine ? 'phone was online' : 'phone had no internet'); $('#app').innerHTML = `<main><div class="banner f"><b>${esc(T('err_connect'))}</b><span class="small">${esc(T('err_retry'))}</span><button class="btn primary" onclick="location.reload()">${esc(T('refresh'))}</button></div></main>`; setTimeout(() => { if (navigator.onLine) location.reload(); }, 20000); return; }
     if (me() && !isAdmin()) state.mine = true;
     render(); if (state.view === 'calendar') toToday();
     // Test period: explain once how to report a mistake. A new badge goes first; then this waits for the next opening.
