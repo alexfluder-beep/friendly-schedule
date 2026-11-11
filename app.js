@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.23';
+  const APP_VERSION = '3.24';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -1271,14 +1271,41 @@
     const level = Math.floor((1 + Math.sqrt(1 + 8 * xp / 100)) / 2), base = 100 * level * (level - 1) / 2, next = 100 * level * (level + 1) / 2;
     return memo['g' + id] = { list, done, xp, level, base, next, km, walk, regs, partners, cur, prev, isD, isG, rep, weekNow, yearNow: per.y[td.slice(0, 4)] || 0 };
   }
+  // ---------- medals: flat vector art drawn here, so they are sharp at any size and work offline ----------
+  const METAL = { bronze: ['#7d4a1e', '#b87333', '#e0a36b'], silver: ['#7c838b', '#b9bec4', '#eceef0'], gold: ['#a67c12', '#e2b340', '#f6d67a'] };   // rim, face, highlight
+  const RIBBON = { guide: '#f0901e', all: '#f0901e', master: '#a8500e', driver: '#3b5bbd', delica: '#3b5bbd', own: '#3b5bbd', geo: '#2f6b48', fun: '#6243bd', new: '#0f766e', now: '#0f766e', titles: '#20251f', secret: '#20251f' };
+  const mPoly = (n, r1, r2, rot) => [...Array(n * 2)].map((_, i) => { const a = Math.PI * i / n + (rot || 0), r = i % 2 ? r2 : r1; return (48 + r * Math.sin(a)).toFixed(1) + ',' + (62 - r * Math.cos(a)).toFixed(1); }).join(' ');
+  const M_SHAPE = { seal: mPoly(16, 37, 33.5), burst: mPoly(12, 38, 31), hex: mPoly(3, 38, 38), shield: null };
+  const mShapeOf = t => (t === 'geo' || t === 'titles' ? 'shield' : t === 'driver' || t === 'delica' || t === 'own' ? 'hex' : t === 'fun' || t === 'secret' || t === 'now' || t === 'new' ? 'burst' : 'seal');
+  // Bronze, silver or gold: the place of a badge on its own ladder (50 / 100 / 250 tours), or how far a tour mastery has gone.
+  function tierOf(b, list) {
+    if (b.track === 'titles' || b.track === 'secret') return 'gold';
+    if (b.track === 'master') { const n = Array.isArray(b.tier) ? b.tier.length : Number(b.tier) || [10, 25, 50, 100, 250, 500].filter(x => x <= b.raw).length; return n >= 4 ? 'gold' : n >= 2 ? 'silver' : 'bronze'; }
+    const pre = String(b.k).replace(/\d+$/, ''), sib = (list || []).filter(x => x.track === b.track && String(x.k).replace(/\d+$/, '') === pre && /\d$/.test(x.k)).sort((x, y) => x.goal - y.goal);
+    if (sib.length > 1) { const i = sib.findIndex(x => x.k === b.k); return i <= 0 ? 'bronze' : i === sib.length - 1 ? 'gold' : 'silver'; }
+    return ['welcome', 'first', 'firstoff'].includes(b.k) ? 'bronze' : 'silver';
+  }
+  function medalInner(b, tier, hex) {
+    const secret = b.hidden && !b.done, done = !!b.done, shape = mShapeOf(secret ? 'secret' : b.track), [rim, face, hi] = METAL[tier] || METAL.bronze;
+    const c = hex ? { rim: '#d9d9d0', face: '#f1efe8', ink: '#70766d', acc: '#f0901e' } : { rim: 'var(--line)', face: 'var(--surface2)', ink: 'var(--muted)', acc: 'var(--accent)' };
+    const body = (fill, stroke) => (shape === 'shield' ? `<path d="M48 24 80 34v26c0 20-14 32-32 40-18-8-32-20-32-40V34z" fill="${fill}" stroke="${stroke}" stroke-width="3" stroke-linejoin="round"/>` : `<polygon points="${M_SHAPE[shape]}" fill="${fill}" stroke="${stroke}" stroke-width="3" stroke-linejoin="round"/>`);
+    const rib = done ? RIBBON[b.track] || '#f0901e' : c.rim, p = Math.max(0, Math.min(100, Math.round((b.have || 0) / (b.goal || 1) * 100)));
+    const icon = secret ? `<text x="48" y="72" text-anchor="middle" font-size="30" font-weight="700" fill="${c.ink}" font-family="-apple-system,Segoe UI,Roboto,sans-serif">?</text>` : `<g transform="translate(34 48) scale(1.17)" fill="none" stroke="${done ? '#20251f' : c.ink}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${IC[b.icon] || IC.star}</g>`;
+    return `<path d="M30 2h14l8 30H38z" fill="${rib}"/><path d="M66 2H52l-8 30h14z" fill="${rib}" opacity="${done ? .78 : 1}"/>
+      ${done ? body(face, rim) : body(c.face, c.rim)}
+      <circle cx="48" cy="62" r="24" fill="${done ? hi : hex ? '#ffffff' : 'var(--surface)'}" stroke="${done ? rim : c.rim}" stroke-width="2"/>
+      ${done ? `<path d="M29 54a21 21 0 0 1 17-13" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".7"/>` : !secret && p ? `<circle cx="48" cy="62" r="24" fill="none" stroke="${c.acc}" stroke-width="4" stroke-linecap="round" stroke-dasharray="${(p * 1.508).toFixed(1)} 151" transform="rotate(-90 48 62)"/>` : ''}
+      ${icon}`;
+  }
+  const medalArt = b => `<span class="art">${`<svg viewBox="0 0 96 104" aria-hidden="true"><defs><clipPath id="mc-${esc(String(b.k).replace(/[^a-z0-9]/gi, ''))}"><circle cx="48" cy="62" r="38"/></clipPath></defs>${medalInner(b, tierOf(b, (game(me().id) || {}).list))}${b.done ? `<g clip-path="url(#mc-${esc(String(b.k).replace(/[^a-z0-9]/gi, ''))})"><rect class="shine" x="-30" y="20" width="16" height="90" fill="#fff" opacity=".55" transform="rotate(20 48 62)"/></g>` : ''}</svg>`}</span>`;
   const bName = b => b.title || T('b_' + b.k), bDesc = b => b.desc || T('bd_' + b.k), bSecret = b => b.hidden && !b.done;
-  const medal = b => (bSecret(b) ? `<button class="mdl secret" data-act="badge" data-k="${esc(b.k)}" style="--p:0" aria-label="${T('b_secret')}"><span class="ring"><span class="in">?</span></span><span class="mt">${T('b_secret')}</span><span class="muted small">&nbsp;</span></button>`
-    : `<button class="mdl ${b.done ? 'done' : ''}" data-t="${b.track}" data-act="badge" data-k="${esc(b.k)}" style="--p:${Math.round(b.have / b.goal * 100)}" aria-label="${esc(bName(b))}"><span class="ring"><span class="in">${ico(b.icon)}</span></span><span class="mt">${esc(bName(b))}</span><span class="muted small num">${b.track === 'titles' ? nf(b.raw) + ' ' + T('tours_n') : b.track === 'master' ? '×' + nf(b.raw) : b.done ? T('b_done') : nf(b.have) + ' / ' + nf(b.goal)}</span></button>`);
+  const medal = b => (bSecret(b) ? `<button class="mdl secret" data-act="badge" data-k="${esc(b.k)}" style="--p:0" aria-label="${T('b_secret')}">${medalArt(b)}<span class="mt">${T('b_secret')}</span><span class="muted small">&nbsp;</span></button>`
+    : `<button class="mdl ${b.done ? 'done' : ''}" data-t="${b.track}" data-act="badge" data-k="${esc(b.k)}" style="--p:${Math.round(b.have / b.goal * 100)}" aria-label="${esc(bName(b))}">${medalArt(b)}<span class="mt">${esc(bName(b))}</span><span class="muted small num">${b.track === 'titles' ? nf(b.raw) + ' ' + T('tours_n') : b.track === 'master' ? '×' + nf(b.raw) : b.done ? T('b_done') : nf(b.have) + ' / ' + nf(b.goal)}</span></button>`);
   function badgeModalHtml(m) {
     const g = game(me().id), b = g.list.find(x => x.k === m.k); if (!b) return '';
     const head = `<div class="hdr"><span class="spacer"></span><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>`;
-    if (bSecret(b)) return `${head}<div class="ccard"><span class="mdl big secret" style="--p:0"><span class="ring"><span class="in">?</span></span></span><h2>${T('b_secret')}</h2><p class="muted">${T('bd_secret')}</p></div>`;
-    return `${head}<div class="ccard"><span class="mdl big ${b.done ? 'done' : ''}" data-t="${b.track}" style="--p:${Math.round(b.have / b.goal * 100)}"><span class="ring"><span class="in">${ico(b.icon)}</span></span></span><h2>${esc(bName(b))}</h2><p class="muted">${esc(bDesc(b))}</p>
+    if (bSecret(b)) return `${head}<div class="ccard"><span class="mdl big secret" style="--p:0">${medalArt(b)}</span><h2>${T('b_secret')}</h2><p class="muted">${T('bd_secret')}</p></div>`;
+    return `${head}<div class="ccard"><span class="mdl big ${b.done ? 'done' : ''}" data-t="${b.track}" style="--p:${Math.round(b.have / b.goal * 100)}">${medalArt(b)}</span><h2>${esc(bName(b))}</h2><p class="muted">${esc(bDesc(b))}</p>
         ${b.track === 'titles' ? '' : `<b class="num">${nf(b.raw)} / ${nf(b.goal)} ${esc(b.unit)}</b><span class="meter" style="width:100%"><i style="width:${Math.round(b.have / b.goal * 100)}%"></i></span>`}${b.done && b.track !== 'master' ? `<span class="tag t-ok">${T('b_done')}</span>` : ''}</div>
       ${b.done ? `<div class="actions"><button class="btn" data-act="badgesave" data-k="${esc(b.k)}">${T('b_save')}</button><button class="btn primary" data-act="badgeshare" data-k="${esc(b.k)}">${ico('share')}${T('share')}</button></div>` : ''}`;
   }
@@ -1306,7 +1333,7 @@
   function badgeNote(bs) {
     if (!bs.length) return; const old = document.querySelector('.bnote'); if (old) old.remove();
     const el = document.createElement('div'); el.className = 'bnote'; el.setAttribute('role', 'status');
-    el.innerHTML = `<span class="mdl done" data-t="${esc(bs[0].track)}" style="--p:100"><span class="ring"><span class="in">${ico(bs[0].icon)}</span></span></span><span class="grow-l"><b>${esc(bs.length > 1 ? T('bn_many', { n: bs.length }) : T('bn_one'))}</b><span class="small">${esc(bs.map(bName).join(', '))}</span></span><button class="btn sm" data-act="bnview">${T('bn_view')}</button>`;
+    el.innerHTML = `<span class="mdl done" data-t="${esc(bs[0].track)}" style="--p:100">${medalArt(bs[0])}</span><span class="grow-l"><b>${esc(bs.length > 1 ? T('bn_many', { n: bs.length }) : T('bn_one'))}</b><span class="small">${esc(bs.map(bName).join(', '))}</span></span><button class="btn sm" data-act="bnview">${T('bn_view')}</button>`;
     document.body.appendChild(el); requestAnimationFrame(() => el.classList.add('in')); setTimeout(() => { el.classList.remove('in'); setTimeout(() => el.remove(), 400); }, 7000);
   }
   function celebrateHtml(m) {
@@ -1314,7 +1341,7 @@
     const cols = ['#f0901e', '#2f6b48', '#3b5bbd', '#20251f', '#e2b340', '#6243bd'];
     const bits = [...Array(28)].map((_, i) => `<i style="left:${(i * 37) % 100}%;background:${cols[i % cols.length]};animation-delay:${(i % 9) * 0.12}s;animation-duration:${2.2 + (i % 5) * 0.35}s"></i>`).join('');
     return `<div class="celebrate"><div class="confetti" aria-hidden="true">${bits}</div><span class="muted">${T(b.track === 'titles' ? 'ce_title' : 'ce_new')}</span>
-      <span class="mdl big done pop" data-t="${b.track}" style="--p:100"><span class="ring"><span class="in">${ico(b.icon)}</span></span></span><h2>${esc(bName(b))}</h2><p class="muted">${esc(bDesc(b))}</p>
+      <span class="mdl big done pop" data-t="${b.track}" style="--p:100">${medalArt(b)}</span><h2>${esc(bName(b))}</h2><p class="muted">${esc(bDesc(b))}</p>
       <div class="actions"><button class="btn" data-act="badgeshare" data-k="${esc(b.k)}">${ico('share')}${T('share')}</button><button class="btn primary big" data-act="celeok">${T('ce_ok')}</button></div></div>`;
   }
 
@@ -1329,8 +1356,7 @@
     const tl = title.map(l => { const s = `<text x="540" y="${y}" text-anchor="middle" font-size="68" font-weight="700" fill="#20251f" ${font}>${xml(l)}</text>`; y += 80; return s; }).join(''); y += 4;
     const dl = desc.map(l => { const s = `<text x="540" y="${y}" text-anchor="middle" font-size="34" fill="#55594f" ${font}>${xml(l)}</text>`; y += 46; return s; }).join('');
     return `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080"><rect width="1080" height="1080" fill="#f7f5ef"/><rect x="36" y="36" width="1008" height="1008" rx="56" fill="#ffffff" stroke="#d9d9d0" stroke-width="3"/>
-      <circle cx="540" cy="330" r="196" fill="${colors[0]}"/><circle cx="540" cy="330" r="222" fill="none" stroke="${colors[0]}" stroke-width="10" opacity=".35"/>
-      <g transform="translate(408 198) scale(11)" fill="none" stroke="${colors[1]}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${IC[b.icon] || IC.star}</g>
+      <g transform="translate(300 70) scale(5)">${medalInner({ ...b, done: true }, tierOf(b, (game(p.id) || {}).list), true)}</g>
       ${tl}${dl}${count ? `<text x="540" y="${y + 34}" text-anchor="middle" font-size="40" font-weight="700" fill="#20251f" ${font}>${xml(count)}</text>` : ''}
       <circle cx="96" cy="984" r="12" fill="#f0901e"/><text x="122" y="996" font-size="34" font-weight="700" fill="#20251f" ${font}>Friendly.ge</text>
       ${/^data:image\//.test(p.avatar || '') ? `<defs><clipPath id="av"><circle cx="948" cy="972" r="44"/></clipPath></defs><image href="${xml(p.avatar)}" x="904" y="928" width="88" height="88" preserveAspectRatio="xMidYMid slice" clip-path="url(#av)"/><circle cx="948" cy="972" r="44" fill="none" stroke="${colors[0]}" stroke-width="5"/><text x="884" y="984" text-anchor="end" font-size="34" fill="#55594f" ${font}>${xml(p.name || '')}</text>` : `<circle cx="948" cy="972" r="44" fill="${xml(p.color || '#66737f')}"/><text x="948" y="986" text-anchor="middle" font-size="38" font-weight="700" fill="#ffffff" ${font}>${xml(initials(p.name || '?'))}</text><text x="884" y="984" text-anchor="end" font-size="34" fill="#55594f" ${font}>${xml(p.name || '')}</text>`}</svg>`;
@@ -1565,13 +1591,13 @@
     const st = [{ k: 'details', done: !!(p.phone && String(p.languages || '').trim()) }, { k: 'photo', done: !!p.avatar }];
     if (p.role === 'guide') st.push({ k: 'tours', done: !!((p.display || {}).toursOk) });
     // Telegram: with the bot set up, the step is linking the bot (tours, changes and free-tour offers arrive there); otherwise the username.
-    st.push({ k: 'tg', done: botOn() ? !!p.telegram_id : !!p.telegram });
+    st.push({ k: 'tg', done: !!(p.display || {}).tgSkip || (botOn() ? !!p.telegram_id : !!p.telegram) });   // not everyone uses Telegram: the step can be skipped
     return st;
   }
   function setupCard(compact) {
     const st = setupSteps(), left = st.filter(x => !x.done).length; if (!st.length || !left) return '';
     if (compact) return `<button class="banner small setupban" data-act="gosetup"><span>${T('su_banner', { n: st.length - left, all: st.length })}</span><b>${T('su_finish')} ›</b></button>`;
-    return `<div class="card f setupcard"><b>${T('su_title')}</b><span class="muted">${T('su_text')}</span>${st.map(x => `<button class="surow ${x.done ? 'done' : ''}" data-act="gosetup" data-k="${x.k}"><span class="sudot">${x.done ? '✓' : ''}</span><span class="grow-l">${T('su_' + x.k)}</span>${x.done ? '' : '<b>›</b>'}</button>`).join('')}</div>`;
+    return `<div class="card f setupcard"><b>${T('su_title')}</b><span class="muted">${T('su_text')}</span>${st.map(x => `<button class="surow ${x.done ? 'done' : ''}" data-act="gosetup" data-k="${x.k}"><span class="sudot">${x.done ? '✓' : ''}</span><span class="grow-l">${T('su_' + x.k)}</span>${x.done ? '' : '<b>›</b>'}</button>${x.k === 'tg' && !x.done ? `<button class="lnk suskip" data-act="tgskip">${T('su_tg_skip')}</button>` : ''}`).join('')}</div>`;
   }
   function myToursHtml(m) {
     const ids = new Set(m.skills || []), all = !ids.size, list = catalog().filter(c => c.id), sel = state.myTours || new Set(all ? list.map(c => String(c.id)) : [...ids]);
@@ -1612,7 +1638,7 @@
     return head + `<div class="bar tfilt"><div class="seg">${['open', 'done', 'all'].map(x => `<button data-act="taskfilter" data-v="${x}" aria-pressed="${f === x}">${T('f_' + x)}</button>`).join('')}</div>
       ${admin ? `<div class="seg"><button data-act="mine" data-v="0" aria-pressed="${!state.mine}">${T('team')}</button><button data-act="mine" data-v="1" aria-pressed="${!!state.mine}">${T('mine')}</button></div>` : ''}</div>
       ${admin && !state.viewAs ? `<button class="btn primary fab xfab only-phone" data-act="tasknew">${msi('add_task')}${T('task_new')}</button>` : ''}
-      ${setupCard()}<div class="list">${list.length ? list.map(taskCard).join('') : setupSteps().some(x => !x.done) ? '' : `<div class="empty">${T('no_tasks')}</div>`}</div>`;
+      ${nOpen ? `<button class="banner small setupban" data-act="tasksec" data-v="tours"><span>${admin ? T('us_title', { n: nOpen }) : T('xc_banner', { n: nOpen })}</span><b>${T('xc_see')} ›</b></button>` : ''}${setupCard()}<div class="list">${list.length ? list.map(taskCard).join('') : setupSteps().some(x => !x.done) ? '' : `<div class="empty">${T('no_tasks')}</div>`}</div>`;
   }
   function taskModalHtml(m) {
     const d = m.draft;
@@ -2730,6 +2756,7 @@
     pdkind(el) { const m = state.modal; if (!m || m.type !== 'pdate') return; const t = $('#pd-title'), y = $('#pd-yearly'); if (t) { t.value = T('pdk_' + el.dataset.k); dirty.add(t); } if (y) { y.checked = ['birthday', 'anniversary', 'family'].includes(el.dataset.k); dirty.add(y); } m.touched = true; document.querySelectorAll('#modal .chip2').forEach(c => c.classList.toggle('on', c === el)); },
     pdnew() { state.modal = { type: 'pdate', draft: { title: '', date: today(), yearly: false } }; renderModal(); requestAnimationFrame(() => wheelSync(true)); },
     pdedit(el) { const x = db.personal_dates.find(q => q.id === el.dataset.id); if (!x) return; state.modal = { type: 'pdate', draft: { ...x } }; renderModal(); requestAnimationFrame(() => wheelSync(true)); },
+    tgskip() { const m = me(); run(() => S.save('profiles', { ...stripEmail(m), display: { ...((m.display && typeof m.display === 'object') ? m.display : {}), tgSkip: today() } }), T('saved')); },
     tasksec(el) { state.taskSec = el.dataset.v; render(); window.scrollTo(0, 0); },
     tasknew(el) { const tour = el.dataset.tour ? db.tours.find(t => t.id === el.dataset.tour) : null; state.modal = { type: 'task', isNew: true, draft: { id: S.uid(), title: '', notes: '', due_date: tour ? tour.date : '', assignees: tour ? [tour.guide_id, tour.driver_id].filter(Boolean) : [], status: 'open', tour_id: tour ? tour.id : null } }; renderModal(); },
     taskedit(el) { const k = db.tasks.find(x => x.id === el.dataset.id); state.modal = { type: 'task', isNew: false, draft: { ...k, assignees: [...(k.assignees || [])] } }; renderModal(); },

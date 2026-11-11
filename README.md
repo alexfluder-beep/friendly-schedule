@@ -317,3 +317,8 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 
 ## 3.23
 - Delica drivers are offered a tour only when its name says 4x4 or 4WD (or Delica). Place names such as Kazbegi no longer count, because not every Kazbegi tour is a 4x4 ride.
+
+## 3.24
+- Badges are drawn as medals: a ribbon, a shaped medal (seal, shield, hexagon or star by kind) and the symbol in the middle. Bronze, silver and gold by the step on the ladder; grey with a progress arc until earned; a short shine when an earned badge is opened. The shared badge picture uses the same medal.
+- Getting started: the Telegram step has "I don't use Telegram", which ticks it off.
+- Tasks: when tours are waiting, a line at the top says so and opens the second section.
