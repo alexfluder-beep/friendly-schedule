@@ -337,3 +337,8 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 - Avatars: 30 painted pictures (Georgia, food, travel things) in Me > Choose a picture instead of a photo. Painted once with Gemini; no churches. The files are in `art/avatars/` (192 px, about 5 KB each).
 - Tour pages are also found for short calendar names with nothing set by hand ("Tbilisi walking tour" opens the Old Tbilisi walking tour page; "Gareji 4x4 ENG" the group Gareji page). Same kind only: a group name never opens a private page.
 - The Telegram bot has the same messages: /guests.
+
+## 3.28
+- Four calmer colour schemes in Me > Settings > Colour of buttons: Forest green, Sea blue, Plum, Terracotta (white text on the colour; lighter versions in the dark theme). Orange stays the default until the owner picks another.
+- "1 tour needs a guide or driver" instead of "1 tours need".
+- Long task notes keep their line breaks.

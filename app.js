@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.27';
+  const APP_VERSION = '3.28';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -1638,7 +1638,7 @@
     const late = k.status === 'open' && k.due_date && k.due_date < today();
     return `<div class="card"><div class="row"><input type="checkbox" id="tk-${k.id}" data-ch="taskdone" data-id="${k.id}" ${k.status === 'done' ? 'checked' : ''} ${can ? '' : 'disabled'} style="width:20px;height:20px" aria-label="${T('done')}"><label for="tk-${k.id}" class="ttl" style="flex:1;min-width:0;${k.status === 'done' ? 'text-decoration:line-through;opacity:.7' : ''}">${esc(taskTitle(k))}</label>${isAdmin() ? `<button class="btn sm" data-act="taskedit" data-id="${k.id}">${T('edit')}</button>` : ''}</div>
       <div class="row"><span class="pair">${(k.assignees || []).map(id => `<span class="p">${avatar(id)}${esc(pname(id))}</span>`).join('<span class="plus">+</span>') || `<span class="tag t-warn">${T('unassigned')}</span>`}</span>${k.due_date ? `<span class="tag ${late ? 't-danger' : 't-muted'} num">${esc(fmtDay(k.due_date))}</span>` : ''}${tour ? `<button class="btn sm" data-act="tour" data-id="${tour.id}">${esc(tour.title)}</button>` : ''}</div>
-      ${k.notes ? `<div class="muted small">${esc(k.notes)}</div>` : ''}${k.status === 'done' && k.done_by ? `<div class="muted small">${T('done_by', { name: pname(k.done_by) })}</div>` : ''}</div>`;
+      ${k.notes ? `<div class="muted small tnote">${esc(k.notes)}</div>` : ''}${k.status === 'done' && k.done_by ? `<div class="muted small">${T('done_by', { name: pname(k.done_by) })}</div>` : ''}</div>`;
   }
   // Getting started: what each person does once. Shown in Tasks and as a reminder on the calendar, ticked by itself when done.
   const botOn = () => /^https:\/\/t\.me\//.test(rules().botUrl || '');
@@ -1694,7 +1694,7 @@
     return head + `<div class="bar tfilt"><div class="seg">${['open', 'done', 'all'].map(x => `<button data-act="taskfilter" data-v="${x}" aria-pressed="${f === x}">${T('f_' + x)}</button>`).join('')}</div>
       ${admin ? `<div class="seg"><button data-act="mine" data-v="0" aria-pressed="${!state.mine}">${T('team')}</button><button data-act="mine" data-v="1" aria-pressed="${!!state.mine}">${T('mine')}</button></div>` : ''}</div>
       ${admin && !state.viewAs ? `<button class="btn primary fab xfab only-phone" data-act="tasknew">${msi('add_task')}${T('task_new')}</button>` : ''}
-      ${nOpen ? `<button class="banner small setupban" data-act="tasksec" data-v="tours"><span>${admin ? T('us_title', { n: nOpen }) : T('xc_banner', { n: nOpen })}</span><b>${T('xc_see')} ›</b></button>` : ''}${setupCard()}<div class="list">${list.length ? list.map(taskCard).join('') : setupSteps().some(x => !x.done) ? '' : `<div class="empty">${T('no_tasks')}</div>`}</div>`;
+      ${nOpen ? `<button class="banner small setupban" data-act="tasksec" data-v="tours"><span>${admin ? T('us_title', { n: nOpen }) : T(nOpen === 1 ? 'xc_banner_1' : 'xc_banner', { n: nOpen })}</span><b>${T('xc_see')} ›</b></button>` : ''}${setupCard()}<div class="list">${list.length ? list.map(taskCard).join('') : setupSteps().some(x => !x.done) ? '' : `<div class="empty">${T('no_tasks')}</div>`}</div>`;
   }
   function taskModalHtml(m) {
     const d = m.draft;
@@ -3069,7 +3069,7 @@
   S.authEvent = ev => { if (ev === 'PASSWORD_RECOVERY') { state.auth = 'newpass'; render(); } };
   // Text size, colours and contrast: kept on this phone and on the account, so they follow the person to another phone.
   const DKEYS = { fs: 'fs-fsize', theme: 'fs-theme', contrast: 'fs-contrast', accent: 'fs-accent' };
-  const ACCENTS = [['', '#f0901e'], ['sky', '#5aa9e6'], ['mint', '#45b88a'], ['lilac', '#b39ddb'], ['rose', '#f28fad'], ['sun', '#f2c94c']];
+  const ACCENTS = [['', '#f0901e'], ['forest', '#314b3c'], ['sea', '#1f5f7a'], ['plum', '#5b3f7a'], ['terra', '#b8441c'], ['sky', '#5aa9e6'], ['mint', '#45b88a'], ['lilac', '#b39ddb'], ['rose', '#f28fad'], ['sun', '#f2c94c']];
   const dget = k => { try { return localStorage.getItem(DKEYS[k]) || ''; } catch (e) { return ''; } };
   if (/iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) { const vp = document.querySelector('meta[name=viewport]'); if (vp) vp.setAttribute('content', 'width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover'); }
   document.documentElement.dataset.os = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ? 'ios' : /Android/i.test(navigator.userAgent) ? 'android' : 'other';

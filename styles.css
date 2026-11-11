@@ -981,3 +981,12 @@ html[data-os="ios"] input,html[data-os="ios"] select,html[data-os="ios"] textare
 .avopt.pic{overflow:hidden;background:var(--surface2)}
 .avopt.pic img{width:100%;height:100%;object-fit:cover;border-radius:50%;display:block}
 .avpick b.small{display:block;margin-top:8px}
+
+/* 3.28 Deeper colour schemes (white text on the colour) and readable task notes */
+html[data-accent="forest"]{--accent:#314b3c;--accent-ink:#ffffff;--accent-soft:#e3ebe2}
+html[data-accent="sea"]{--accent:#1f5f7a;--accent-ink:#ffffff;--accent-soft:#dfecf2}
+html[data-accent="plum"]{--accent:#5b3f7a;--accent-ink:#ffffff;--accent-soft:#ebe4f1}
+html[data-accent="terra"]{--accent:#b8441c;--accent-ink:#ffffff;--accent-soft:#f6e3d9}
+@media (prefers-color-scheme:dark){html:not([data-theme="light"])[data-accent="forest"]{--accent:#8fc7a4;--accent-ink:#10231a}html:not([data-theme="light"])[data-accent="sea"]{--accent:#8cc4ea;--accent-ink:#0c2230}html:not([data-theme="light"])[data-accent="plum"]{--accent:#c9b3ee;--accent-ink:#231533}html:not([data-theme="light"])[data-accent="terra"]{--accent:#f0a07f;--accent-ink:#30140a}}
+html[data-theme="dark"][data-accent="forest"]{--accent:#8fc7a4;--accent-ink:#10231a}html[data-theme="dark"][data-accent="sea"]{--accent:#8cc4ea;--accent-ink:#0c2230}html[data-theme="dark"][data-accent="plum"]{--accent:#c9b3ee;--accent-ink:#231533}html[data-theme="dark"][data-accent="terra"]{--accent:#f0a07f;--accent-ink:#30140a}
+.tnote{white-space:pre-line;line-height:1.5}
