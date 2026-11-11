@@ -1,13 +1,15 @@
 // Service worker: keeps the app shell available offline and shows push notifications.
-const CACHE = 'fs-shell-v72';
+const CACHE = 'fs-shell-v74';
 const SHELL = ['./', 'index.html', 'styles.css', 'config.js', 'catalog.js', 'icons.js', 'cute.js', 'i18n.js', 'store.js', 'app.js', 'vendor/qrcode.js', 'vendor/supabase.js', 'vendor/591.supabase.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'badge-96.png'];
-self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
+// A new version is fetched whole and fresh (past the browser's own cache) before it replaces the old one, so the app never runs a mix of old and new files.
+self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
-// Network first, so updates arrive straight away; cached copy only when offline.
+// The app's own files come from the saved copy of this version: it opens at once, also on a weak connection, and every file is from the same version.
+// A new version arrives as a whole (see install above) and the app then offers to reload. Anything not in the saved copy goes to the network.
 self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);
   if (e.request.method !== 'GET' || u.origin !== location.origin) return;
-  e.respondWith(fetch(e.request).then(r => { if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); } return r; }).catch(() => caches.match(e.request).then(r => r || caches.match('index.html'))));
+  e.respondWith(caches.open(CACHE).then(c => c.match(e.request.mode === 'navigate' ? 'index.html' : e.request, { ignoreSearch: true }).then(hit => hit || fetch(e.request).then(r => { if (r.ok) c.put(e.request, r.clone()); return r; }).catch(() => c.match('index.html')))));
 });
 self.addEventListener('push', e => {
   let d = {}; try { d = e.data.json(); } catch (err) { d = { body: e.data ? e.data.text() : '' }; }

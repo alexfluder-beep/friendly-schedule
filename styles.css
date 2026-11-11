@@ -1192,3 +1192,15 @@ code.ref{font:inherit;font-variant-numeric:tabular-nums;letter-spacing:.02em;use
 /* a chosen day that is also a day off or a sick day keeps dark text (it was white on pink) */
 .strip button.myoff[aria-pressed="true"]{color:var(--ink);border-color:var(--ink)}.strip button.myoff[aria-pressed="true"] b,.strip button.myoff[aria-pressed="true"] span{color:var(--ink)}
 @media (min-width:761px){.ghome{display:flex;flex-direction:column;gap:12px}.ghome>.bar{margin:0}}
+
+/* 3.52 tour card: one line of facts (kind, seats taken and free, languages, what guests paid) */
+.tfacts{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}.tag.t-lang{background:var(--surface2);color:var(--ink);border-color:var(--line);font-weight:700;letter-spacing:.03em}
+/* on a computer the tour card is a small window next to the tour that was clicked */
+@media (min-width:761px){.overlay.popov{background:rgba(8,14,20,.18);display:block}.sheet.pop{position:fixed;width:460px;max-width:calc(100vw - 24px);border:1px solid var(--line);border-radius:16px;box-shadow:0 12px 40px rgba(8,14,20,.22);padding:16px;gap:10px;animation:none}
+  .sheet.pop .hdr h2{font-size:var(--t-h3)}.sheet.pop .when{font-size:var(--t-body)}.sheet.pop .tacts .btn{min-height:36px;padding:4px 12px}}
+
+/* guest card marks: marks first, the note, then the anonymous like and dislike on one quiet line */
+.ratebox .likerow{flex-wrap:wrap;gap:8px;border-top:1px solid var(--line);padding-top:10px;margin-top:2px}.ratebox .likerow .grow-l{min-width:140px}
+
+/* tour card buttons on a phone: one compact row, icon above a short label */
+@media (max-width:760px){.tacts{display:grid;grid-template-columns:repeat(auto-fit,minmax(56px,1fr));gap:6px}.tacts .btn,.tacts .btn.primary{flex:none;flex-direction:column;gap:3px;min-height:54px;padding:6px 2px;font-size:11px;line-height:1.15;white-space:normal;text-align:center;border-radius:14px}.tacts .btn .msi{width:20px;height:20px}}

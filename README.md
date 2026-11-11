@@ -470,3 +470,10 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 ## 3.51
 - **Guides and drivers on a computer** get the same switches at the top as the office: Day / Week / Month / Agenda and Team / Mine, with Day summary on the right (the three links at the bottom are for phones only). The home page is one centred column and the week strip uses its full width.
 - Week strip: a sick day shows the sick icon, not the umbrella. The chosen day keeps dark text when it is also a day off or sick day (it was white on pink).
+
+## 3.52
+- **Tour card on a computer is a small window** next to the tour you clicked (week, month and agenda), not a sheet in the middle. Editing still opens the full form. Phones keep the sheet from the bottom.
+- **Facts line on the tour card:** Group or Private, for group tours "Seats 5/6" and how many are free (or "full"), language badges (EN, RU and others from the tour and its bookings), and for the office what the guests paid.
+- **Guest card reviewed:** the marks come first under "Mark this guest" (the title is no longer repeated), then the note and earlier marks with a readable date, then Like and Dislike as two small buttons on one line. The Income row is hidden when no prices are saved.
+- Tour card buttons on a phone: one compact row, icon above a short label.
+- **Updates arrive whole.** The app's files now open from the saved copy of one version (instant start, also on weak internet). A new version is downloaded completely in the background and then replaces the old one; if the app was just opened it reloads by itself, otherwise the "new version" banner shows. Before, on a weak connection a phone could run new styles with an old program file, or stay on an old version for a long time.
