@@ -1208,3 +1208,14 @@ code.ref{font:inherit;font-variant-numeric:tabular-nums;letter-spacing:.02em;use
 
 /* 3.56 best weeks for a rest */
 .vcrow{width:100%;text-align:left;font:inherit;color:var(--ink);cursor:pointer;background:var(--surface)}.vcrow .lmain{flex-direction:column;align-items:flex-start;gap:2px}.vclist{gap:6px}
+
+/* 3.57 one quick question at the top of the home page (how the tour went, or how you feel): five faces with a word */
+.moods{display:grid;grid-template-columns:repeat(auto-fit,minmax(58px,1fr));gap:6px}
+.moodb{display:flex;flex-direction:column;align-items:center;gap:3px;min-height:56px;padding:6px 2px;border:1px solid var(--line);border-radius:var(--r-m);background:var(--surface);color:var(--ink);font:inherit;font-size:var(--t-cap);line-height:1.15;text-align:center;cursor:pointer}
+.moodb svg{width:26px;height:26px}.moodb:active{transform:scale(.96)}.moodcard,.ratecard{gap:8px}
+.moodline svg{flex:none;margin-top:1px}.moodrow{display:inline-flex;gap:2px}.moodrow svg{width:18px;height:18px}
+/* totem window: the numbers appear one by one, then the animal */
+.ttsteps{display:flex;flex-direction:column;gap:6px}.ttstep{display:flex;justify-content:space-between;gap:12px;padding:8px 12px;border-radius:var(--r-m);background:var(--surface);border:1px solid var(--line)}
+.ttres{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;padding:14px;border-radius:var(--r-l);background:var(--accent-soft)}.ttres svg{width:96px;height:96px}.ttres b{font-size:var(--t-h2)}.ttres b::first-letter{text-transform:uppercase}
+@media (prefers-reduced-motion:no-preference){.ttstep,.ttres,.ttnote{opacity:0;animation:ttin .35s ease-out forwards;animation-delay:calc(var(--i) * .32s)}.ttres{animation-name:ttpop;animation-duration:.5s}
+  @keyframes ttin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}@keyframes ttpop{0%{opacity:0;transform:scale(.6)}70%{opacity:1;transform:scale(1.06)}100%{opacity:1;transform:none}}}

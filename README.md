@@ -492,3 +492,16 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 
 ## 3.56
 - **Time off: "Best time for a rest"** replaces "Suggested days off". It offers up to three whole weeks (seven days in a row) in the next four months when the person has no tours, no busy period or high season falls on them, fewer than two teammates (20% of the team) are off, and the team has the fewest tours. Each week says why ("nobody else is off · team tours that week: 3"), and mentions it when the person worked 30 or more days in the last two months. Tapping a week opens the request with both dates filled. Single quiet days stay below. These are suggestions; the office decides.
+
+## 3.57
+- **After a tour, one tap to say how it went.** When a tour of yours has ended (today or in the last two days) the home page asks "How was Kazbegi today?" with four buttons: Great, Good, Normal, Hard day. It saves the tour score the office already sees. "Not now" hides it.
+- **How do you feel today?** Asked once a day on the first open: Great, Good, So-so, Tired, Not well, or "Not now". The card says plainly that the office sees the answers. Work and rest shows today's answer with "Change". The office sees "How the team feels, last 14 days" in Back office > What gets used: the team average and each person's last answers as small faces.
+- **Totem animal.** "Show me my totem animal" (Me > Badges, and "How it was counted" on Work and rest; the office has it too). It shows the numbers one by one (tours, working days, guests, different tours, early starts, rest days) and then the animal. Counted from the last two full weeks; it changes on Monday. Nine animals, all compliments: resting cat, strong bear, busy bee, bright butterfly, steady turtle, early bird, lucky ladybug, quick fox, wise owl.
+- **New badges**, counted from the person's own tours:
+  - Guests' countries by phone code: Ten / Twenty-five / Forty flags; Favourite country (50 guests from one country), Second home (200), Honorary consul (1,000). The badge names your top country.
+  - Names: Name twins (5 guests with the same first name), Name club (15). Secret: Namesake (a guest with your own first name), Rare letter (a name starting with Q, X or Z).
+  - Wine tasting extras: Toast starter (5), Tamada (25), Grand tamada (100). Shoti baker: 25 tours to Kakheti.
+  - Mother of Georgia storyteller: 50 and 200 Old Town walks.
+  - Places unlocked by the first tour there: Chiatura cable car, Juta valley, Ananuri Fortress, Tskaltubo sanatoriums, Soviet lift rider, Uplistsikhe, Vardzia, Canyons and caves.
+  - Volunteer (3) and First hand up (10): offers to take a tour that needed someone.
+- **My road** also counts: told the story of Mother of Georgia, rode the Soviet lift, stopped at Ananuri, rode the Chiatura cable car, walked in Juta, visited Tskaltubo.
