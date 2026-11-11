@@ -296,3 +296,12 @@ create index if not exists tasks_created_by_idx on public.tasks(created_by);
 create index if not exists tasks_done_by_idx on public.tasks(done_by);
 create index if not exists time_off_decided_by_idx on public.time_off(decided_by);
 create index if not exists usage_user_id_idx on public.usage(user_id);
+
+-- 3.15 nightly copy to Google Drive (applied 11 Nov by Claude): settings table for the backup function and a 03:00 Tbilisi job
+create extension if not exists pg_cron;
+create table if not exists public.backup_config (id int primary key default 1 check (id = 1), drive_url text, last_at timestamptz, last_try timestamptz, last_result text);
+alter table public.backup_config enable row level security;
+revoke all on public.backup_config from anon, authenticated;
+insert into public.backup_config (id) values (1) on conflict (id) do nothing;
+select cron.unschedule(jobid) from cron.job where jobname = 'friendly-backup-daily';
+select cron.schedule('friendly-backup-daily', '0 23 * * *', $$ select net.http_post(url := 'https://scqqmnwzglbgnvgzqifu.supabase.co/functions/v1/backup', headers := '{"Content-Type":"application/json"}'::jsonb, body := '{}'::jsonb, timeout_milliseconds := 120000); $$);
