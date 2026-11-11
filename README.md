@@ -306,3 +306,11 @@ Art (tools/art): `make_art.py` makes avatar and badge pictures with Gemini once,
 - Open-tour lists show the language the guests asked for, and the icon sits beside the text.
 - Drivers with the Delica are offered only 4x4 rides (4x4 in the name, Kazbegi, Gareji, Tusheti, Truso, Juta, Khevsureti).
 - Tour card: a person shows the role and at most one title; people and guests line up.
+
+## 3.21 – 3.22
+Phone calendar in the layout the team knows from Setmore:
+- Header: the month name opens and closes the full month; arrows, a date jump, and a round **ALL / me** button to switch between the team and your own tours. On computers nothing changed.
+- Light day strip (selected day is a dark square, today has a ring) and tour cards as tinted blocks with a colour bar.
+- A slim bar above the menu: "This week · 12 tours · 55 guests · profit"; tap it for the full breakdown (admins).
+- The round + opens a sheet: Tour, Day off, Sick, Task, Add person.
+Special dates (Me): an open list with an icon per kind, edit and delete icon buttons, and "+ Add a date" that opens a sheet with one-tap kinds and rolling day / month / year wheels.

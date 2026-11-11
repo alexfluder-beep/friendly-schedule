@@ -856,3 +856,75 @@ html[data-os="ios"] input,html[data-os="ios"] select,html[data-os="ios"] textare
 .sheet .glist .gbtn{gap:12px}
 .sheet .glist.crew .grow .row{gap:12px}
 .sheet .glist.crew .grow .muted{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+
+/* 3.21 phone calendar in the Setmore layout the team knows: month title that opens the month, light day strip,
+   tinted cards with a colour bar, result bar above the menu, add sheet */
+.calhd{display:flex;align-items:center;gap:8px;margin:4px 0 8px}
+.calttl{display:inline-flex;align-items:center;gap:6px;background:none;border:0;padding:8px 4px 8px 0;font-family:inherit;font-size:var(--t-h1);color:var(--ink);min-height:48px;cursor:pointer;letter-spacing:-.01em}
+.calttl b{font-weight:600}.calttl .yr{color:var(--muted);font-weight:500}.calttl .msi{width:24px;height:24px;color:var(--muted)}
+.calhd .iconbtn{width:40px;height:40px;font-size:var(--t-h2);padding:0}
+.calnow{min-height:40px}
+.whochip{width:44px;height:44px;border-radius:50%;border:0;background:var(--surface2);color:var(--ink);font:700 var(--t-cap)/1 inherit;display:grid;place-items:center;padding:0;cursor:pointer;flex:none}
+.whochip .avatar{width:44px;height:44px}
+.incbar{position:fixed;left:0;right:0;bottom:calc(var(--tabs-h,62px) + env(safe-area-inset-bottom,0px));z-index:7;display:flex;align-items:center;gap:12px;min-height:48px;padding:0 16px;background:var(--bg);border:0;border-top:1px solid var(--line);color:var(--ink);font-size:var(--t-sm);text-align:left;cursor:pointer}
+.incbar .msi{width:20px;height:20px;color:var(--muted);flex:none}
+.incbar .grow-l{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.incbar b{font-size:var(--t-body);text-decoration:underline;text-underline-offset:4px;flex:none}
+.fabmenu{display:flex;flex-direction:column}
+.fabmenu .arow{gap:16px;min-height:56px;padding:0 4px;border:0;font-size:var(--t-h3);background:none;cursor:pointer}
+.fabmenu .arow .msi{width:24px;height:24px;color:var(--ink);flex:none}
+.fabmenu hr{border:0;border-top:1px solid var(--line);margin:8px 0;width:100%}
+@media (max-width:760px){
+  main:has(.incbar){padding-bottom:calc(140px + env(safe-area-inset-bottom,0px))}
+  main:has(.incbar) .fab{bottom:calc(128px + env(safe-area-inset-bottom,0px))}
+  .strip{gap:0;border-bottom:1px solid var(--line);padding-bottom:8px;margin:0 -4px}
+  .strip button{background:none;border:0;border-radius:0;padding:4px 0;gap:6px;font-size:var(--t-cap);text-transform:uppercase;letter-spacing:.04em}
+  .strip button b{display:grid;place-items:center;width:40px;height:40px;border-radius:12px;font-size:var(--t-h3);font-weight:500}
+  .strip button[aria-pressed="true"]{background:none;color:var(--muted)}
+  .strip button[aria-pressed="true"] b{background:var(--ink);color:var(--bg)}
+  .strip button[aria-pressed="true"] .dot{background:var(--accent)}
+  .strip button.tdy b{text-decoration:none;box-shadow:inset 0 0 0 2px var(--accent)}
+  .strip button.tdy[aria-pressed="true"] b{box-shadow:none}
+  .mgrid{border:0;border-radius:0;background:none}
+  .mgrid .hd{background:none;color:var(--muted);font-weight:500;font-size:var(--t-cap);text-transform:uppercase}
+  .mgrid button{border:0;align-items:center;min-height:56px;padding:4px 0}
+  .mgrid button > b:first-child,.mgrid button .dn{font-size:var(--t-body);font-weight:500}
+  .mgrid button.sel{outline:0}
+  .acard{border:0;border-left:4px solid var(--k);border-radius:8px;background:color-mix(in srgb,var(--k) 13%,var(--bg));padding:12px 12px 12px 12px;gap:6px}
+  .acard.off{border-left-color:var(--off,#6f8fbf)}
+  .dayhd{margin-top:8px}
+  .dayhd > b{font-weight:500;color:var(--muted);font-size:var(--t-h3)}
+  .dayhd > b.tdy{color:var(--ink);font-weight:700}
+}
+.calhd{min-width:0;gap:4px}
+.calttl{font-size:var(--t-h2);min-width:0;flex:0 1 auto;white-space:nowrap;overflow:hidden}
+.calhd .spacer{flex:1 1 0;min-width:0}
+.calhd .iconbtn,.calhd .whochip,.calnow{flex:none}
+.calnow{padding:0 12px}
+.fabmenu{position:static;right:auto;bottom:auto;z-index:auto;align-items:stretch;gap:0}
+.fabmenu .fabitem{box-shadow:none;animation:none;border-radius:8px;font-weight:500;justify-content:flex-start;width:100%}
+@media (max-width:760px){.strip{margin:0}}
+.calhd .jump{flex:none}
+
+/* 3.22 special dates: open list with icons, add/edit in a sheet, rolling date wheels */
+.pdlist{display:flex;flex-direction:column}
+.pdrow{display:flex;align-items:center;gap:12px;min-height:56px;padding:8px 0;border-top:1px solid var(--line)}
+.pdrow:first-child{border-top:0}
+.pdic{width:40px;height:40px;border-radius:12px;background:var(--surface2);display:grid;place-items:center;flex:none;color:var(--ink)}
+.pdic .msi{width:22px;height:22px}
+.pdtx{flex:1;min-width:0;flex-direction:column;align-items:flex-start;gap:0;flex-wrap:nowrap}
+.pdtx b{font-weight:600;overflow-wrap:anywhere}
+.pdrow .iconbtn{width:40px;height:40px;flex:none;padding:0}.pdrow .iconbtn .msi{width:20px;height:20px}
+.pdform{border-top:0;padding-top:0;margin-top:0}
+.chip2{display:inline-flex;align-items:center;gap:8px}.chip2 .msi{width:18px;height:18px;color:var(--muted)}
+.chip2.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}.chip2.on .msi{color:var(--bg)}
+.lbl{font-size:var(--t-sm);color:var(--muted)}.lbl b{color:var(--ink)}
+.wheel{position:relative;display:grid;grid-template-columns:1fr 1.6fr 1.2fr;height:220px;border-radius:16px;background:var(--surface2);overflow:hidden;user-select:none}
+.wband{position:absolute;left:8px;right:8px;top:88px;height:44px;border-radius:12px;background:var(--surface);box-shadow:0 0 0 1px var(--line);pointer-events:none}
+.wcol{position:relative;overflow-y:auto;scroll-snap-type:y mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;outline:0;
+  -webkit-mask-image:linear-gradient(transparent,#000 35%,#000 65%,transparent);mask-image:linear-gradient(transparent,#000 35%,#000 65%,transparent)}
+.wcol::-webkit-scrollbar{display:none}
+.wcol > i{display:block;height:88px}
+.wit{display:block;width:100%;height:44px;border:0;background:none;scroll-snap-align:center;font:500 var(--t-h3)/44px inherit;color:var(--muted);font-variant-numeric:tabular-nums;padding:0;cursor:pointer}
+.wit.on{color:var(--ink);font-weight:700;font-size:var(--t-h2)}
+.wit[hidden]{display:none}
