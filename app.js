@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.34';
+  const APP_VERSION = '3.35';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -55,7 +55,22 @@
   const state = { meTab: 'profile', adminTab: null, view: 'calendar', mode: 'week', date: today(), mine: false, modal: null, year: new Date().getFullYear(), auth: 'signin', authMsg: '', taskFilter: 'open', imp: null, bell: false };
   let memo = {};
   // "Look as": the admin sees the app exactly as one guide or driver would. Nothing can be saved while looking.
-  const me = () => (state.viewAs && S.me && S.me.role === 'admin' && db.profiles.find(p => p.id === state.viewAs)) || S.me;
+  // Two logins of one person (Back office rules.sameAs { second account: main account }): the second login works as the main one,
+  // so tours, badges, statistics, pay and settings are the same on both, and the person shows once in every list.
+  // Last guard before anything is saved: a guest count or capacity must be a whole number from 0 to 999. A booking number that slipped
+  // into a count (11 Nov: "1128150174900687") is taken out, kept as the booking code when there is none, and the admin is told.
+  // The row is still saved, so a booking is never lost because of one bad number.
+  const COUNT_F = ['pax', 'adults', 'children', 'capacity'];
+  function countGuard(table, rows) {
+    if (table !== 'tours' && table !== 'bookings') return; const bad = [];
+    (rows || []).forEach(r => { if (!r) return; COUNT_F.forEach(k => { const v = r[k]; if (v === null || v === undefined || v === '') return; const n = Number(v); if (Number.isInteger(n) && n >= 0 && n <= 999) return; bad.push(String(v)); if (table === 'bookings' && !r.ref && /^\d{5,}$/.test(String(v))) r.ref = String(v); r[k] = 0; }); });
+    if (bad.length) { const msg = T('count_bad', { v: bad.slice(0, 3).join(', ') }); setTimeout(() => { try { toast(msg); } catch (e) { /* not ready */ } }, 0); try { logErr('data', 'Guest count out of range, saved as 0: ' + bad.slice(0, 5).join(', '), table); } catch (e) { /* later */ } }
+  }
+  { const s1 = S.save.bind(S), sm = S.saveMany.bind(S); S.save = (t, row) => { countGuard(t, [row]); return s1(t, row); }; S.saveMany = (t, rows) => { countGuard(t, rows); return sm(t, rows); }; }
+  const sameAs = () => ((db.settings.find(x => x.id === 'rules') || {}).value || {}).sameAs || {};
+  const twin = id => { const t = sameAs()[id]; return t && db.profiles.some(p => p.id === t) ? t : id; };
+  const selfP = () => { const m = S.me; if (!m) return m; const t = twin(m.id); return t === m.id ? m : (db.profiles.find(p => p.id === t) || m); };
+  const me = () => (state.viewAs && S.me && S.me.role === 'admin' && db.profiles.find(p => p.id === state.viewAs)) || selfP();
   const viewOnly = () => { const e = new Error('view only'); e.viewOnly = true; return Promise.reject(e); };
   ['save', 'saveMany', 'remove'].forEach(k => { const f = S[k]; if (typeof f === 'function') S[k] = (...a) => (state.viewAs ? viewOnly() : f.apply(S, a)); });
   const isAdmin = () => me() && me().role === 'admin';
@@ -65,13 +80,13 @@
   const pv = () => ({ guideDays: 14, keepMonths: 24, auto: true, ...(rules().privacy || {}) });
   // Guides and drivers see guest names only around the tour; the database enforces the same limit.
   const guestsHidden = t => !isAdmin() && endOf(t) < addDays(today(), -pv().guideDays);
-  const person = id => db.profiles.find(p => p.id === id);
+  const person = id => { const t = twin(id); return db.profiles.find(p => p.id === t); };
   const pname = id => (person(id) || {}).name || '—';
   const roleRank = { admin: 0, guide: 1, driver: 2 };
-  const staff = () => db.profiles.filter(p => p.active !== false).sort((a, b) => (roleRank[a.role] - roleRank[b.role]) || a.name.localeCompare(b.name));
+  const staff = () => db.profiles.filter(p => p.active !== false && twin(p.id) === p.id).sort((a, b) => (roleRank[a.role] - roleRank[b.role]) || a.name.localeCompare(b.name));
   const crew = () => staff().filter(p => p.role !== 'admin' || db.tours.some(t => t.guide_id === p.id || t.driver_id === p.id));
   const live = t => t.status !== 'cancelled';
-  const involves = (t, id) => t.guide_id === id || t.driver_id === id;
+  const involves = (t, id) => { const a = twin(id); return twin(t.guide_id) === a || twin(t.driver_id) === a; };
   const endOf = t => (t.date_to && t.date_to > t.date ? t.date_to : t.date);
   const tourDays = t => { const out = []; for (let d = t.date, i = 0; d <= endOf(t) && i < 60; d = addDays(d, 1), i++) out.push(d); return out; };
   const MARKS = ['wine', 'private_room', 'front_seat', 'bear_food', 'pickup', 'dropoff', 'stays', 'cancellation', 'nonref'];
@@ -485,7 +500,7 @@
   let hiddenAt = 0; document.addEventListener('visibilitychange', () => { hiddenAt = Date.now(); });
   function logErr(kind, message, detail) {
     try {
-      const msg = String(message || '').slice(0, 500); if (!msg || /ResizeObserver loop|^Script error\.?$/i.test(msg)) return;
+      const msg = String(message || '').slice(0, 500); if (!msg || /ResizeObserver loop|^Script error\.?$|Transition was (aborted|skipped)|Viewport size changed/i.test(msg)) return;
       if (/abort|load failed|failed to fetch|networkerror/i.test(msg) && (!navigator.onLine || document.hidden || Date.now() - hiddenAt < 15000)) return; // the phone paused the app or lost signal: not a real problem
       const q = JSON.parse(localStorage.getItem(ERRQ) || '[]');
       if (q.length && q[q.length - 1].message === msg && Date.now() - new Date(q[q.length - 1].at).getTime() < 60000) return; // same error again within a minute
@@ -780,7 +795,7 @@
     const people = crew().filter(p => !state.mine || p.id === me().id);
     const title = state.mode === 'week' ? (days[0].slice(0, 7) === days[6].slice(0, 7) ? `${D(days[0]).getDate()}–${fmt(days[6], { day: 'numeric', month: 'short', year: 'numeric' })}` : `${fmt(days[0], { day: 'numeric', month: 'short' })} – ${fmt(days[6], { day: 'numeric', month: 'short', year: 'numeric' })}`) : fmt(state.date, { month: 'long', year: 'numeric' });
     if (!isAdmin() && state.mine && state.mode === 'week') return guideHomeHtml(days, title) + fabHtml();
-    let h = `${state.newVersion ? `<button class="banner small setupban" data-act="reload"><span>${T('nv_text')}</span><b>${T('nv_btn')} ›</b></button>` : ''}${setupCard(true)}${window.matchMedia('(max-width:760px)').matches ? installCardHtml(false) : ''}${nextHtml()}${fabHtml()}
+    let h = `${setupCard(true)}${window.matchMedia('(max-width:760px)').matches ? installCardHtml(false) : ''}${nextHtml()}${fabHtml()}
       ${!PHONE() ? '' : `<div class="calhd"><button class="calttl" data-act="mode" data-m="${state.mode === 'month' ? 'week' : 'month'}" aria-expanded="${state.mode === 'month'}" aria-label="${T(state.mode === 'month' ? 'week' : 'month')}"><b>${esc(fmt(state.date, { month: 'long' }))}</b> <span class="yr num">${state.date.slice(0, 4)}</span>${msi(state.mode === 'month' ? 'keyboard_arrow_up' : 'keyboard_arrow_down')}</button><label class="jump" title="${T('pick_date')}">${ico('cal')}<input type="date" id="jump" data-ch="jump" value="${esc(state.date)}" aria-label="${T('pick_date')}"></label><span class="spacer"></span>
         ${monday(state.date) !== monday(td) ? `<button class="btn sm calnow" data-act="today">${T('today')}</button>` : ''}<button class="iconbtn" data-act="nav" data-d="-1" aria-label="${T('prev')}">‹</button><button class="iconbtn" data-act="nav" data-d="1" aria-label="${T('next')}">›</button>
         <button class="whochip" data-act="mine" data-v="${state.mine ? '0' : '1'}" aria-label="${T(state.mine ? 'mine' : 'team')}">${state.mine ? avatar(me().id) : `<span>${T('who_all')}</span>`}</button></div>`}
@@ -1361,6 +1376,7 @@
     if (bSecret(b)) return `${head}<div class="ccard"><span class="mdl big secret" style="--p:0">${medalArt(b)}</span><h2>${T('b_secret')}</h2><p class="muted">${T('bd_secret')}</p></div>`;
     return `${head}<div class="ccard"><span class="mdl big ${b.done ? 'done' : ''}" data-t="${b.track}" style="--p:${Math.round(b.have / b.goal * 100)}">${medalArt(b)}</span><h2>${esc(bName(b))}</h2><p class="muted">${esc(bDesc(b))}</p>
         ${b.track === 'titles' ? '' : `<b class="num">${nf(b.raw)} / ${nf(b.goal)} ${esc(b.unit)}</b><span class="meter" style="width:100%"><i style="width:${Math.round(b.have / b.goal * 100)}%"></i></span>`}${b.done && b.track !== 'master' ? `<span class="tag t-ok">${T('b_done')}</span>` : ''}${b.done && badgeAt(b.k) ? `<span class="muted small num">${T('b_on', { date: fmt(badgeAt(b.k), { day: 'numeric', month: 'long', year: 'numeric' }) })}</span>` : ''}</div>
+      ${(() => { if (b.track === 'master' || b.track === 'titles') return ''; const team = staff().filter(p => p.role !== 'admin' || p.id === me().id), n = team.filter(p => p.id !== me().id && (game(p.id).list.find(x => x.k === b.k) || {}).done).length; return `<span class="muted small">${esc(n === 0 ? T(b.done ? 'b_team_only' : 'b_team_none') : T('b_team_n', { n, of: team.length - 1 }))}</span>`; })()}
       ${b.done ? `<div class="actions"><button class="btn" data-act="celereplay" data-k="${esc(b.k)}">${T('b_replay')}</button><button class="btn" data-act="badgesave" data-k="${esc(b.k)}">${T('b_save')}</button><button class="btn primary" data-act="badgeshare" data-k="${esc(b.k)}">${ico('share')}${T('share')}</button></div>` : ''}`;
   }
   // ---------- a newly earned badge gets a full-screen moment ----------
@@ -2003,7 +2019,7 @@
       const all = db.profiles.slice().sort((a, b) => (a.active === false) - (b.active === false) || (roleRank[a.role] - roleRank[b.role]) || a.name.localeCompare(b.name));
       const cur = all.filter(p => !p.left_at), gone = all.filter(p => p.left_at), waiting = cur.filter(p => p.active === false).length;
       const two = (x, y) => `<span class="grow-l" style="flex-direction:column;align-items:flex-start;gap:0;min-width:0"><b>${x}</b><span class="muted small">${y}</span></span>`;
-      const prow = p => `<div class="card prow" data-key="p${p.id}"><span class="row nw">${avatar(p.id)}${two(esc(p.name), esc([T('role_' + p.role), p.languages, p.phone, tgUser(p.telegram) && '@' + tgUser(p.telegram)].filter(Boolean).join(' · ')))}${p.id === me().id ? `<span class="tag t-ok">${T('you')}</span>` : ''}${p.active === false && !p.left_at ? `<button class="btn sm primary" data-act="pactive" data-id="${p.id}">${T('activate')}</button>` : ''}${p.left_at ? '' : `<button class="btn sm" data-act="pedit" data-id="${p.id}">${T('edit')}</button>`}</span></div>`;
+      const prow = p => `<div class="card prow" data-key="p${p.id}"><span class="row nw">${avatar(p.id)}${two(esc(p.name), esc([T('role_' + p.role), p.languages, p.phone, tgUser(p.telegram) && '@' + tgUser(p.telegram)].filter(Boolean).join(' · ')))}${p.id === me().id ? `<span class="tag t-ok">${T('you')}</span>` : ''}${twin(p.id) !== p.id ? `<span class="tag t-muted">${esc(T('p_twin', { name: pname(p.id) }))}</span>` : ''}${p.active === false && !p.left_at ? `<button class="btn sm primary" data-act="pactive" data-id="${p.id}">${T('activate')}</button>` : ''}${p.left_at ? '' : `<button class="btn sm" data-act="pedit" data-id="${p.id}">${T('edit')}</button>`}</span></div>`;
       const irow = i => `<div class="card prow" data-key="i${i.id}"><span class="row nw"><span class="avatar ini">${esc(initials(i.name || i.email))}</span>${two(esc(i.name || i.email), esc([T('role_' + i.role), i.email].join(' · ')))}<span class="tag t-warn">${T('invited')}</span></span><span class="bar">${i.phone ? `<a class="btn sm" href="${esc(waLink(i.phone, inviteText(i)))}" target="_blank" rel="noopener">${ico('wa')}WhatsApp</a>` : ''}<button class="btn sm" data-act="copy" data-v="${esc(inviteText(i))}">${ico('copy')}${T('invite_copy')}</button><button class="btn sm" data-act="invdel" data-id="${i.id}">${T('remove')}</button></span></div>`;
       h += `<div class="bar"><button class="btn primary" data-act="pnew">+ ${T('add_person')}</button></div><details class="sect"><summary>${T('bulk_title')}</summary><form class="f" data-form="bulkteam"><span class="muted small">${T('bulk_text')}</span><textarea id="bulk-list" name="list" rows="6" placeholder="${T('bulk_hint')}" required></textarea><div class="actions"><button class="btn primary">${T('bulk_add')}</button></div></form></details><p class="muted small">${T(S.mode === 'demo' ? 'team_note_demo' : 'team_note2')}</p>
         ${waiting ? `<div class="banner">${T('waiting_approval', { n: waiting })}</div>` : ''}
@@ -2215,7 +2231,7 @@
     guest = guest.replace(/\S+@\S+.*$/, '').replace(/\s*(Phone|Tel|Mobile)\b.*$/i, '').replace(/^\((?:MR|MRS|MS|MISS|DR)\)\s*/i, '').trim();
     if (/^[A-Z' -]+\/[A-Z' -]+$/.test(guest)) { const [sn, gn] = guest.split('/'); const cap = s => s.toLowerCase().replace(/\b\w/g, x => x.toUpperCase()); guest = `${cap(gn)} ${cap(sn)}`.trim(); }
     const native = get(/\bName\s*:\s*([^\n]+)/); if (native && /[^\u0000-\u024f]/.test(native) && !guest.includes(native)) guest = guest ? `${guest} (${native.trim()})` : native.trim();
-    const num = re => { const m = t.match(re); return m ? Number(m[1]) : 0; };
+    const num = re => { const m = t.match(re), n = m ? Number(m[1]) : 0; return n >= 1 && n <= 99 ? n : 0; };   // a head count is 1-99; a longer number is a booking code, not people
     let adults = num(/(\d+)\s*x?\s*Adults?\b/i), children = num(/(\d+)\s*x?\s*(?:Child|Children|Kids?)\b/i) + num(/(\d+)\s*x?\s*Youths?\b/i) + num(/(\d+)\s*x?\s*Infants?\b/i);
     if (!adults && !children) adults = num(/(?:Travell?ers|Participants|Persons|People|Guests|Number of (?:participants|people|guests)|Booking Quantity|Quantity)\s*:?\s*(\d+)/i) || 1;
     const phs = [...t.matchAll(/(?:Phone|Mobile|Tel(?:ephone)?|WhatsApp)\s*(?:number)?\s*:?\s*(?:\([^)]*\))?\s*(?:[A-Z]{2}\s*)?(\+?\d[\d\s()*-]{6,}\d)/gi)].map(m => m[1]).filter(x => !x.includes('*')).map(x => x.replace(/[\s()-]/g, ''));
@@ -2481,6 +2497,13 @@
       <div class="cols"><div class="card"><b>${T('st_kinds')}</b>${kinds.map(([k, n]) => `<div class="row"><span class="tag t-${k}">${T('kind_' + k)}</span><span class="meter"><i style="width:${inYear.length ? Math.round(n / inYear.length * 100) : 0}%"></i></span><b class="num">${n}</b></div>`).join('')}</div>
       <div class="card"><b>${T('st_top')}</b>${top.map(([t, n]) => `<div class="row"><span style="flex:1;min-width:0;overflow-wrap:anywhere">${esc(t)}</span><b class="num">${n}</b></div>`).join('') || `<span class="muted small">${T('no_tours')}</span>`}</div></div>`;
   }
+  // "My road": how many times this person has been to the well-known places. Counted from the tour names in their history.
+  const ROAD = [['jvari', /kazbegi|truso|juta|stepantsminda|khevsureti|shatili/i, 2], ['tusheti', /tusheti|omalo/i, 1], ['gareji', /gareji|rainbow/i, 1], ['kakheti', /kakheti|sighnaghi|signagi|telavi|wine/i, 1],
+    ['mtskheta', /mtskheta|jvari\b/i, 1], ['sabaduri', /sabaduri/i, 1], ['border', /armenia|yerevan|sevan|dilijan|haghpat/i, 2], ['gudauri', /gudauri/i, 1], ['vardzia', /vardzia|borjomi|rabati/i, 1], ['oldtown', /walking|old tbilisi/i, 1], ['brutal', /brutal|soviet/i, 1]];
+  function roadHtml(id) {
+    const ts = personStats(id).ts, rows = ROAD.map(([k, re, mul]) => [k, ts.filter(t => re.test(t.title)).length * mul]).filter(x => x[1] > 0).sort((x, y) => y[1] - x[1]);
+    return rows.length ? `<h3>${T('rd_title')}</h3><div class="card roadc">${rows.map(([k, n]) => `<span class="roadrow"><span>${esc(T('rd_' + k))}</span><b class="num">×${nf(n)}</b></span>`).join('')}<span class="muted small">${T('rd_note')}</span></div>` : '';
+  }
   function badgesHtml(id) {
     const g = game(id), delta = (a, b) => (a === b ? '' : ` <span class="muted small num">${a > b ? '+' : '−'}${nf(Math.abs(a - b))}</span>`);
     const next = g.list.filter(b => !b.done && !b.hidden && b.track !== 'master' && b.have > 0).sort((x, y) => y.have / y.goal - x.have / x.goal).slice(0, 3);
@@ -2489,6 +2512,7 @@
     return `<div class="card lvl"><div class="row nw">${avatar(id, true)}<div class="grow-l" style="flex-direction:column;align-items:stretch;gap:4px;min-width:0"><b class="lvn">${T('level')} ${g.level}</b><details class="lvhelp"><summary class="lnk small">${T('lv_how')}</summary><p class="small">${T('lv_text')}</p><ul class="small"><li>${T('lv_tour')}</li><li>${T('lv_guest')}</li><li>${T('lv_km')}</li><li>${T('lv_badge')}</li></ul><p class="small muted">${T('lv_steps')}</p></details><span class="meter"><i style="width:${Math.round((g.xp - g.base) / (g.next - g.base) * 100)}%"></i></span><span class="muted small num">${T('g_xp', { xp: nf(g.xp), next: nf(g.next) })} · ${g.done}/${g.list.length} ${T('badges').toLowerCase()}</span></div></div></div>
       <h3>${T('g_month')}</h3><div class="stats"><div class="stat"><b>${g.weekNow}</b>${T('g_week')}</div><div class="stat"><b>${g.cur.tours}</b>${T('g_thismonth')}${delta(g.cur.tours, g.prev.tours)}</div><div class="stat"><b>${g.yearNow}</b>${T('g_year')}</div><div class="stat"><b>${nf(g.cur.guests)}</b>${T('guests')}${delta(g.cur.guests, g.prev.guests)}</div>${g.isD ? `<div class="stat"><b>${nf(g.cur.km)}</b>km${delta(g.cur.km, g.prev.km)}</div>` : ''}<div class="stat"><b>${Math.round(g.regs.size / REGIONS.length * 100)}%</b>${T('g_geo')}</div></div>
       ${next.length ? `<h3>${T('g_next')}</h3><div class="medals">${next.map(b => medal(b)).join('')}</div>` : ''}
+      ${roadHtml(id)}
       ${tracks.map(([k, label]) => { const bs = g.list.filter(b => b.track === k).sort((x, y) => (k === 'secret' ? y.done - x.done : 0)); return bs.length ? `${label ? `<h3>${esc(label)}</h3>` : ''}<div class="medals">${bs.map(b => medal(b)).join('')}</div>` : ''; }).join('')}
       <div class="card f"><b>${T('g_together')}</b>${pals.map(([pid, n]) => `<div class="row">${avatar(pid)}<span style="flex:1;min-width:0">${esc(T('g_with', { name: pname(pid), n }))}</span>${n >= 50 ? `<span class="tag t-ok">50+</span>` : ''}</div>`).join('') || `<span class="muted small">${T('no_tours')}</span>`}
         ${g.isG ? `<div class="row">${ico('heart')}<span>${T('g_repeat', { n: g.rep })}</span></div>` : ''}${g.isD ? `<div class="row">${ico('moon')}<span>${T('g_moon', { km: nf(g.km), p: (g.km / 384400 * 100).toFixed(g.km / 384400 < 0.1 ? 2 : 1) })}</span></div>` : ''}${g.isG && g.walk ? `<div class="row">${ico('boot')}<span>${T('g_walked', { km: nf(g.walk) })}</span></div>` : ''}</div>
@@ -2579,7 +2603,7 @@
     if (!document.startViewTransition || reduce || a === b) { go(); return; }
     document.documentElement.dataset.dir = b > a ? 'fwd' : 'back';
     quietMorph = true;
-    try { const vt = document.startViewTransition(() => { try { go(); } finally { quietMorph = false; } }); vt.finished.finally(() => { delete document.documentElement.dataset.dir; }); } catch (e) { quietMorph = false; go(); }
+    try { const vt = document.startViewTransition(() => { try { go(); } finally { quietMorph = false; } }); vt.finished.catch(() => { /* screen turned or resized: the page is already drawn */ }).finally(() => { delete document.documentElement.dataset.dir; }); if (vt.ready) vt.ready.catch(() => { /* same */ }); if (vt.updateCallbackDone) vt.updateCallbackDone.catch(() => { /* same */ }); } catch (e) { quietMorph = false; go(); }
   }
   document.addEventListener('input', ev => { const el = ev.target; if (el && el.nodeType === 1) dirty.add(el); }, true);
   // Day-first date fields: the number keyboard has no dot, so the dots are put in while typing (24111990 becomes 24.11.1990).
@@ -2610,7 +2634,7 @@
       
       <button class="iconbtn ${state.refreshing ? 'spin' : ''}" data-act="refresh" aria-label="${T('refresh')}" title="${esc(upd)}">${ico('refresh')}</button>
       <button class="iconbtn" data-act="bell" aria-label="${T('notifications')}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>${unread ? `<span class="badge">${unread}</span>` : ''}</button>${syncRow()}</header>
-      ${maintHtml() || ''}${state.viewAs ? `<div class="vabar"><span>${T('va_now', { name: esc(me().name) })}</span><button class="btn sm" data-act="vaexit">${T('va_exit')}</button></div>` : ''}<main data-key="v-${state.view}-${state.view === 'admin' ? (state.adminTab || '') : state.view === 'me' ? state.meTab : ''}">${demo}${body}</main><nav class="tabs" aria-label="Main">${nav}</nav>`;
+      ${maintHtml() || ''}${state.newVersion ? `<button class="banner small setupban nvban" data-act="reload"><span>${T('nv_text')}</span><b>${T('nv_btn')} ›</b></button>` : ''}${state.viewAs ? `<div class="vabar"><span>${T('va_now', { name: esc(me().name) })}</span><button class="btn sm" data-act="vaexit">${T('va_exit')}</button></div>` : ''}<main data-key="v-${state.view}-${state.view === 'admin' ? (state.adminTab || '') : state.view === 'me' ? state.meTab : ''}">${demo}${body}</main><nav class="tabs" aria-label="Main">${nav}</nav>`;
     const t1 = performance.now(); morph(app, shell + '<div id="modal"></div><div id="toasts"></div>');
     const hd = app.querySelector('header.top'); if (hd) document.documentElement.style.setProperty('--toph', hd.offsetHeight + 'px'); const sp = app.querySelector('.strip'); if (sp && sp.offsetHeight) document.documentElement.style.setProperty('--striph', sp.offsetHeight + 'px');
     window.__rt = { build: Math.round(t1 - t0), patch: Math.round(performance.now() - t1) }; syncNotice(); watchConn();
@@ -3152,6 +3176,7 @@
     render(); if (state.view === 'calendar') toToday();
     // Test period: explain once how to report a mistake. A new badge goes first; then this waits for the next opening.
     setTimeout(() => { try { if (testOn() && me() && me().active && !window.__noCelebrate && !state.modal && localStorage.getItem('fs-test-seen') !== '1') { localStorage.setItem('fs-test-seen', '1'); acts.testinfo(); } } catch (e) { /* private mode */ } }, 2500);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && state.newVersion && !state.modal && !document.querySelector('form [data-dirty], .qsave.on')) { try { location.reload(); } catch (e) { /* stays on the banner */ } } });
     setTimeout(privacyAuto, 4000); checkBadges(); weekCheck(); setInterval(weekCheck, 30 * 60000); setTimeout(fxRefresh, 6000); setInterval(fxRefresh, 6 * 3600000);
     setInterval(() => { if (me() && me().active && !isAdmin() && state.view === 'calendar' && !state.modal && !document.hidden) render(); }, 5 * 60000);
     if ('serviceWorker' in navigator && location.protocol === 'https:' && S.mode === 'supabase') { try { swReg = await navigator.serviceWorker.register('sw.js'); const had = !!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange', () => { if (had) { state.newVersion = true; render(); } }); setInterval(() => { try { swReg.update(); } catch (e) { /* later */ } }, 30 * 60000); } catch (e) { /* no service worker here */ } }

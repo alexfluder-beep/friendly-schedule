@@ -369,3 +369,10 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 ## 3.34
 - Badges page: region titles and tour mastery have their own pictures (fox for the city, mountain, sun, wine glass, cave, compass, flag; tour mastery by the tour's name) instead of the same trophy and star. Three even columns on phones.
 - Sticker: the picture sits inside the circle on every badge, smaller stars. Share picture uses the brand colour.
+
+## 3.35
+- **Guest counts are guarded before every save.** A count or capacity must be a whole number from 0 to 999. A long number that slipped into a count (11 Nov: a 16-digit booking number) is taken out, kept as the booking code when there is none, the row is saved with 0 and the admin is told. A booking is no longer lost because of one bad number. The pasted-email reader takes only 1-99 as a head count.
+- Old copies update: the "new version" line shows on every page, and the app reloads by itself when the person comes back to it with nothing open.
+- A turned or resized screen during a page change is no longer reported as an error.
+- Two logins of one person: `rules.sameAs { second account: main account }`. The second login works as the main one (same tours, badges, statistics, pay, settings); the person shows once in lists; the team list marks the second login. The two Boss accounts are joined this way (27 tours moved to the main one; the ids are kept in the settings row `merge_log`).
+- Badge page: how many teammates have the same badge. Badges page: "My road", how many times the person crossed the Jvari Pass or the Armenian border, went to Tusheti, Gareji, Kakheti and so on (a pass or border counts twice).

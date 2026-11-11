@@ -1031,3 +1031,9 @@ html[data-accent="amber"]{--accent:#f0901e;--accent-ink:#20251f;--accent-soft:#f
 /* 3.34 Badges page: three even columns on phones, a little air between the stars and the name */
 @media (max-width:520px){.medals{grid-template-columns:repeat(3,minmax(0,1fr));gap:18px 8px}}
 .mdl .mt{margin-top:2px}
+
+/* 3.35 new-version line sits under the header on every page */
+.nvban{margin:8px var(--gut) 0;width:calc(100% - var(--gut) - var(--gutr))}
+
+/* 3.35 My road counters */
+.roadc{gap:0}.roadrow{display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--line)}.roadrow b{font-size:var(--t-h3);white-space:nowrap}.roadc>.muted{padding-top:8px}
