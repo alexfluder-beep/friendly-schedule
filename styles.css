@@ -1015,3 +1015,10 @@ html[data-accent="amber"]{--accent:#f0901e;--accent-ink:#20251f;--accent-soft:#f
 /* next tour: how soon, on the right, where the card was empty */
 .card.nxt{position:relative;padding-right:112px}
 .card.nxt .nxwhen{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:var(--accent-soft);color:var(--ink);border-radius:999px;padding:6px 12px;font-weight:700;font-size:var(--t-sm);white-space:nowrap}
+
+/* 3.32 Work and rest card */
+.wrcard{gap:10px}
+.wrline{display:flex;gap:10px;align-items:flex-start;line-height:1.45}
+.wrline .msi{width:20px;height:20px;flex:none;color:var(--muted);margin-top:2px}
+.wrearn{width:100%;text-align:left;justify-content:space-between;flex-wrap:nowrap;color:var(--ink)}
+.wrearn b{white-space:nowrap}

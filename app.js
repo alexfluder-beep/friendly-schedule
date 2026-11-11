@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.31';
+  const APP_VERSION = '3.32';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -1600,6 +1600,7 @@
     const hol = db.holidays.filter(h => h.date_to >= td).sort((a, b) => a.date_from.localeCompare(b.date_from)).slice(0, 6);
     let h = `<div class="bar"><h2>${T('nav_timeoff')}</h2><span class="spacer"></span><button class="btn primary" data-act="offnew">+ ${T('request')}</button>${helpBtn()}</div>${helpBox('timeoff')}
       <div class="stats"><div class="stat"><b>${my.off}</b>${T('days_off_year', { y })}</div><div class="stat"><b>${my.sick}</b>${T('sick_days')}</div><div class="stat"><b>${my.pending}</b>${T('pending')}</div></div>`;
+    h += workRestHtml();
     const sug = (suggestDaysOff(4)[me().id] || []).filter(x => x.st === 'sug').map(x => x.d);
     if (!isAdmin() && sug.length) h += `<div class="card"><b>${T('sug_title')}</b><span class="muted small">${T('sug_text')}</span><div class="bar">${sug.map(d => `<button class="btn sm" data-act="offnew" data-date="${d}">${esc(fmtDay(d))}</button>`).join('')}</div></div>`;
     if (isAdmin()) h += `<h3>${T('to_approve')} (${pending.length})</h3><div class="list">${pending.length ? pending.map(o => offRow(o, true)).join('') : `<div class="empty">${T('nothing_pending')}</div>`}</div>`;
@@ -1670,6 +1671,26 @@
   const langTags = t => { const l = tourLangs(t); return l.length ? ` <span class="tag t-muted ltag" title="${T('lang_tour')}">${msi('language')}${esc(l.join(' · '))}</span>` : ''; };
   // Delica drivers are offered only the off-road rides the Delica is for.
   const RIDE_4X4 = /4\s*[x×х]\s*4|4\s*wd|delica/i;   // by the tour name only: not every Kazbegi tour is a 4x4 ride (owner, 11 Nov)
+  // Work and rest (Time off page, guides and drivers): how the last month went, what is coming, the season, and honest ways to earn more.
+  // Everything is counted from the schedule itself; no guest names.
+  function workRestHtml() {
+    const m = me(); if (!m || isAdmin()) return ''; const td = today(), r = rules(), mine = db.tours.filter(t => live(t) && involves(t, m.id));
+    const past = mine.filter(t => t.date <= td && t.date > addDays(td, -30)), days = [...new Set(past.map(t => t.date))], run = days.reduce((x, d) => Math.max(x, streakAt(m.id, d)), 0);
+    const next = mine.filter(t => t.date > td && t.date <= addDays(td, 14)), busy = new Set(next.map(t => t.date)); let free = '';
+    for (let i = 1; i <= 14 && !free; i++) { const d = addDays(td, i); if (!busy.has(d)) free = d; }
+    const lines = [], mon = n => fmt(`2026-${String(n).padStart(2, '0')}-01`, { month: 'long' });
+    lines.push(['event', T('wr_last', { w: days.length, t: past.length, s: run }) + ' ' + T(run >= (r.maxStreak || 6) ? 'wr_adv_rest' : days.length < 8 ? 'wr_adv_quiet' : 'wr_adv_ok')]);
+    lines.push(['beach_access', next.length ? T('wr_next', { t: next.length, d: free ? fmtDay(free) : '—' }) : T('wr_next_none')]);
+    const mN = Number(td.slice(5, 7)), hi = mN >= r.seasonFrom && mN <= r.seasonTo;
+    lines.push(['sunny', hi ? T('wr_season_hi', { m: mon(r.seasonTo), n: r.maxSeasonBlock }) : T('wr_season_lo', { m: mon(r.seasonFrom) })]);
+    const pk = peaks().filter(p => p.to >= td).sort((x, y) => x.from.localeCompare(y.from))[0];
+    if (pk) lines.push(['star', T('wr_peak', { name: pk.name || T('wr_busy'), from: fmtDay(pk.from), to: fmtDay(pk.to) })]);
+    const cnt = {}, name = {}; db.tours.forEach(t => { if (!live(t) || t.date < addDays(td, -30) || t.date > addDays(td, 30)) return; const k = statKey(t.title); cnt[k] = (cnt[k] || 0) + 1; name[k] = name[k] || aliasOf(t.title); });
+    const top = Object.keys(cnt).filter(k => cnt[k] >= 2).sort((x, y) => cnt[y] - cnt[x]).slice(0, 3), known = new Set(mine.map(t => statKey(t.title))), fresh = top.find(k => !known.has(k));
+    if (top.length) lines.push(['payments', T('wr_trend', { list: top.map(k => `${name[k]} (${cnt[k]})`).join(', ') }) + (fresh && m.role !== 'driver' ? ' ' + T('wr_learn', { name: name[fresh] }) : '')]);
+    const open = openTours().filter(x => !x.mine).length;
+    return `<div class="card wrcard"><b>${T('wr_title')}</b>${lines.map(([ic, tx]) => `<span class="wrline">${msi(ic)}<span>${esc(tx)}</span></span>`).join('')}${open ? `<button class="banner small wrearn" data-act="wrtours"><span>${esc(T('wr_earn', { n: open, role: T('role_' + (m.role === 'driver' ? 'driver' : 'guide')).toLowerCase() }))}</span><b>${T('xc_see')} ›</b></button>` : ''}</div>`;
+  }
   function openTours() {
     const m = me(); if (!m || isAdmin()) return []; const role = m.role === 'driver' ? 'driver' : 'guide', td = today(), to = addDays(td, 30);
     return db.tours.filter(t => live(t) && t.date >= td && t.date <= to && !involves(t, m.id) && (role === 'guide' ? !t.guide_id : (!t.driver_id && kmOf(t.title) > 0 && (m.vehicle !== 'delica' || RIDE_4X4.test(t.title)))) && !offOn(m.id, t.date))
@@ -2824,6 +2845,7 @@
     pdedit(el) { const x = db.personal_dates.find(q => q.id === el.dataset.id); if (!x) return; state.modal = { type: 'pdate', draft: { ...x } }; renderModal(); requestAnimationFrame(() => wheelSync(true)); },
     tgskip() { const m = me(); run(() => S.save('profiles', { ...stripEmail(m), display: { ...((m.display && typeof m.display === 'object') ? m.display : {}), tgSkip: today() } }), T('saved')); },
     tasksec(el) { state.taskSec = el.dataset.v; render(); window.scrollTo(0, 0); },
+    wrtours() { state.taskSec = 'tours'; acts.viewNow ? acts.viewNow({ dataset: { v: 'tasks' } }) : (state.view = 'tasks', render()); window.scrollTo(0, 0); },
     tasknew(el) { const tour = el.dataset.tour ? db.tours.find(t => t.id === el.dataset.tour) : null; state.modal = { type: 'task', isNew: true, draft: { id: S.uid(), title: '', notes: '', due_date: tour ? tour.date : '', assignees: tour ? [tour.guide_id, tour.driver_id].filter(Boolean) : [], status: 'open', tour_id: tour ? tour.id : null } }; renderModal(); },
     taskedit(el) { const k = db.tasks.find(x => x.id === el.dataset.id); state.modal = { type: 'task', isNew: false, draft: { ...k, assignees: [...(k.assignees || [])] } }; renderModal(); },
     taskdel() { const id = state.modal.draft.id; confirmDo(T('confirm_remove'), T('remove'), () => S.remove('tasks', id)); },

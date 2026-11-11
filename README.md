@@ -355,3 +355,6 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 - The weekly money bar sits exactly on the bottom menu (no strip of the list between them), on any phone and text size.
 - Tour cards: the crew sits on the same line as the kind and guest count; one person who guides and drives is shown once.
 - "My next tour" shows how soon it is (Today, Tomorrow, in 3 days) on the right.
+
+## 3.32
+- Time off page, for guides and drivers: a "Work and rest" card counted from the schedule. Last 30 days (working days, tours, longest run) with one plain piece of advice; the next 14 days and the next free day; high or low season (Back office rules) and the next busy period (peak dates); the most booked tours now and one the person has not led yet; and "Earn more": how many tours on their free days still need a guide or driver, with a button to the list. No guest names.
