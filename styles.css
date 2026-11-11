@@ -1156,3 +1156,14 @@ details.bpmore[open]>summary{border-radius:14px 14px 0 0}
 /* badge names: a long word breaks with a hyphen at a syllable, never in the middle of nowhere */
 .mdl b,.mdl .nm,.medals .mdl>span{hyphens:auto;-webkit-hyphens:auto;overflow-wrap:break-word;word-break:normal}
 .mdl .mt{hyphens:auto;-webkit-hyphens:auto;overflow-wrap:break-word;word-break:normal;max-width:100%}
+
+/* 3.47 agenda: one long list by date, like a printed schedule */
+.agenda{padding:4px 16px}.agday{display:grid;grid-template-columns:150px minmax(0,1fr);gap:8px 16px;padding:12px 0;border-top:1px solid var(--line)}.agday:first-child{border-top:0}
+.agd{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;color:var(--ink-soft,var(--ink))}.agd b{display:inline-grid;place-items:center;min-width:28px;height:28px;border-radius:8px;font-size:var(--t-body)}.agday.tdy .agd b{background:var(--ink);color:var(--surface)}
+.agl{display:flex;flex-direction:column;gap:2px;min-width:0}
+.agr{display:grid;grid-template-columns:110px 12px minmax(0,1fr) minmax(120px,auto);align-items:center;gap:10px;padding:6px 8px;border:0;border-radius:8px;background:none;color:var(--ink);text-align:left;font:inherit;width:100%}
+button.agr{cursor:pointer}button.agr:hover{background:var(--surface2)}
+.agt{text-align:right;color:var(--muted);white-space:nowrap}.agdot{width:12px;height:12px;border-radius:50%}.agb{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.agb .msi{width:16px;height:16px;vertical-align:-3px}
+.agw{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;justify-content:flex-start}.agw .avatar{width:24px;height:24px;font-size:10px}.agr.cx{opacity:.6}
+.whosel{width:auto;max-width:220px;min-height:40px}.vseg button{min-width:64px}.daylist{max-width:760px}
+@media print{header.top,.tabs,.nav,.fab,.bar,.calhd,.banner,.subtop,#toasts,.demo,.vabar,.phstrip,.incbar,.homelinks,button.add{display:none!important}body{background:#fff}main{padding:0;max-width:none}.card,.agenda{border:0;box-shadow:none}.agr{break-inside:avoid}.only-wide{display:block!important}}

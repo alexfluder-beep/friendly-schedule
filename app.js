@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.46';
+  const APP_VERSION = '3.47';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -642,11 +642,27 @@
     return `<span class="smk tr ${need ? 'need' : ''} ${ts.length ? '' : 'none'}" ${ts.length ? `aria-label="${esc(T('sm_tours', { n: ts.length }))}"` : 'aria-hidden="true"'}><i></i>${ts.length > 1 || (!id && ts.length) ? `<span class="num">${ts.length}</span>` : ''}</span><span class="smk off ${mine ? 'me' : ''} ${mine || n ? '' : id ? 'gone' : 'none'}" ${mine || n ? `aria-label="${esc(mine ? T('off_mine') : T('sm_off', { n }))}"` : 'aria-hidden="true"'}>${msi('beach_access')}${!mine && n ? `<span class="num">${n}</span>` : ''}</span>`;
   }
   const stripLegend = own => `<div class="striplg muted small" aria-hidden="true"><span><i class="lgd"></i>${T(own ? 'sm_lg_my' : 'sm_lg_tours')}</span>${own || !isAdmin() ? '' : `<span><i class="lgd need"></i>${T('sm_lg_need')}</span>`}<span>${msi('beach_access')}${T(own ? 'sm_lg_myoff' : 'sm_lg_off')}</span></div>`;
+  // Whose tours the calendar shows: mine, one chosen person (office, computer view), or everyone.
+  const seenBy = () => (state.mine ? me().id : (isAdmin() && state.who) || '');
+  const seen = t => { const id = seenBy(); return !id || involves(t, id); };
+  // Agenda: one long list by date, like a printed schedule. Thirty days from the chosen date; days with nothing are left out.
+  function agendaHtml() {
+    const from = state.date, td = today(), who = seenBy(); let rows = '', any = 0;
+    for (let i = 0; i < 30; i++) { const d = addDays(from, i), ts = toursOnDay(d).filter(seen).sort((x, y) => (x.start_time || '').localeCompare(y.start_time || '')), offs = db.time_off.filter(o => o.status !== 'declined' && o.date_from <= d && o.date_to >= d && (!who || twin(o.user_id) === who)), cx = cancelledOnDay(d).filter(seen), ho = holidayOn(d);
+      if (!ts.length && !offs.length && !cx.length && d !== td) continue; any++;
+      const line = (time, dot, body, right, cls, attr) => `<${attr ? 'button' : 'div'} class="agr ${cls || ''}" ${attr || ''}><span class="agt num">${time}</span><i class="agdot" style="${dot}"></i><span class="agb">${body}</span><span class="agw">${right}</span></${attr ? 'button' : 'div'}>`;
+      const pe = id => { const x = person(id); return x ? `${avatar(id)}<span>${esc(x.name)}</span>` : ''; };
+      const list = [...offs.map(o => line('', 'background:var(--private)', `${msi(o.type === 'sick' ? 'sick' : 'beach_access')} ${T(o.type === 'sick' ? 'sick' : o.type === 'half' ? 'halfday' : 'dayoff')}${o.status === 'pending' ? ' · ' + T('pending') : ''}`, pe(o.user_id), 'off')),
+        ...ts.map(t => line(`${esc(t.start_time || '')}${t.end_time ? '–' + esc(t.end_time) : ''}`, `background:${esc(tourStyle(t.title).color)}`, `<b>${esc(t.title)}</b> <span class="muted num">${t.kind === 'group' ? `(${Number(t.pax) || 0}/${Number(t.capacity) || 0})` : acText(t)}</span>${!t.guide_id ? ` <span class="tag t-warn">${T('unassigned')}</span>` : ''}`, [t.guide_id, t.driver_id].filter(Boolean).map(pe).join(''), '', `data-act="tour" data-id="${t.id}"`)),
+        ...cx.map(t => line(esc(t.start_time || ''), 'background:var(--muted)', `<s>${esc(t.title)}</s> <span class="tag t-danger">${T('cancelled')}</span>`, '', 'cx', `data-act="tour" data-id="${t.id}"`))].join('') || `<div class="agr none"><span class="agt"></span><i></i><span class="agb muted">${T('no_tours')}</span><span></span></div>`;
+      rows += `<div class="agday ${d === td ? 'tdy' : ''}"><div class="agd"><b class="num">${D(d).getDate()}</b><span>${esc(fmt(d, { month: 'short', weekday: 'short' }))}</span>${ho ? `<span class="tag t-hol">${esc(trName(ho.name))}</span>` : ''}</div><div class="agl">${list}</div></div>`; }
+    return `<div class="card agenda">${rows || `<div class="empty">${T('ag_none')}</div>`}</div>`;
+  }
   function dayBlock(d) {
     const td = today(), ho = holidayOn(d), ev = eventOn(d);
-    const dts = toursOnDay(d).filter(t => (!state.mine || involves(t, me().id))).sort((x, y) => (x.start_time || '').localeCompare(y.start_time || ''));
+    const dts = toursOnDay(d).filter(seen).sort((x, y) => (x.start_time || '').localeCompare(y.start_time || ''));
     const offs = db.time_off.filter(o => o.status !== 'declined' && o.date_from <= d && o.date_to >= d && (!state.mine || o.user_id === me().id));
-    const cxs = cancelledOnDay(d).filter(t => !state.mine || involves(t, me().id));
+    const cxs = cancelledOnDay(d).filter(seen);
     return `<div class="dayhd" id="day-${d}" data-drop="${d}"><b class="${d === td ? 'tdy' : ''}">${esc(fmt(d, { weekday: 'long', day: 'numeric', month: 'long' }))}</b>${ho ? `<span class="tag t-hol">${msi('celebration')}${esc(trName(ho.name))}</span>` : ''}${pubHolOn(d) && !ho ? `<span class="tag t-pub" title="${esc(T('ph_info'))}">${msi('flag')}${esc(T(pubHolOn(d)))}</span>` : ''}${ev ? `<span class="tag t-group">${esc(trName(ev.name))}</span>` : ''}<span class="spacer"></span>${dts.length ? `<button class="lnk" data-act="summary" data-date="${d}">${T('day_summary')}</button>` : ''}${!isAdmin() && d > td && !offOn(me().id, d) ? `<button class="lnk" data-act="offnew" data-date="${d}">${T('ask_dayoff')}</button>` : ''}</div>
       ${dts.map(agendaCard).join('')}${cxs.map(agendaCard).join('')}${offs.map(o => `<div class="acard off ${o.type === 'sick' ? 'sick' : o.type === 'half' ? 'half' : ''}"><span class="ttl">${msi(o.type === 'sick' ? 'sick' : 'beach_access')}${T(o.type === 'sick' ? 'sick' : o.type === 'half' ? 'halfday' : 'dayoff')}${o.status === 'pending' ? ' · ' + T('pending') : ''}</span><span class="row">${avatar(o.user_id)}<span>${esc(pname(o.user_id))}</span></span></div>`).join('')}
       ${!dts.length && !offs.length && !cxs.length ? `<div class="muted small nothing" data-drop="${d}">${T('no_tours')}</div>` : ''}`;
@@ -808,20 +824,24 @@
   }
   function calendarHtml() {
     const wk = monday(state.date), days = [...Array(7)].map((_, i) => addDays(wk, i)), td = today();
-    const people = crew().filter(p => !state.mine || p.id === me().id);
-    const title = state.mode === 'week' ? (days[0].slice(0, 7) === days[6].slice(0, 7) ? `${D(days[0]).getDate()}–${fmt(days[6], { day: 'numeric', month: 'short', year: 'numeric' })}` : `${fmt(days[0], { day: 'numeric', month: 'short' })} – ${fmt(days[6], { day: 'numeric', month: 'short', year: 'numeric' })}`) : fmt(state.date, { month: 'long', year: 'numeric' });
-    if (!isAdmin() && state.mine && state.mode === 'week') return guideHomeHtml(days, title) + fabHtml();
+    const people = crew().filter(p => (!state.mine || p.id === me().id) && (state.mine || !isAdmin() || !state.who || p.id === state.who));
+    if (PHONE() && state.mode !== 'week' && state.mode !== 'month') state.mode = 'week';   // Day and Agenda are computer views; a phone already shows the week as a list
+    const title0 = state.mode === 'week' ? (days[0].slice(0, 7) === days[6].slice(0, 7) ? `${D(days[0]).getDate()}–${fmt(days[6], { day: 'numeric', month: 'short', year: 'numeric' })}` : `${fmt(days[0], { day: 'numeric', month: 'short' })} – ${fmt(days[6], { day: 'numeric', month: 'short', year: 'numeric' })}`) : fmt(state.date, { month: 'long', year: 'numeric' });
+    const title = state.mode === 'day' ? fmt(state.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : state.mode === 'agenda' ? `${fmtDay(state.date)} – ${fmtDay(addDays(state.date, 29))}` : title0;
+    if (!isAdmin() && state.mine && state.mode === 'week') return guideHomeHtml(days, title0) + fabHtml();
     let h = `${setupCard(true)}${window.matchMedia('(max-width:760px)').matches ? installCardHtml(false) : ''}${greetHtml()}${nextHtml()}${fabHtml()}
       ${!PHONE() ? '' : `<div class="calhd"><button class="calttl" data-act="mode" data-m="${state.mode === 'month' ? 'week' : 'month'}" aria-expanded="${state.mode === 'month'}" aria-label="${T(state.mode === 'month' ? 'week' : 'month')}"><b>${esc(fmt(state.date, { month: 'long' }))}</b> <span class="yr num">${state.date.slice(0, 4)}</span>${msi(state.mode === 'month' ? 'keyboard_arrow_up' : 'keyboard_arrow_down')}</button><label class="jump" title="${T('pick_date')}">${ico('cal')}<input type="date" id="jump" data-ch="jump" value="${esc(state.date)}" aria-label="${T('pick_date')}"></label><span class="spacer"></span>
         ${monday(state.date) !== monday(td) ? `<button class="btn sm calnow" data-act="today">${T('today')}</button>` : ''}${state.mode === 'month' ? '' : `<button class="iconbtn" data-act="nav" data-d="-1" aria-label="${T('prev')}">‹</button><button class="iconbtn" data-act="nav" data-d="1" aria-label="${T('next')}">›</button>`}
         <button class="whochip ${state.mine ? '' : 'txt'}" data-act="mine" data-v="${state.mine ? '0' : '1'}" aria-label="${T(state.mine ? 'mine' : 'team')}">${state.mine ? avatar(me().id) : `<span>${T('who_all')}</span>`}</button></div>`}
       ${PHONE() ? '' : `<div class="bar">
-      <div class="seg"><button data-act="mode" data-m="week" aria-pressed="${state.mode === 'week'}">${T('week')}</button><button data-act="mode" data-m="month" aria-pressed="${state.mode === 'month'}">${T('month')}</button></div>
+      <div class="seg vseg">${[['day', 'D'], ['week', 'W'], ['month', 'M'], ['agenda', 'A']].map(([m, k]) => `<button data-act="mode" data-m="${m}" aria-pressed="${state.mode === m}" title="${T('v_key', { k })}">${T('v_' + m)}</button>`).join('')}</div>
       <div class="seg"><button data-act="mine" data-v="0" aria-pressed="${!state.mine}">${T('team')}</button><button data-act="mine" data-v="1" aria-pressed="${!!state.mine}">${T('mine')}</button></div>
-      <span class="spacer"></span><button class="btn only-wide" data-act="summary">${T('day_summary')}</button>${isAdmin() ? `<button class="btn primary only-wide" data-act="newtour">+ ${T('tour')}</button><button class="btn only-wide" data-act="offnew">+ ${T('dayoff')}</button>` : ''}<span class="only-wide">${helpBtn()}</span></div>${helpBox('calendar')}
+      ${isAdmin() && !state.mine ? `<select class="inp whosel" data-ch="who" aria-label="${T('v_who')}"><option value="">${T('v_allteam', { n: crew().length })}</option>${crew().map(p => opt(p.id, p.name, state.who || '')).join('')}</select>` : ''}<span class="spacer"></span><button class="btn only-wide" data-act="print">${T('v_print')}</button><button class="btn only-wide" data-act="summary">${T('day_summary')}</button>${isAdmin() ? `<button class="btn primary only-wide" data-act="newtour">+ ${T('tour')}</button><button class="btn only-wide" data-act="offnew">+ ${T('dayoff')}</button>` : ''}<span class="only-wide">${helpBtn()}</span></div>${helpBox('calendar')}
       <div class="bar"><h2>${esc(title)}</h2><label class="jump" title="${T('pick_date')}">${ico('cal')}<input type="date" id="jump" data-ch="jump" value="${esc(state.date)}" aria-label="${T('pick_date')}"></label><span class="spacer"></span><div class="seg"><button data-act="nav" data-d="-1" aria-label="${T('prev')}">‹</button><button data-act="today">${T('today')}</button><button data-act="nav" data-d="1" aria-label="${T('next')}">›</button></div></div>`}`;
     const pFrom_To = [state.mode === 'month' ? state.date.slice(0, 8) + '01' : days[0], state.mode === 'month' ? addDays(addDays(state.date.slice(0, 8) + '01', 32).slice(0, 8) + '01', -1) : days[6]];
     const pstats = !(isAdmin() && !state.mine) ? '' : `<div class="only-wide">${periodStatsHtml(pFrom_To[0], pFrom_To[1])}</div>${incBarHtml(pFrom_To[0], pFrom_To[1])}`;
+    if (state.mode === 'agenda') return h + agendaHtml() + photoStripHtml();
+    if (state.mode === 'day') return h + `<div class="list daylist">${dayBlock(state.date)}</div>` + photoStripHtml();
     if (state.mode === 'month') return h + monthHtml() + photoStripHtml() + pstats;
     // wide: team grid
     const hd = days.map(d => { const ho = holidayOn(d), ev = eventOn(d); return `<div class="hd ${d === td ? 'today' : ''}">${esc(fmtDay(d))}${ho ? `<span class="hol">${esc(trName(ho.name))}</span>` : ''}${ev ? `<span class="hol ev">${esc(trName(ev.name))}</span>` : ''}</div>`; }).join('');
@@ -833,7 +853,7 @@
     }).join('');
     const un = days.some(d => toursOnDay(d).some(t => !t.guide_id && !t.driver_id));
     h += `<div class="gridwrap only-wide"><div class="wgrid"><div class="hd">${T('team')}</div>${hd}
-      ${un && !state.mine ? rowFor(T('unassigned'), '', null, t => !t.guide_id && !t.driver_id) : ''}
+      ${un && !state.mine && !(isAdmin() && state.who) ? rowFor(T('unassigned'), '', null, t => !t.guide_id && !t.driver_id) : ''}
       ${people.map(p => rowFor(p.name, T('role_' + p.role), p.id, t => involves(t, p.id))).join('')}</div></div>`;
     // phone: day strip + agenda
     const sel = state.date;
@@ -849,7 +869,7 @@
     let cells = '';
     for (let i = 0; i < 42; i++) {
       const d = addDays(start, i); if (i % 7 === 0 && i >= 28 && d.slice(0, 7) !== mo) break;
-      const all = toursOnDay(d), ts = state.mine ? all.filter(t => involves(t, my)) : all, myOff = offOn(my, d), ho = holidayOn(d);
+      const all = toursOnDay(d), ts = all.filter(seen), myOff = offOn(my, d), ho = holidayOn(d);
       cells += `<button class="${d.slice(0, 7) !== mo ? 'out' : ''} ${d === td ? 'today' : ''} ${d === sel ? 'sel' : ''} ${offCls(myOff)} ${ho ? 'hol' : ''} ${pubHolOn(d) ? 'pub' : ''}" title="${esc(pubHolOn(d) ? T(pubHolOn(d)) : '')}" data-act="pickday" data-date="${d}" data-drop="${d}" aria-pressed="${d === sel}" aria-label="${esc(fmtDay(d))}: ${ts.length} ${T('tours_n')}"><b class="num">${D(d).getDate()}</b><span class="dots">${ts.slice(0, 4).map(t => `<i style="background:${esc(tourStyle(t.title).color)}"></i>`).join('')}${ts.length > 4 ? `<span class="num">+${ts.length - 4}</span>` : ''}</span><span class="mrows">${ts.slice().sort((x, y) => (x.start_time || '').localeCompare(y.start_time || '')).slice(0, 4).map(t => `<span class="mrow${live(t) ? '' : ' cx'}" data-act="tour" data-id="${t.id}"><i style="background:${esc((person(t.guide_id) || {}).color || tourStyle(t.title).color)}"></i><span class="num">${esc(t.start_time || '')}</span> ${esc(t.title)} <span class="num muted">${paxText(t)}</span></span>`).join('')}${ts.length > 4 ? `<span class="mrow more">${T('more_n', { n: ts.length - 4 })}</span>` : ''}</span>${offMark(d)}</button>`;
     }
     const legend = `<div class="row small muted lgrow"><span class="lg"><i class="dotk"></i>${T('lg_tour')}</span><span class="lg"><i class="sq myoff"></i>${T('lg_myoff')}</span><span class="lg"><i class="sq myoff mysick"></i>${T('sick')}</span><span class="lg"><i class="sq hol"></i>${T('holidays')}</span><span class="lg"><i class="sq pub"></i>${T('ph_legend')}</span></div>`;
@@ -2151,6 +2171,7 @@
       const rs = state.restore;
       h += `<div class="card f"><b>${T('bk_safe_title')}</b><ul class="small"><li>${T('bk_safe1')}</li><li>${T('bk_safe2')}</li><li>${T('bk_safe3')}</li><li>${T('bk_safe4')}</li></ul></div>`;
       h += `<div class="card f"><b>${T('rs_title')}</b><span class="muted small">${T('rs_text')}</span><input class="inp" type="file" accept=".json,application/json" data-ch="restorefile">${rs ? `<b>${T('rs_found', { date: rs.exported ? fmtDay(rs.exported.slice(0, 10)) : '?', tours: (rs.data.tours || []).length, bookings: (rs.data.bookings || []).length, clients: (rs.data.clients || []).length })}</b><div class="bar"><button class="btn" data-act="rsno">${T('close')}</button><button class="btn primary" data-act="rsgo">${T('rs_go')}</button></div>` : ''}</div>`;
+      h += `<div class="card f"><b>${T('oc_title')}</b><span class="muted small">${T('oc_text')}</span>${window.showDirectoryPicker ? (OFFDIR.handle ? `<span class="small">${T('oc_folder', { name: esc(OFFDIR.handle.name) })} ${OFFDIR.ok ? `<span class="tag t-ok">${T('oc_on')}</span>` : `<span class="tag t-warn">${T('oc_ask')}</span>`}${OFFDIR.at ? ` <span class="muted num">${T('oc_last', { time: hm(OFFDIR.at) })}</span>` : ''}</span><div class="bar">${OFFDIR.ok ? '' : `<button class="btn primary" data-act="offdirallow">${T('oc_allow')}</button>`}<button class="btn" data-act="offdirpick">${T('oc_change')}</button><button class="btn" data-act="offdiroff">${T('oc_stop')}</button><button class="btn" data-act="offcopynow">${T('oc_now')}</button></div>` : `<div class="bar"><button class="btn primary" data-act="offdirpick">${T('oc_pick')}</button><button class="btn" data-act="offcopynow">${T('oc_now')}</button></div>`) : `<span class="small">${T('oc_nobrowser')}</span><div class="bar"><button class="btn" data-act="offcopynow">${T('oc_now')}</button></div>`}<span class="muted small">${T('oc_private')}</span></div>`;
       h += `<div class="card"><b>${T('bk_title')}</b><p class="muted small">${T('bk_text')}</p><p class="small">${lastBackup() ? T('bk_last', { date: fmtDay(lastBackup().slice(0, 10)) }) : T('bk_never')}</p><div class="bar"><button class="btn primary" data-act="backup">${T('bk_download')}</button>${S.mode === 'demo' ? `<button class="btn danger" data-act="demoreset">${T('demo_reset')}</button>` : ''}</div></div>`;
     }
     return h;
@@ -2841,11 +2862,23 @@
   }
   // Delivery notices: saved on the phone while offline, and sent when the internet is back.
   let lastPending = 0;
+  // Offline copy (office, Chrome or Edge on a computer): while changes wait for the internet, one file in a folder the owner chose holds the
+  // whole schedule and the waiting changes. Put the folder inside Google Drive and Drive uploads the file by itself when the connection returns.
+  // It is a safety copy for people to keep; the app still sends the changes itself. The folder must stay private: the file has guest details.
+  const OFFDIR = { handle: null, ok: false, last: -1, at: '', timer: 0 }, OFFNAME = 'friendly-schedule-offline-copy.json';
+  const offlineJson = () => JSON.stringify({ exported: new Date().toISOString(), app: APP_VERSION, note: 'Safety copy made while changes were waiting to be sent. "waiting" lists the changes not sent yet.', waiting: S.waiting || [], ...db }, null, 1);
+  async function offlineCopy(force) {
+    if (!OFFDIR.handle || !isAdmin()) return false;
+    try { if (!force && (await OFFDIR.handle.queryPermission({ mode: 'readwrite' })) !== 'granted') { OFFDIR.ok = false; return false; }
+      const f = await OFFDIR.handle.getFileHandle(OFFNAME, { create: true }), w = await f.createWritable(); await w.write(offlineJson()); await w.close(); OFFDIR.ok = true; OFFDIR.at = new Date().toISOString(); return true;
+    } catch (e) { OFFDIR.ok = false; return false; }
+  }
+  function offlineCopySoon(n) { if (!OFFDIR.handle || n === OFFDIR.last) return; OFFDIR.last = n; clearTimeout(OFFDIR.timer); OFFDIR.timer = setTimeout(async () => { const was = OFFDIR.ok, done = await offlineCopy(false); if (!done && was !== false && n > 0) toast(T('oc_need')); if (state.view === 'admin' && state.adminTab === 'backup') render(); }, 1500); }
   let badgeN = -1;
   function appBadge(n) { if (n === badgeN) return; badgeN = n; try { if (n && navigator.setAppBadge) navigator.setAppBadge(n).catch(() => {}); else if (!n && navigator.clearAppBadge) navigator.clearAppBadge().catch(() => {}); } catch (e) { /* not supported */ } }
   window.addEventListener('beforeunload', ev => { if ((S.pending || 0) > 0 && !PHONE()) { ev.preventDefault(); ev.returnValue = ''; } });
   try { if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', ev => { if (ev.data && ev.data.type === 'fs-sync' && S.offline && navigator.onLine) S.sync(); }); } catch (e) { /* no helper here */ }
-  function syncNotice() { const n = S.pending || 0; appBadge(n); if (n > lastPending && S.offline) toast(T('st_saved')); else if (lastPending > 0 && n === 0 && !S.offline) toast(T('st_sent')); lastPending = n; }
+  function syncNotice() { const n = S.pending || 0; appBadge(n); if (n > 0 || OFFDIR.last > 0) offlineCopySoon(n); if (n > lastPending && S.offline) toast(T('st_saved')); else if (lastPending > 0 && n === 0 && !S.offline) toast(T('st_sent')); lastPending = n; }
   // ---------- test period: ask people to report anything odd ----------
   // Maintenance: the admin switches it on in Rules (or in config.js when the database itself is down).
   const maint = () => { const s = (db.settings.find(x => x.id === 'maintenance') || {}).value || {}; return CFG.maintenance ? { on: true, text: String(CFG.maintenance) } : s; };
@@ -2905,7 +2938,7 @@
     prelangb(el) { S.ls.set('fs-lang', el.dataset.v); render(); },
     view(el) { const from = state.view === 'admin' && state.adminTab === 'clients' ? 'clients' : state.view; slideTo(VIEW_ORDER.indexOf(from), VIEW_ORDER.indexOf(el.dataset.v), () => acts.viewNow(el)); },
     viewNow(el) { state.view = el.dataset.v; if (state.view === 'clients') { state.view = 'admin'; state.adminTab = 'clients'; state.q = ''; } else if (state.view === 'admin') state.adminTab = null; try { history.replaceState(null, '', '#' + state.view); } catch (e) { location.hash = state.view; } render(); window.scrollTo(0, 0); },
-    nav(el) { const n = Number(el.dataset.d); if (state.mode === 'week') state.date = addDays(state.date, 7 * n); else { const d = D(state.date); d.setDate(1); d.setMonth(d.getMonth() + n); state.date = iso(d); } render(); document.querySelectorAll('main .mgrid, main .gridwrap, main .list').forEach(e => { e.classList.remove('sl-n', 'sl-p'); void e.offsetWidth; e.classList.add(n > 0 ? 'sl-n' : 'sl-p'); }); },
+    nav(el) { const n = Number(el.dataset.d); if (state.mode === 'week') state.date = addDays(state.date, 7 * n); else if (state.mode === 'day') state.date = addDays(state.date, n); else if (state.mode === 'agenda') state.date = addDays(state.date, 28 * n); else { const d = D(state.date); d.setDate(1); d.setMonth(d.getMonth() + n); state.date = iso(d); } render(); document.querySelectorAll('main .mgrid, main .gridwrap, main .list').forEach(e => { e.classList.remove('sl-n', 'sl-p'); void e.offsetWidth; e.classList.add(n > 0 ? 'sl-n' : 'sl-p'); }); },
     today() { state.date = today(); render(); toToday(); },
     mode(el) { state.mode = el.dataset.m; render(); },
     mine(el) { state.mine = el.dataset.v === '1'; render(); },
@@ -3026,6 +3059,7 @@
     wsame(el) { const box = el.closest('.wweek'), rows = [...box.querySelectorAll('.wrow')], src = rows.find(r => r.querySelector('[type=checkbox]').checked && r.querySelector('[name^=wf]').value) || rows[0], f = src.querySelector('[name^=wf]').value, t = src.querySelector('[name^=wt]').value; rows.forEach(r => { r.querySelector('[name^=wf]').value = f; r.querySelector('[name^=wt]').value = t; r.querySelectorAll("input").forEach(x => dirty.add(x)); }); qsaveOn(); },
     showpw() { state.showPw = !state.showPw; render(); },
     tcday(el) { const d = el.dataset.date, why = el.dataset.why; if (why) { state.tcWhy = `${fmtDay(d)}: ${T('tc_no')} (${why})`; render(); } else { state.tcWhy = ''; acts.offnew({ dataset: { date: d } }); } },
+    print() { window.print(); },
     usf(el) { state.usageF = { ...(state.usageF || {}), [el.dataset.k]: el.dataset.v }; render(); },
     refresh() { if (state.refreshing) return; state.refreshing = true; render(); (async () => { try { if (S.offline) await S.sync(); else await S.pulse(); } catch (e) { console.error(e); } state.refreshing = false; render(); if (!S.warming) toast(T(S.offline ? 'rf_off' : 'up_to_date')); })(); },
     pvcount() { run(async () => { state.staleN = await S.staleGuests(pv().keepMonths); }); },
@@ -3145,6 +3179,10 @@
       const blob = new Blob([JSON.stringify({ exported: new Date().toISOString(), app: APP_VERSION, ...db }, null, 1)], { type: 'application/json' });
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `friendly-schedule-backup-${today()}.json`; document.body.appendChild(a); a.click(); a.remove();
     },
+    async offdirpick() { try { const h = await window.showDirectoryPicker({ mode: 'readwrite', id: 'fs-offline' }); await S.remember('offdir', h); OFFDIR.handle = h; OFFDIR.ok = true; await offlineCopy(true); toast(T('oc_set', { name: h.name })); } catch (e) { if (e && e.name !== 'AbortError') toast(T('oc_fail')); } render(); },
+    async offdirallow() { try { OFFDIR.ok = (await OFFDIR.handle.requestPermission({ mode: 'readwrite' })) === 'granted'; if (OFFDIR.ok) await offlineCopy(true); } catch (e) { OFFDIR.ok = false; } render(); },
+    async offdiroff() { await S.remember('offdir', null); OFFDIR.handle = null; OFFDIR.ok = false; render(); },
+    offcopynow() { const blob = new Blob([offlineJson()], { type: 'application/json' }), a2 = document.createElement('a'); a2.href = URL.createObjectURL(blob); a2.download = OFFNAME; document.body.appendChild(a2); a2.click(); a2.remove(); },
     demoreset() { confirmDo(T('demo_reset') + '?', T('demo_reset'), async () => { S.demoReset(); state.imp = null; }); },
     push() { enableNotifications(); },
     pushoff() { pushOff(); },
@@ -3158,6 +3196,7 @@
     gckind(el) { const s2 = state.gcOff || (state.gcOff = new Set()); el.checked ? s2.delete(el.dataset.v) : s2.add(el.dataset.v); render(); },
     mytour(el) { const m = me(), list = catalog().filter(c => c.id), base = (m.skills || []).length ? m.skills : list.map(c => String(c.id)), st = state.myTours || new Set(base); el.checked ? st.add(el.dataset.v) : st.delete(el.dataset.v); state.myTours = st; render(); },
     jump(el) { if (el.value) { state.date = el.value; render(); } },
+    who(el) { state.who = el.value || ''; render(); },
     cattitle(el) {
       const m = state.modal, c = catFind(el.value); if (!m || !m.draft || !c || m.catApplied === c.title) return; m.catApplied = c.title;
       const d = m.draft; d.title = c.title; d.kind = KINDS.includes(c.kind) ? c.kind : 'private'; if (c.start) d.start_time = c.start; d.end_time = c.end || ''; d.capacity = c.capacity || 0;
@@ -3282,6 +3321,9 @@
     const fn = forms[f.dataset.form]; if (fn) busyWhile(ev.submitter || f.querySelector('button.primary, button:not([type=button])'), run(() => fn(new FormData(f), f)));
   });
   document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && state.modal) guardClose(closeModal); });
+  // Calendar keys on a computer, as in Setmore: D day, W week, M month, A agenda, T whole team / mine. Never while typing or with a sheet open.
+  document.addEventListener('keydown', ev => { if (ev.ctrlKey || ev.metaKey || ev.altKey || state.modal || state.view !== 'calendar' || PHONE() || !me() || /^(INPUT|TEXTAREA|SELECT)$/.test((ev.target && ev.target.tagName) || '') || (ev.target && ev.target.isContentEditable)) return;
+    const k = String(ev.key || '').toLowerCase(), m = { d: 'day', w: 'week', m: 'month', a: 'agenda' }[k]; if (m) { state.mode = m; render(); } else if (k === 't') { state.mine = !state.mine; render(); } });
   try { window.matchMedia('(max-width:760px)').addEventListener('change', () => render()); } catch (e) { /* old browsers keep the layout they opened with */ }
   window.addEventListener('hashchange', () => { const v = location.hash.slice(1); if (['calendar', 'timeoff', 'tasks', 'admin', 'me'].includes(v) && v !== state.view) { state.view = v; render(); } });
 
@@ -3409,6 +3451,7 @@
     const v = location.hash.slice(1); if (['calendar', 'timeoff', 'tasks', 'admin', 'me'].includes(v)) state.view = v;
     try { await S.init(); } catch (e) { console.error(e); logErr('offline', `${errCode(e)} App could not start: ${(e && e.message) || e}`, navigator.onLine ? 'phone was online' : 'phone had no internet'); $('#app').innerHTML = `<main><div class="banner f"><b>${esc(T('err_connect'))}</b><span class="small">${esc(errCode(e) + ': ' + T('ec_' + errCode(e)))}</span><span class="small">${esc(T('err_retry'))}</span><button class="btn primary" onclick="location.reload()">${esc(T('refresh'))}</button></div></main>`; setTimeout(() => { if (navigator.onLine) location.reload(); }, 20000); return; }
     saveHello(); document.addEventListener('visibilitychange', () => { if (document.hidden) saveHello(); });
+    if (S.recall && window.showDirectoryPicker && isAdmin()) S.recall('offdir').then(async h => { if (h && h.queryPermission) { OFFDIR.handle = h; OFFDIR.ok = (await h.queryPermission({ mode: 'readwrite' })) === 'granted'; } }).catch(() => {});
     if (S.remember) S.remember('lang', lang()); if ((S.pending || 0) > 0) setTimeout(() => toast(T('st_waiting_open', { n: S.pending || 0 })), 600);
     if (S.warming) { let warm = true; S.onChange((t, r, type) => { if (warm && type === 'STATE' && !S.warming) { warm = false; PH.asked.clear(); displayFromAccount(); saveHello(); weekCheck(); } }); }
     if (S.mode === 'demo') window.__test = { pageFor: (title, kind) => { const u = pageFor({ title, kind }), m = /\/activity\/(\d+)/.exec(u); return m ? { id: Number(m[1]) } : null; } };          // for the automatic tests only

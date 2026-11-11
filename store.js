@@ -256,7 +256,8 @@
       } catch (e) { store.offline = true; emit(null, null, 'STATE', true); }
       finally { store.syncing = false; if (!store.offline && me && outbox.length) setTimeout(() => store.sync(), 50); }   // a change queued while the fresh data was loading goes out now
     },
-    remember(k, v) { if (mode === 'supabase') idb.set(k, v); },   // small notes the app's helper reads when the app is closed (the language)
+    remember(k, v) { return idb.set(k, v); }, recall(k) { return idb.get(k); },   // small notes kept on the device (the language for the helper, the folder for the offline copy)
+    get waiting() { return outbox.slice(); },                                          // changes not sent yet, for the offline copy
     demoViewAs(id) { me = db.profiles.find(p => p.id === id) || me; ls.set('fs-demo-as', me.id); emit('profiles', me, 'UPDATE'); },
     demoReset() { ls.del(DEMO_KEY); ls.del('fs-demo-as'); TABLES.forEach(t => db[t] = []); seedDemo(); me = db.profiles[0]; emit('profiles', me, 'UPDATE'); },
     async signIn(email, password) { if (mode === 'demo') { ls.del('fs-demo-out'); me = db.profiles.find(p => p.role === 'admin' && p.active !== false) || db.profiles[0]; return; } const { data, error } = await sb.auth.signInWithPassword({ email, password }); if (error) throw error; await afterLogin(data.user); },
