@@ -1107,3 +1107,10 @@ html[data-accent="amber"]{--accent:#f0901e;--accent-ink:#20251f;--accent-soft:#f
 
 /* 3.41 a photo that is still loading shows a quiet camera, not an empty square */
 .wait{display:grid;place-items:center;color:var(--muted)}.wait .msi{width:40%;max-width:28px;height:auto;opacity:.5}
+
+/* 3.42 greeting line on an ordinary day: no card, a small sun or moon, the name and one short phrase */
+.hi{display:flex;align-items:center;gap:10px;padding:2px 2px 0}.hi svg{width:36px;height:36px;flex:none}.hi .grow-l{flex-direction:column;align-items:flex-start;gap:1px;min-width:0}.hi b{font-size:1.05rem}
+.hi .by{font-style:normal;white-space:nowrap;opacity:.8}.hi .by::before{content:"· "}
+
+/* 3.42 bottom bar: every icon is the same line drawing in the same 20px box, so the four labels sit on one line */
+@media (max-width:760px){.tabic{width:20px;height:20px;align-items:center;justify-content:center}.tabic>svg{width:20px;height:20px}.tabs button{justify-content:center}.tabs button>span:last-child{line-height:1.2}}

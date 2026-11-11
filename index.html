@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Schedule">
-<style>:root{padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}[hidden]{display:none!important}.hello{min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:24px}.hello b{font-size:26px;font-weight:700;letter-spacing:-.01em}</style>
+<style>:root{padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}[hidden]{display:none!important}.hello{min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:24px}.hello b{font-size:26px;font-weight:700;letter-spacing:-.01em}.hello span{white-space:pre-line;max-width:30ch;line-height:1.45}</style>
 <link rel="preload" href="app.js" as="script">
 <link rel="stylesheet" href="styles.css">
 </head>
@@ -24,8 +24,9 @@
     var h = JSON.parse(localStorage.getItem('fs-hello') || '{}'), hr = new Date().getHours(), part = hr >= 5 && hr < 12 ? 0 : hr < 18 ? 1 : hr < 23 ? 2 : 3;
     var L = { en: ['Good morning', 'Good afternoon', 'Good evening', 'Good night', 'Opening your schedule…'], ru: ['Доброе утро', 'Добрый день', 'Добрый вечер', 'Доброй ночи', 'Открываю расписание…'], ka: ['დილა მშვიდობისა', 'გამარჯობა', 'საღამო მშვიდობისა', 'ღამე მშვიდობისა', 'განრიგი იხსნება…'] }[h.l] || null;
     if (!L) L = ['Good morning', 'Good afternoon', 'Good evening', 'Good night', 'Opening your schedule…'];
-    document.getElementById('hello-t').textContent = L[part] + (h.n ? ', ' + h.n : '');
-    document.getElementById('hello-s').textContent = L[4];
+    var now = new Date(), key = now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2) + '-' + ('0' + now.getDate()).slice(-2), day = (h.d || {})[key] || {};
+    document.getElementById('hello-t').textContent = day.h || (L[part] + (h.n ? ', ' + h.n : ''));
+    document.getElementById('hello-s').textContent = day.s || (day.p && day.p[part > 2 ? 2 : part]) || L[4];
     var O = '#4a3526', S = 'stroke="' + O + '" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"';
     var face = '<circle cx="19.5" cy="23" r="1.5" fill="' + O + '"/><circle cx="28.5" cy="23" r="1.5" fill="' + O + '"/><path d="M21.3 26q2.7 3.200 5.400 0" fill="none" stroke="' + O + '" stroke-width="1.8" stroke-linecap="round"/><circle cx="16.900" cy="25.600" r="1.700" fill="#ff9aa2" opacity=".75"/><circle cx="31.100" cy="25.600" r="1.700" fill="#ff9aa2" opacity=".75"/>';
     var sun = '<path d="M24 3v6M24 39v6M3 24h6M39 24h6M9.200 9.200l4.200 4.200M34.600 34.600l4.200 4.200M9.200 38.800l4.200-4.200M34.600 13.400l4.200-4.200" stroke="#ffb26b" stroke-width="3.400" stroke-linecap="round"/><circle cx="24" cy="24" r="12" fill="#ffd166" ' + S + '/>' + face;
@@ -38,6 +39,7 @@
 <script src="catalog.js" defer></script>
 <script src="icons.js" defer></script>
 <script src="cute.js" defer></script>
+<script src="phrases.js" defer></script>
 <script src="i18n.js" defer></script>
 <script src="store.js" defer></script>
 <script src="app.js" defer></script>

@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.41';
+  const APP_VERSION = '3.42';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -307,8 +307,8 @@
   const mapsLink = a => 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(a);
   const waLink = (phone, text) => 'https://wa.me/' + String(phone || '').replace(/\D/g, '') + (text ? '?text=' + encodeURIComponent(text) : '');
   const ICON = { wa: 'WhatsApp', call: '', copy: '' };
-  const NAVIC = { calendar: 'cal', timeoff: 'sun', tasks: 'check', clients: 'user', admin: 'grid', me: 'user' };
-  const IC = { tg: '<path d="M21 3 3 10.5l6.5 2.5L18 6l-6.5 8.5L18 21z"/>', sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>', check: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>', user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>', grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>', wa: '<path d="M21 11.5a8.4 8.4 0 0 1-12.6 7.3L3 20l1.3-5.2A8.4 8.4 0 1 1 21 11.5z"/>', call: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/>', mail: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/>', copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>', pin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/>', cal: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>' };
+  const NAVIC = { calendar: 'cal', timeoff: 'umb', tasks: 'check', clients: 'user', admin: 'grid', me: 'user' };
+  const IC = { umb: '<path d="M4.64 17.36A9 9 0 0 1 17.36 4.64Z"/><path d="M11 11l8.500 8.500"/><path d="M15 21.500h6.500"/>', tg: '<path d="M21 3 3 10.5l6.5 2.5L18 6l-6.5 8.5L18 21z"/>', sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>', check: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>', user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>', grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>', wa: '<path d="M21 11.5a8.4 8.4 0 0 1-12.6 7.3L3 20l1.3-5.2A8.4 8.4 0 1 1 21 11.5z"/>', call: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/>', mail: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/>', copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>', pin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/>', cal: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>' };
   IC.guide = '<path d="M6 21V4"/><path d="M6 4h11l-2.5 4 2.5 4H6"/>'; IC.driver = '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/><path d="M12 14v7M10.2 11.2 3.6 8.8M13.8 11.2l6.6-2.4"/>';
   IC.share = '<path d="M12 15V3"/><path d="M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/>';
   IC.cloud = '<path d="M7 18a4 4 0 0 1-.5-8 5.5 5.5 0 0 1 10.6 1.2A3.5 3.5 0 0 1 17 18z"/>'; IC.cloudsun = '<circle cx="8" cy="8" r="3"/><path d="M8 2v1.5M2 8h1.5M3.8 3.8l1 1M12.2 3.8l-1 1"/><path d="M10 20a3.5 3.5 0 0 1-.3-7 4.8 4.8 0 0 1 9.2 1A3 3 0 0 1 18.5 20z"/>'; IC.rain = '<path d="M7 15a4 4 0 0 1-.5-8 5.5 5.5 0 0 1 10.6 1.2A3.5 3.5 0 0 1 17 15z"/><path d="M8 18l-1 3M12 18l-1 3M16 18l-1 3"/>'; IC.snow = '<path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9"/>';
@@ -2557,13 +2557,40 @@
   }
   const photosOn = day => db.photos.filter(p => p.day === day).sort((x, y) => likesN(y) - likesN(x) || String(x.created_at || '').localeCompare(String(y.created_at || '')));
   const myPhoto = day => db.photos.find(p => p.day === day && twin(p.user_id) === me().id);
-  // A kind word on the right day: the person's own birthday or anniversary (from their special dates), or a holiday from the team calendar.
+  // The greeting line. Ordinary day: "Good morning, <name>" and one short phrase (phrases.js). A special day gets a card:
+  // own birthday or anniversary (special dates), a holiday from the team calendar, a sick day (get well) or an approved day off.
+  const hashN = x => { let h = 7; for (const c of String(x)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; };
+  const dayPart = () => { const h = new Date().getHours(); return h >= 5 && h < 12 ? 0 : h < 18 ? 1 : h < 23 ? 2 : 3; };
+  const firstName = m => String((m && m.name) || '').replace(/\(.*?\)/g, '').trim().split(/\s+/)[0] || '';
+  const hiText = (k, name) => T(k, { name }).replace(/[,،]\s*$/, '').replace(/,\s*!/, '!');
+  function phraseFor(day, part) {
+    const all = window.PHRASES || {}, P = all[lang()] || all.en; if (!P || !me()) return null;
+    const n = hashN(day + me().id), list = part === 0 ? P.am : part >= 2 ? P.pm : (n % 2 ? P.joke : P.geo), x = list[n % list.length];
+    return Array.isArray(x) ? { t: x[0], by: x[1] } : { t: x, by: '' };
+  }
+  function specialOn(day) {
+    const m = me(); if (!m) return null; const md = day.slice(5);
+    const mine = db.personal_dates.filter(d => twin(d.user_id) === m.id && (d.yearly ? String(d.date).slice(5) === md : d.date === day)).map(d => pdKind(d.title));
+    const k = mine.includes('birthday') ? 'birthday' : mine.includes('anniversary') ? 'anniversary' : ''; if (k) return { k, art: 'gift' };
+    const o = offOn(m.id, day); if (o && o.type === 'sick') return { k: 'sick', art: 'cup' };
+    const h = holidayOn(day); if (h) return { k: 'holiday', art: 'star', name: h.name };
+    return o && o.status === 'approved' && o.type !== 'half' ? { k: 'off', art: 'sofa' } : null;
+  }
+  const specialText = sp => [hiText('gr_' + sp.k, sp.k === 'holiday' ? sp.name : firstName(me())), T('gr_' + sp.k + '_t')];
   function greetHtml() {
-    const m = me(); if (!m || !m.active || state.viewAs) return ''; const td = today(), md = td.slice(5), first = String(m.name || '').replace(/\(.*?\)/g, '').trim().split(/\s+/)[0] || '';
-    const mine = db.personal_dates.filter(d => twin(d.user_id) === m.id && (d.yearly ? String(d.date).slice(5) === md : d.date === td)).map(d => pdKind(d.title));
-    const k = mine.includes('birthday') ? 'birthday' : mine.includes('anniversary') ? 'anniversary' : '', h = holidayOn(td);
-    if (!k && !h) return ''; const art = (window.CUTE && window.CUTE.art[k ? 'gift' : 'star']) || '';
-    return `<div class="card greet"><svg viewBox="0 0 48 48" aria-hidden="true">${art}</svg><span class="grow-l"><b>${esc(k ? T('gr_' + k, { name: first }) : T('gr_holiday', { name: h.name }))}</b><span class="muted small">${esc(T(k ? 'gr_' + k + '_t' : 'gr_holiday_t'))}</span></span></div>`;
+    const m = me(); if (!m || !m.active || state.viewAs) return ''; const td = today(), sp = specialOn(td), art = k => (window.CUTE && window.CUTE.art[k]) || '';
+    if (sp) { const [h, t] = specialText(sp); return `<div class="card greet"><svg viewBox="0 0 48 48" aria-hidden="true">${art(sp.art)}</svg><span class="grow-l"><b>${esc(h)}</b><span class="muted small">${esc(t)}</span></span></div>`; }
+    const part = dayPart(), ph = phraseFor(td, part);
+    return `<div class="hi"><svg viewBox="0 0 48 48" aria-hidden="true">${art(part === 0 ? 'sunrise' : part === 1 ? 'sun' : 'moon')}</svg><span class="grow-l"><b>${esc(hiText('gr_p' + part, firstName(m)))}</b>${ph ? `<span class="muted small">${esc(ph.t)}${ph.by ? ` <i class="by">${esc(ph.by)}</i>` : ''}</span>` : ''}</span></div>`;
+  }
+  // For the greeting shown while the app opens next time: first name, language, and the words for the next seven days. Kept on this phone only.
+  function saveHello() {
+    try {
+      if (!me()) { localStorage.removeItem('fs-hello'); return; }
+      const d = {}, td = today();
+      for (let i = 0; i < 7; i++) { const day = addDays(td, i), sp = specialOn(day), one = x => { const f = phraseFor(day, x); return f ? f.t + (f.by ? '\n' + f.by : '') : ''; }; d[day] = sp ? { h: specialText(sp)[0], s: specialText(sp)[1] } : { p: [one(0), one(1), one(2)] }; }
+      localStorage.setItem('fs-hello', JSON.stringify({ n: firstName(me()), l: lang(), d }));
+    } catch (e) { /* private mode */ }
   }
   function photoStripHtml() {
     if (!me() || !me().active) return ''; const td = today(), ps = photosOn(td), show = ps.length ? ps : photosOn(addDays(td, -1));
@@ -2767,7 +2794,7 @@
     const unread = myNotes().filter(n => !n.read).length;
     const cur = state.view === 'admin' && state.adminTab === 'clients' ? 'clients' : state.view;
     const tb = me() && me().active ? tasksBadge() : 0;
-    const nav = NAV().map(([k, l]) => `<button data-act="view" data-v="${k}" ${cur === k ? 'aria-current="page"' : ''}><span class="tabic">${k === 'timeoff' ? msi('beach_access') : ico(NAVIC[k])}${k === 'tasks' && tb ? `<i class="tabn num">${tb > 9 ? '9+' : tb}</i>` : ''}</span><span>${esc(l)}</span></button>`).join('');
+    const nav = NAV().map(([k, l]) => `<button data-act="view" data-v="${k}" ${cur === k ? 'aria-current="page"' : ''}><span class="tabic">${ico(NAVIC[k])}${k === 'tasks' && tb ? `<i class="tabn num">${tb > 9 ? '9+' : tb}</i>` : ''}</span><span>${esc(l)}</span></button>`).join('');
     const body = state.view === 'calendar' ? calendarHtml() : state.view === 'timeoff' ? timeoffHtml() : state.view === 'tasks' ? tasksHtml() : state.view === 'admin' ? adminHtml() : meHtml();
     const demo = S.mode === 'demo' ? `<div class="banner slim"><b>${T('demo_title')}</b><span class="small only-wide">${T('demo_text')}</span><label class="small" for="demo-as">${T('demo_as')}</label><select id="demo-as" data-ch="demoas">${db.profiles.filter(p => p.active !== false).map(p => opt(p.id, `${p.name} · ${T('role_' + p.role)}`, me().id)).join('')}</select></div>` : '';
     const upd = S.syncedAt ? T('updated_at', { time: new Intl.DateTimeFormat(LOCALES[lang()], { hour: '2-digit', minute: '2-digit' }).format(new Date(S.syncedAt)) }) : T('refresh');
@@ -3341,7 +3368,7 @@
   (async () => {
     const v = location.hash.slice(1); if (['calendar', 'timeoff', 'tasks', 'admin', 'me'].includes(v)) state.view = v;
     try { await S.init(); } catch (e) { console.error(e); logErr('offline', `${errCode(e)} App could not start: ${(e && e.message) || e}`, navigator.onLine ? 'phone was online' : 'phone had no internet'); $('#app').innerHTML = `<main><div class="banner f"><b>${esc(T('err_connect'))}</b><span class="small">${esc(errCode(e) + ': ' + T('ec_' + errCode(e)))}</span><span class="small">${esc(T('err_retry'))}</span><button class="btn primary" onclick="location.reload()">${esc(T('refresh'))}</button></div></main>`; setTimeout(() => { if (navigator.onLine) location.reload(); }, 20000); return; }
-    try { if (me()) localStorage.setItem('fs-hello', JSON.stringify({ n: String(me().name || '').replace(/\(.*?\)/g, '').trim().split(/\s+/)[0] || '', l: lang() })); else localStorage.removeItem('fs-hello'); } catch (e) { /* private mode */ }
+    saveHello(); document.addEventListener('visibilitychange', () => { if (document.hidden) saveHello(); });
     if (S.mode === 'demo') window.__test = { pageFor: (title, kind) => { const u = pageFor({ title, kind }), m = /\/activity\/(\d+)/.exec(u); return m ? { id: Number(m[1]) } : null; } };          // for the automatic tests only
     if (me() && !isAdmin()) state.mine = true;
     displayFromAccount();

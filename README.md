@@ -415,3 +415,9 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 - **A greeting instead of "Loading…".** While the app opens you see a small sun or moon and "Good morning / Good afternoon / Good evening, <first name>" in your language. The first name and language are remembered on the phone only (`fs-hello`), and removed on sign-out.
 - A photo that is still loading shows a quiet camera, not an empty square.
 - **Photo of the day moved down.** The schedule comes first; the Photo of the day line is now under the week's tours (guides and drivers) and under the calendar (office), not at the top of the first screen.
+
+## 3.42
+- **A greeting line on the home page.** On an ordinary day: a small sun or moon, "Good morning / afternoon / evening, <first name>" and one short phrase. Morning: a few warm words for the day. Afternoon: a light joke about guiding or a Georgian saying (Shota Rustaveli, proverbs, the motto of Georgia, one line by Pushkin about the Tbilisi baths). Evening: calm words. Each person gets their own phrase, and it stays the same for the whole day. The phrases are in `phrases.js` in English, Russian and Georgian; adding one is adding a line.
+- **Wishes on special days** (a card with a sticker): own birthday or anniversary, a holiday from the team calendar, **a sick day ("Get well soon")** and an approved day off ("Enjoy your day off").
+- The screen shown while the app opens uses the same words: the phrase of the day, or the birthday, holiday or get-well wish. The words for the next seven days are kept on the phone only.
+- **Bottom bar lines up.** The day-off icon is now a line drawing like the other three, in the same 20px box, so all four labels sit on one line.
