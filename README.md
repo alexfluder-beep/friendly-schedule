@@ -346,3 +346,6 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 ## 3.29
 - Default colours follow the Friendly.ge brand book: green for structure (selected tabs and chips), one orange for the main button, sand for soft bands. Me > Settings > Colour of buttons keeps the other schemes; the old bright orange is there as "Bright orange".
 - Badge page: "Open the box again" replays the gift-box opening of an earned badge.
+
+## 3.30
+- Badges are cute round stickers instead of metal medals: a soft colour by group, one simple friendly picture with a little face, one to three small stars for the step on the ladder. Not earned yet: pale, with a ring that fills up. The 38 pictures are drawn by hand in `cute.js` (no picture files, no outside service); `CUTE.map` says which badge gets which picture.

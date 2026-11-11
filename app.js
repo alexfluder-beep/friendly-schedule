@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.29';
+  const APP_VERSION = '3.30';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -1336,19 +1336,22 @@
     if (sib.length > 1) { const i = sib.findIndex(x => x.k === b.k); return i <= 0 ? 'bronze' : i === sib.length - 1 ? 'gold' : 'silver'; }
     return ['welcome', 'first', 'firstoff'].includes(b.k) ? 'bronze' : 'silver';
   }
+  // Badges are cute round stickers (cute.js): a soft colour by group, one friendly picture, and one to three small stars for the step
+  // on the ladder. Not earned yet: pale, with a ring that fills as the person gets closer.
+  const STICKER = { guide: '#ffe2b8', all: '#ffe2b8', master: '#fff0b8', driver: '#cfe8fb', delica: '#cfe8fb', own: '#cfe8fb', geo: '#d5f0df', fun: '#fbd9e3', new: '#e4dcf7', now: '#e4dcf7', titles: '#fff0b8', secret: '#e4dcf7' };
+  const cuteOf = b => { const C = window.CUTE || { art: {}, map: {} }, k = String(b.k), n = C.map[k] || C.map[k.replace(/\d+$/, '')] || (b.track === 'titles' ? 'trophy' : b.track === 'geo' ? 'map' : b.track === 'driver' || b.track === 'delica' ? 'van' : b.track === 'master' ? 'star' : 'star'); return C.art[n] || C.art.star || ''; };
   function medalInner(b, tier, hex) {
-    const secret = b.hidden && !b.done, done = !!b.done, shape = mShapeOf(secret ? 'secret' : b.track), [rim, face, hi] = METAL[tier] || METAL.bronze;
-    const c = hex ? { rim: '#d9d9d0', face: '#f1efe8', ink: '#70766d', acc: '#f0901e' } : { rim: 'var(--line)', face: 'var(--surface2)', ink: 'var(--muted)', acc: 'var(--accent)' };
-    const body = (fill, stroke) => (shape === 'shield' ? `<path d="M48 24 80 34v26c0 20-14 32-32 40-18-8-32-20-32-40V34z" fill="${fill}" stroke="${stroke}" stroke-width="3" stroke-linejoin="round"/>` : `<polygon points="${M_SHAPE[shape]}" fill="${fill}" stroke="${stroke}" stroke-width="3" stroke-linejoin="round"/>`);
-    const rib = done ? RIBBON[b.track] || '#f0901e' : c.rim, p = Math.max(0, Math.min(100, Math.round((b.have || 0) / (b.goal || 1) * 100)));
-    const icon = secret ? `<text x="48" y="72" text-anchor="middle" font-size="30" font-weight="700" fill="${c.ink}" font-family="-apple-system,Segoe UI,Roboto,sans-serif">?</text>` : `<g transform="translate(34 48) scale(1.17)" fill="none" stroke="${done ? '#20251f' : c.ink}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${IC[b.icon] || IC.star}</g>`;
-    return `<path d="M30 2h14l8 30H38z" fill="${rib}"/><path d="M66 2H52l-8 30h14z" fill="${rib}" opacity="${done ? .78 : 1}"/>
-      ${done ? body(face, rim) : body(c.face, c.rim)}
-      <circle cx="48" cy="62" r="24" fill="${done ? hi : hex ? '#ffffff' : 'var(--surface)'}" stroke="${done ? rim : c.rim}" stroke-width="2"/>
-      ${done ? `<path d="M29 54a21 21 0 0 1 17-13" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".7"/>` : !secret && p ? `<circle cx="48" cy="62" r="24" fill="none" stroke="${c.acc}" stroke-width="4" stroke-linecap="round" stroke-dasharray="${(p * 1.508).toFixed(1)} 151" transform="rotate(-90 48 62)"/>` : ''}
-      ${icon}`;
+    const secret = b.hidden && !b.done, done = !!b.done, O = '#4a3526';
+    const c = hex ? { rim: '#d9d9d0', face: '#f1efe8', ink: '#70766d', acc: '#314b3c', paper: '#ffffff' } : { rim: 'var(--line)', face: 'var(--surface2)', ink: 'var(--muted)', acc: 'var(--accent)', paper: 'var(--surface)' };
+    const p = Math.max(0, Math.min(100, Math.round((b.have || 0) / (b.goal || 1) * 100))), n = tier === 'gold' ? 3 : tier === 'silver' ? 2 : 1;
+    const stars = done && window.CUTE ? [...Array(n)].map((_, i) => window.CUTE.star(48 + (i - (n - 1) / 2) * 15, 94, 7.5)).join('') : '';
+    const pic = secret ? `<text x="48" y="61" text-anchor="middle" font-size="34" font-weight="700" fill="${c.ink}" font-family="-apple-system,Segoe UI,Roboto,sans-serif">?</text>` : `<g transform="translate(15 13) scale(1.375)"${done ? '' : ' style="filter:grayscale(1);opacity:.4"'}>${cuteOf(b)}</g>`;
+    return `<circle cx="48" cy="46" r="42" fill="${done ? '#ffffff' : c.paper}" stroke="${done ? O : c.rim}" stroke-width="3"/>
+      <circle cx="48" cy="46" r="35.5" fill="${done ? STICKER[b.track] || '#ffe2b8' : c.face}"/>
+      ${!done && !secret && p ? `<circle cx="48" cy="46" r="39" fill="none" stroke="${c.acc}" stroke-width="4" stroke-linecap="round" stroke-dasharray="${(p * 2.45).toFixed(1)} 246" transform="rotate(-90 48 46)"/>` : ''}
+      ${pic}${stars}`;
   }
-  const medalArt = b => `<span class="art">${`<svg viewBox="0 0 96 104" aria-hidden="true"><defs><clipPath id="mc-${esc(String(b.k).replace(/[^a-z0-9]/gi, ''))}"><circle cx="48" cy="62" r="38"/></clipPath></defs>${medalInner(b, tierOf(b, (game(me().id) || {}).list))}${b.done ? `<g clip-path="url(#mc-${esc(String(b.k).replace(/[^a-z0-9]/gi, ''))})"><rect class="shine" x="-30" y="20" width="16" height="90" fill="#fff" opacity=".55" transform="rotate(20 48 62)"/></g>` : ''}</svg>`}</span>`;
+  const medalArt = b => `<span class="art">${`<svg viewBox="0 0 96 104" aria-hidden="true"><defs><clipPath id="mc-${esc(String(b.k).replace(/[^a-z0-9]/gi, ''))}"><circle cx="48" cy="46" r="41"/></clipPath></defs>${medalInner(b, tierOf(b, (game(me().id) || {}).list))}${b.done ? `<g clip-path="url(#mc-${esc(String(b.k).replace(/[^a-z0-9]/gi, ''))})"><rect class="shine" x="-30" y="0" width="16" height="96" fill="#fff" opacity=".6" transform="rotate(20 48 46)"/></g>` : ''}</svg>`}</span>`;
   const bName = b => b.title || T('b_' + b.k), bDesc = b => b.desc || T('bd_' + b.k), bSecret = b => b.hidden && !b.done;
   const medal = b => (bSecret(b) ? `<button class="mdl secret" data-act="badge" data-k="${esc(b.k)}" style="--p:0" aria-label="${T('b_secret')}">${medalArt(b)}<span class="mt">${T('b_secret')}</span><span class="muted small">&nbsp;</span></button>`
     : `<button class="mdl ${b.done ? 'done' : ''}" data-t="${b.track}" data-act="badge" data-k="${esc(b.k)}" style="--p:${Math.round(b.have / b.goal * 100)}" aria-label="${esc(bName(b))}">${medalArt(b)}<span class="mt">${esc(bName(b))}</span><span class="muted small num">${b.track === 'titles' ? nf(b.raw) + ' ' + T('tours_n') : b.track === 'master' ? '×' + nf(b.raw) : b.done ? T('b_done') : nf(b.have) + ' / ' + nf(b.goal)}</span></button>`);
