@@ -811,3 +811,22 @@ button,a,summary,label,select{touch-action:manipulation}
 .askbox{position:fixed;inset:0;z-index:60;background:rgba(8,14,20,.55);display:flex;align-items:center;justify-content:center;padding:16px}
 .askcard{background:var(--bg);border-radius:28px;padding:20px;max-width:400px;width:100%;display:flex;flex-direction:column;gap:16px;font-size:var(--t-h3)}
 .askcard .actions{flex-wrap:wrap}
+
+/* 3.18 plus menu, tour card buttons in one design, period summary at the bottom */
+.fabwrap{position:static}
+.fab{transition:transform .2s cubic-bezier(.2,0,0,1)}
+.fab.open{transform:rotate(45deg)}
+.fabscrim{position:fixed;inset:0;z-index:7;background:rgba(8,14,20,.35);border:0;padding:0}
+.fabmenu{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(144px + env(safe-area-inset-bottom,0px));z-index:8;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.fabitem{min-height:48px;padding:0 20px 0 16px;gap:12px;background:var(--surface);font-size:var(--t-body);font-weight:600;box-shadow:0 0 0 1px var(--line)}
+.fabitem .msi{width:24px;height:24px;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.fabitem{animation:auth-up .18s cubic-bezier(.2,0,0,1) both}.fabitem:nth-child(2){animation-delay:.03s}.fabitem:nth-child(3){animation-delay:.06s}}
+.tacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.tacts .btn{min-height:48px;padding:4px 8px;gap:8px;justify-content:center;font-size:var(--t-sm);white-space:normal;line-height:1.2}
+.tacts .btn .msi{width:20px;height:20px;flex:none}
+@media (max-width:420px){.tacts{grid-template-columns:repeat(2,minmax(0,1fr))}.tacts .btn.primary{grid-column:1 / -1}}
+.wstats{margin-top:16px}
+.tabic{position:relative}
+.tabn{position:absolute;top:-6px;left:calc(50% + 6px);min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:var(--accent);color:var(--ink);font:700 11px/18px inherit;font-style:normal;text-align:center}
+html[data-os="ios"] input,html[data-os="ios"] select,html[data-os="ios"] textarea{font-size:max(16px,1em)}
+.xrow .tag{flex:none}

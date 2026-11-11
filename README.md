@@ -290,3 +290,12 @@ Art (tools/art): `make_art.py` makes avatar and badge pictures with Gemini once,
 
 ## 3.17
 - Setmore import: the hand-typed "No of participants" column no longer stops the import. Only 1–99 counts as people ("3", "x2", "2+2", "3 (2 adults + 1 child)"); a booking code or long number typed there by mistake is kept as the booking code instead.
+
+## 3.18
+- Calendar: the period summary (tours, guests, profit) moved to the bottom of the page.
+- The round **+** on phones opens a short menu: Tour (admins), Day off, Sick. Guides and drivers get the + too.
+- Tour card buttons in one design with icons: Edit, Move, Copy tour, Cancel tour, Delete tour. **Copy tour** opens a new tour with the same details and no guests.
+- Tours that need someone moved off the calendar into **Tasks**; the Tasks tab shows a number. Admins see "Tours without a guide or driver" there, tap to assign.
+- Tasks: adding a task is the same round + as on the calendar.
+- iPhone: the screen no longer zooms in and stays zoomed when a field is tapped.
+- Special dates: the dots are typed for you (24111990 becomes 24.11.1990).
