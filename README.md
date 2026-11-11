@@ -365,3 +365,7 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 - By role: drivers see kilometres and long road days; guides see guests hosted and the languages asked for in the next 30 days next to the ones they speak.
 - Forecast: team bookings for the next 30 days against the previous 30, and the same days last year when the data is there.
 - The card ends with: "Automatic suggestions, counted from your schedule and your answers. They can be wrong: you and the office decide." Everything is recounted on every open.
+
+## 3.34
+- Badges page: region titles and tour mastery have their own pictures (fox for the city, mountain, sun, wine glass, cave, compass, flag; tour mastery by the tour's name) instead of the same trophy and star. Three even columns on phones.
+- Sticker: the picture sits inside the circle on every badge, smaller stars. Share picture uses the brand colour.

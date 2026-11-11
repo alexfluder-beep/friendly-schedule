@@ -33,6 +33,9 @@
     cup: `<path d="M17 6q-2.5 3 0 5.5M24 5q-2.5 3 0 5.5" fill="none" stroke="${O}" stroke-width="1.8" stroke-linecap="round"/><path d="M34 21h3.5a5.5 5.5 0 0 1 0 11H34" fill="none" ${S}/><path d="M9 16h26v15a8 8 0 0 1-8 8H17a8 8 0 0 1-8-8z" fill="${W}" ${S}/><path d="M9 16h26v5H9z" fill="${OR}" ${S}/>${face(22, 28, 4)}`,
     flag: `<path d="M13 6v36" ${S} fill="none"/><path d="M13 8h26l-6 8 6 8H13z" fill="${R}" ${S}/><path d="M5 43c3-5 13-5 16 0z" fill="${M}" ${S}/>${face(23, 15, 3.2, false)}`,
     bear: animal(BR, false),
+    fox: `${animal('#ff9d5c', true)}<path d="M11 20 12 7l4.5 3zM37 20 36 7l-4.5 3z" fill="${G}"/>`,
+    cave: `<path d="M4 41C4 20 13 8 24 8s20 12 20 33z" fill="#d9b08c" ${S}/><path d="M15 41c0-10 4-15 9-15s9 5 9 15z" fill="${G}" ${S}/><circle cx="20.5" cy="36" r="1.4" fill="${Y}"/><circle cx="27.5" cy="36" r="1.4" fill="${Y}"/>${face(24, 17, 3.6, false)}`,
+    compass: `<circle cx="24" cy="24" r="18" fill="${W}" ${S}/><circle cx="24" cy="24" r="13.5" fill="none" stroke="${B}" stroke-width="2"/><path d="M24 9l5 15h-10z" fill="${R}" ${S}/><path d="M24 39l5-15h-10z" fill="${B}" ${S}/><circle cx="24" cy="24" r="2.2" fill="${O}"/>`,
     cat: `${animal('#f6f1e4', true)}<circle cx="15" cy="17" r="1.3" fill="${G}"/><circle cx="33" cy="17" r="1.3" fill="${G}"/><circle cx="24" cy="14" r="1.3" fill="${G}"/><circle cx="12" cy="24" r="1.1" fill="${G}"/><circle cx="36" cy="24" r="1.1" fill="${G}"/>`,
     owl: `<path d="M12 12 14 5l7 5zM36 12 34 5l-7 5z" fill="${L}" ${S}/><ellipse cx="24" cy="26" rx="14" ry="16" fill="${L}" ${S}/><circle cx="18" cy="21" r="6" fill="${W}" ${S}/><circle cx="30" cy="21" r="6" fill="${W}" ${S}/><circle cx="18" cy="21" r="2" fill="${O}"/><circle cx="30" cy="21" r="2" fill="${O}"/><path d="M24 25l-2.5 4h5z" fill="${OR}" ${S}/><path d="M18 35q3 2 6 0t6 0" fill="none" stroke="${O}" stroke-width="1.6" stroke-linecap="round"/>`,
     bird: `<path d="M24 9q1-5 4-5-1 3-1 5" fill="${Y}" ${S}/><circle cx="23" cy="26" r="14.5" fill="${Y}" ${S}/><path d="M36 22l8 3-8 3.5z" fill="${OR}" ${S}/><path d="M12 28q5 6 10 0" fill="${OR}" ${S}/><circle cx="29" cy="21" r="1.8" fill="${O}"/><circle cx="32" cy="28" r="1.8" fill="${P}" opacity=".75"/><path d="M18 40v3M26 40v3" ${S} fill="none"/>`,
@@ -58,5 +61,10 @@
     solo10: 'wheel', solo50: 'wheel', steel: 'shield', t100: 'trophy', t250: 'trophy', t50: 'trophy', team: 'heart', walk100: 'boot', walk42: 'boot', week5: 'calendar', weekend: 'sun',
     welcome: 'gift', wine: 'wine', year150: 'trophy', newyear: 'snow', snow: 'cat', comeback: 'heart', hattrick: 'stars3', fri13: 'clover', sunrise: 'sunrise',
   };
-  window.CUTE = { art: A, map: MAP, star };
+  // Region titles (by their theme) and tour mastery (by words in the tour name) get their own pictures.
+  const TITLE = { sun: 'sun', mountain: 'mountain', glass: 'wine', pin: 'fox', globe: 'flag' };
+  const TOUR = [[/kazbegi|truso|juta|gudauri|tusheti|svaneti|khevsureti/i, 'mountain'], [/gareji|rainbow/i, 'sun'], [/kakheti|wine|signagi|sighnaghi|telavi/i, 'wine'], [/sabaduri/i, 'bear'], [/walking|old tbilisi/i, 'boot'],
+    [/armenia|yerevan|sevan|dilijan/i, 'flag'], [/chiatura|kutaisi|katskhi|tskaltubo/i, 'compass'], [/vardzia|uplistsikhe|borjomi|rabati/i, 'cave'], [/transfer|airport/i, 'van'], [/brutal|soviet|tiflis|tbilisi|night/i, 'fox'], [/mtskheta|gori/i, 'map']];
+  const pick = b => { const k = String(b.k); if (b.track === 'titles') return TITLE[b.icon] || (/west/.test(k) ? 'compass' : /south/.test(k) ? 'cave' : 'trophy'); if (b.track === 'master') { const h = TOUR.find(x => x[0].test(b.title || k)); return h ? h[1] : 'star'; } return MAP[k] || MAP[k.replace(/\d+$/, '')] || ''; };
+  window.CUTE = { art: A, map: MAP, star, pick };
 })();

@@ -1027,3 +1027,7 @@ html[data-accent="amber"]{--accent:#f0901e;--accent-ink:#20251f;--accent-soft:#f
 .wrq{border-top:0;padding:0}.wrq summary{font-weight:600}.wrq .bar{gap:6px;margin:4px 0 8px}
 .wrchip{min-width:44px}.wrchip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .wrnote{border-top:1px solid var(--line);padding-top:8px}
+
+/* 3.34 Badges page: three even columns on phones, a little air between the stars and the name */
+@media (max-width:520px){.medals{grid-template-columns:repeat(3,minmax(0,1fr));gap:18px 8px}}
+.mdl .mt{margin-top:2px}

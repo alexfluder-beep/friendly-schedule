@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.33';
+  const APP_VERSION = '3.34';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -1339,13 +1339,13 @@
   // Badges are cute round stickers (cute.js): a soft colour by group, one friendly picture, and one to three small stars for the step
   // on the ladder. Not earned yet: pale, with a ring that fills as the person gets closer.
   const STICKER = { guide: '#ffe2b8', all: '#ffe2b8', master: '#fff0b8', driver: '#cfe8fb', delica: '#cfe8fb', own: '#cfe8fb', geo: '#d5f0df', fun: '#fbd9e3', new: '#e4dcf7', now: '#e4dcf7', titles: '#fff0b8', secret: '#e4dcf7' };
-  const cuteOf = b => { const C = window.CUTE || { art: {}, map: {} }, k = String(b.k), n = C.map[k] || C.map[k.replace(/\d+$/, '')] || (b.track === 'titles' ? 'trophy' : b.track === 'geo' ? 'map' : b.track === 'driver' || b.track === 'delica' ? 'van' : b.track === 'master' ? 'star' : 'star'); return C.art[n] || C.art.star || ''; };
+  const cuteOf = b => { const C = window.CUTE || { art: {}, pick: () => '' }, n = C.pick(b) || (b.track === 'geo' ? 'map' : b.track === 'driver' || b.track === 'delica' ? 'van' : 'star'); return C.art[n] || C.art.star || ''; };
   function medalInner(b, tier, hex) {
     const secret = b.hidden && !b.done, done = !!b.done, O = '#4a3526';
     const c = hex ? { rim: '#d9d9d0', face: '#f1efe8', ink: '#70766d', acc: '#314b3c', paper: '#ffffff' } : { rim: 'var(--line)', face: 'var(--surface2)', ink: 'var(--muted)', acc: 'var(--accent)', paper: 'var(--surface)' };
     const p = Math.max(0, Math.min(100, Math.round((b.have || 0) / (b.goal || 1) * 100))), n = tier === 'gold' ? 3 : tier === 'silver' ? 2 : 1;
-    const stars = done && window.CUTE ? [...Array(n)].map((_, i) => window.CUTE.star(48 + (i - (n - 1) / 2) * 15, 94, 7.5)).join('') : '';
-    const pic = secret ? `<text x="48" y="61" text-anchor="middle" font-size="34" font-weight="700" fill="${c.ink}" font-family="-apple-system,Segoe UI,Roboto,sans-serif">?</text>` : `<g transform="translate(15 13) scale(1.375)"${done ? '' : ' style="filter:grayscale(1);opacity:.4"'}>${cuteOf(b)}</g>`;
+    const stars = done && window.CUTE ? [...Array(n)].map((_, i) => window.CUTE.star(48 + (i - (n - 1) / 2) * 14, 95, 6.5)).join('') : '';
+    const pic = secret ? `<text x="48" y="61" text-anchor="middle" font-size="34" font-weight="700" fill="${c.ink}" font-family="-apple-system,Segoe UI,Roboto,sans-serif">?</text>` : `<g transform="translate(18 16) scale(1.25)"${done ? '' : ' style="filter:grayscale(1);opacity:.4"'}>${cuteOf(b)}</g>`;
     return `<circle cx="48" cy="46" r="42" fill="${done ? '#ffffff' : c.paper}" stroke="${done ? O : c.rim}" stroke-width="3"/>
       <circle cx="48" cy="46" r="35.5" fill="${done ? STICKER[b.track] || '#ffe2b8' : c.face}"/>
       ${!done && !secret && p ? `<circle cx="48" cy="46" r="39" fill="none" stroke="${c.acc}" stroke-width="4" stroke-linecap="round" stroke-dasharray="${(p * 2.45).toFixed(1)} 246" transform="rotate(-90 48 46)"/>` : ''}
@@ -1417,7 +1417,7 @@
     return `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080"><rect width="1080" height="1080" fill="#f7f5ef"/><rect x="36" y="36" width="1008" height="1008" rx="56" fill="#ffffff" stroke="#d9d9d0" stroke-width="3"/>
       <g transform="translate(300 70) scale(5)">${medalInner({ ...b, done: true }, tierOf(b, (game(p.id) || {}).list), true)}</g>
       ${tl}${dl}${count ? `<text x="540" y="${y + 34}" text-anchor="middle" font-size="40" font-weight="700" fill="#20251f" ${font}>${xml(count)}</text>` : ''}
-      <circle cx="96" cy="984" r="12" fill="#f0901e"/><text x="122" y="996" font-size="34" font-weight="700" fill="#20251f" ${font}>Friendly.ge</text>
+      <circle cx="96" cy="984" r="12" fill="#b94a2f"/><text x="122" y="996" font-size="34" font-weight="700" fill="#20251f" ${font}>Friendly.ge</text>
       ${/^data:image\//.test(p.avatar || '') ? `<defs><clipPath id="av"><circle cx="948" cy="972" r="44"/></clipPath></defs><image href="${xml(p.avatar)}" x="904" y="928" width="88" height="88" preserveAspectRatio="xMidYMid slice" clip-path="url(#av)"/><circle cx="948" cy="972" r="44" fill="none" stroke="${colors[0]}" stroke-width="5"/><text x="884" y="984" text-anchor="end" font-size="34" fill="#55594f" ${font}>${xml(p.name || '')}</text>` : `<circle cx="948" cy="972" r="44" fill="${xml(p.color || '#66737f')}"/><text x="948" y="986" text-anchor="middle" font-size="38" font-weight="700" fill="#ffffff" ${font}>${xml(initials(p.name || '?'))}</text><text x="884" y="984" text-anchor="end" font-size="34" fill="#55594f" ${font}>${xml(p.name || '')}</text>`}</svg>`;
   }
   function badgePng(b) {
