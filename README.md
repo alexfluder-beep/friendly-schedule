@@ -489,3 +489,6 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 ## 3.55
 - **Time off: your days off are on the Team ready calendar.** Approved days off (umbrella), sick days and requests still waiting (dashed) are marked on the same calendar as the team percentages. Arrows move four weeks back or forward, so past days off can be looked up too. Tapping one of your days says what it is.
 - **My requests is short.** It lists only what is coming up or still waiting; everything earlier is folded under "Earlier requests".
+
+## 3.56
+- **Time off: "Best time for a rest"** replaces "Suggested days off". It offers up to three whole weeks (seven days in a row) in the next four months when the person has no tours, no busy period or high season falls on them, fewer than two teammates (20% of the team) are off, and the team has the fewest tours. Each week says why ("nobody else is off · team tours that week: 3"), and mentions it when the person worked 30 or more days in the last two months. Tapping a week opens the request with both dates filled. Single quiet days stay below. These are suggestions; the office decides.

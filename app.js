@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.55';
+  const APP_VERSION = '3.56';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -1680,8 +1680,8 @@
     let h = `<div class="bar"><h2>${T('nav_timeoff')}</h2><span class="spacer"></span><button class="btn primary" data-act="offnew">+ ${T('request')}</button>${helpBtn()}</div>${helpBox('timeoff')}
       <div class="stats"><div class="stat"><b>${my.off}</b>${T('days_off_year', { y })}</div><div class="stat"><b>${my.sick}</b>${T('sick_days')}</div><div class="stat"><b>${my.pending}</b>${T('pending')}</div></div>`;
     h += workRestHtml();
-    const sug = (suggestDaysOff(4)[me().id] || []).filter(x => x.st === 'sug').map(x => x.d);
-    if (!isAdmin() && sug.length) h += `<div class="card"><b>${T('sug_title')}</b><span class="muted small">${T('sug_text')}</span><div class="bar">${sug.map(d => `<button class="btn sm" data-act="offnew" data-date="${d}">${esc(fmtDay(d))}</button>`).join('')}</div></div>`;
+    const sug = (suggestDaysOff(4)[me().id] || []).filter(x => x.st === 'sug').map(x => x.d), vac = isAdmin() ? [] : vacationWeeks();
+    if (!isAdmin() && (sug.length || vac.length)) h += `<div class="card"><b>${T('vc_title')}</b>${vac.length ? `<span class="muted small">${T('vc_text')}</span><div class="list vclist">${vac.map(v => `<button class="card lrow nohead vcrow" data-act="offnew" data-date="${v.from}" data-to="${v.to}"><span class="lmain"><b class="nw">${esc(fmtRange(v.from, v.to))}</b><span class="muted small">${esc(v.why)}</span></span><span class="ldate"><span class="lnk">${T('vc_ask')} ›</span></span></button>`).join('')}</div>` : `<span class="muted small">${T('vc_none')}</span>`}${sug.length ? `<span class="muted small">${T('vc_days')}</span><div class="bar">${sug.map(d => `<button class="btn sm" data-act="offnew" data-date="${d}">${esc(fmtDay(d))}</button>`).join('')}</div>` : ''}<span class="muted small">${T('wr_note')}</span></div>`;
     if (isAdmin()) h += `<h3>${T('to_approve')} (${pending.length})</h3><div class="list">${pending.length ? pending.map(o => offRow(o, true)).join('') : `<div class="empty">${T('nothing_pending')}</div>`}</div>`;
     h += `<div class="cols"><div class="list"><h3>${T('my_requests')}</h3>${(() => { const td0 = today(), now = mine.filter(o => o.date_to >= td0 || o.status === 'pending'), old = mine.filter(o => !now.includes(o)); return (now.length ? now.map(o => offRow(o, isAdmin())).join('') : `<div class="empty">${T(mine.length ? 'req_none_now' : 'no_requests')}</div>`) + (old.length ? `<details class="sect bpmore" data-keep="req-old" ${(state.keep || {})['req-old'] ? 'open' : ''}><summary data-s="${T('show')}" data-h="${T('hide')}"><span>${T('req_old')} <span class="tag t-muted num">${old.length}</span></span></summary><div class="list">${old.map(o => offRow(o, isAdmin())).join('')}</div></details>` : ''); })()}</div>
       <div class="list"><h3>${T(isAdmin() ? 'team_off' : 'tc_title')}</h3>${!isAdmin() ? teamOffCounts(upcoming) : !upcoming.length ? `<div class="empty">${T('nobody_off')}</div>` : isAdmin() ? upcoming.map(o => `<div class="card lrow">${avatar(o.user_id)}<span class="lmain"><b>${esc(pname(o.user_id))}</b>${offTag(o)}</span><span class="num ldate">${esc(fmtRange(o.date_from, o.date_to))}</span></div>`).join('') : teamOffCounts(upcoming)}
@@ -1751,6 +1751,22 @@
   // Delica drivers are offered only the off-road rides the Delica is for.
   const RIDE_4X4 = /4\s*[x×х]\s*4|4\s*wd|delica/i;   // by the tour name only: not every Kazbegi tour is a 4x4 ride (owner, 11 Nov)
   // For guides and drivers the team's days off are numbers per day, never names: "2 guides, 1 driver off" and the share of the team.
+  // Best weeks for a longer rest (guides and drivers): seven days in a row in the next four months when this person has no tour,
+  // no busy period or high season falls on them, as few teammates as possible are off, and the team has few tours. Suggestions only.
+  function vacationWeeks() {
+    const m = me(), td = today(), r = rules(), pk = peaks(), team = staff().filter(p => p.role !== 'admin' && p.id !== m.id), out = [];
+    const hi = d => { const mo = Number(d.slice(5, 7)); return mo >= r.seasonFrom && mo <= r.seasonTo; }, first = addDays(td, Math.max(1, Number(r.minNoticeDays) || 0));
+    const myBusy = d => db.tours.some(t => live(t) && involves(t, m.id) && t.date <= d && endOf(t) >= d) || db.time_off.some(o => twin(o.user_id) === m.id && o.status !== 'declined' && o.date_from <= d && o.date_to >= d);
+    const offN = d => new Set(db.time_off.filter(o => o.status !== 'declined' && twin(o.user_id) !== m.id && o.date_from <= d && o.date_to >= d).map(o => twin(o.user_id))).size;
+    for (let i = 0; i < 120; i++) { const from = addDays(first, i), days = [...Array(7)].map((_, k) => addDays(from, k));
+      if (days.some(d => myBusy(d) || hi(d) || pk.some(p => p.from <= d && p.to >= d))) continue;
+      const off = Math.max(...days.map(offN)), tours = days.reduce((n, d) => n + toursOnDay(d).filter(live).length, 0);
+      if (team.length && off >= Math.max(2, Math.ceil(team.length * 0.2))) continue;
+      out.push({ from, to: days[6], off, tours, score: off * 10 + tours + i / 60 }); }
+    const picked = []; out.sort((a, b) => a.score - b.score).forEach(v => { if (picked.length < 3 && !picked.some(x => v.from <= x.to && v.to >= x.from)) picked.push(v); });
+    const past = db.tours.filter(t => live(t) && involves(t, m.id) && t.date > addDays(td, -60) && t.date <= td), worked = new Set(past.map(t => t.date)).size;
+    return picked.sort((a, b) => a.from.localeCompare(b.from)).map(v => ({ ...v, why: [T('vc_free'), v.off ? T('vc_off', { n: v.off }) : T('vc_off0'), T('vc_tours', { n: v.tours }), worked >= 30 ? T('vc_earned', { n: worked }) : ''].filter(Boolean).join(' · ') }));
+  }
   function teamOffCounts(list) {
     const td = today(), m = me(), team = staff().filter(p => p.role !== 'admin'), n = team.length || 1, pg = Number(state.tcPage) || 0, start = addDays(monday(td), 28 * pg), r = rules(), pk = peaks();
     const own = d => db.time_off.find(o => twin(o.user_id) === m.id && o.status !== 'declined' && o.date_from <= d && o.date_to >= d);
@@ -3160,7 +3176,7 @@
     tourdelask(el) { const t = db.tours.find(x => x.id === el.dataset.id); if (!t) return; const n = tourBookings(t.id).length;
       confirmDo(T('del_ask', { title: t.title, date: fmtDay(t.date), n }), T('del_yes'), async () => { for (const b of tourBookings(t.id)) await S.remove('bookings', b.id); await S.remove('tours', t.id); toast(T('del_done')); render(); }); },
     bell() { state.modal = { type: 'bell' }; renderModal(); const un = myNotes().filter(n => !n.read); (async () => { for (const n of un) { try { await S.save('notifications', { ...n, read: true }); } catch (e) { /* ignore */ } } render(); })(); },
-    offnew(el) { const sick = el.dataset.type === 'sick', d0 = el.dataset.date || (sick ? today() : state.date > today() ? state.date : addDays(today(), 1)); state.fabOpen = false; state.modal = { type: 'off', draft: { user_id: el.dataset.who || me().id, type: sick ? 'sick' : 'dayoff', date_from: d0, date_to: d0, note: '' } }; renderModal(); render(); },
+    offnew(el) { const sick = el.dataset.type === 'sick', d0 = el.dataset.date || (sick ? today() : state.date > today() ? state.date : addDays(today(), 1)); state.fabOpen = false; state.modal = { type: 'off', draft: { user_id: el.dataset.who || me().id, type: sick ? 'sick' : 'dayoff', date_from: d0, date_to: el.dataset.to && el.dataset.to >= d0 ? el.dataset.to : d0, note: '' } }; renderModal(); render(); },
     fabtoggle() { state.modal = { type: 'addmenu' }; renderModal(); },
     pstats(el) { state.modal = { type: 'pstats', from: el.dataset.from, to: el.dataset.to }; renderModal(); },
     tourclone(el) { const t = db.tours.find(x => x.id === el.dataset.id); if (!t) return; const { id, external_id, status, pax, adults, children, cancel_reason, created_at, ...keep } = t; openTour(null, { ...keep, pax: 1, adults: 1, children: 0, status: 'confirmed', external_id: null }); state.modal.touched = true; toast(T('clone_hint')); },
