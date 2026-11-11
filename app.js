@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.30';
+  const APP_VERSION = '3.31';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -622,8 +622,8 @@
       ${!dts.length && !offs.length && !cxs.length ? `<div class="muted small nothing" data-drop="${d}">${T('no_tours')}</div>` : ''}`;
   }
   function agendaCard(t) {
-    const off = !live(t), w = off ? [] : tourWarnings(t), ppl = [t.guide_id, t.driver_id].filter(Boolean);
-    return `<button class="acard ${off ? 'cancelled' : ''}" data-key="t${t.id}" style="--k:${esc(tourStyle(t.title).color)}" data-act="tour" data-id="${t.id}"${isAdmin() && !off ? ` data-drag="${t.id}"` : ''} data-drop="${t.date}"><span class="ttl">${emblem(t, true)}<span>${t.start_time ? `<span class="num st">${esc(t.start_time)}</span> ` : ''}<span class="tname">${esc(t.title)}</span></span></span><span class="kindrow"><span class="kind k-${esc(t.kind || 'private')}">${msi(t.kind === 'group' ? 'groups' : t.kind === 'transfer' ? 'airport_shuttle' : 'person')}${T('kind_' + (t.kind || 'private'))}</span><span class="num cnt">${paxText(t)}</span>${w.length ? ` <span class="chk">${T('chk')}</span>` : ''}${off ? ` <span class="tag t-danger">${T('cancelled')}</span>` : ''}${!off && staysN(tourBookings(t.id)) ? ` <span class="tag t-stay num">${T('stay_n', { n: staysN(tourBookings(t.id)) })}</span>` : ''}</span>${endOf(t) !== t.date ? `<span class="num muted small">${esc(fmtRange(t.date, endOf(t)))}</span>` : ''}${wxLine(t)}<span class="row">${ppl.length ? ppl.map(id => `<span class="p">${avatar(id)}${esc(pname(id))}</span>`).join('') : `<span class="tag t-warn">${T('unassigned')}</span>`}</span></button>`;
+    const off = !live(t), w = off ? [] : tourWarnings(t), ppl = [...new Set([t.guide_id, t.driver_id].filter(Boolean))];
+    return `<button class="acard ${off ? 'cancelled' : ''}" data-key="t${t.id}" style="--k:${esc(tourStyle(t.title).color)}" data-act="tour" data-id="${t.id}"${isAdmin() && !off ? ` data-drag="${t.id}"` : ''} data-drop="${t.date}"><span class="ttl">${emblem(t, true)}<span>${t.start_time ? `<span class="num st">${esc(t.start_time)}</span> ` : ''}<span class="tname">${esc(t.title)}</span></span></span><span class="kindrow"><span class="kind k-${esc(t.kind || 'private')}">${msi(t.kind === 'group' ? 'groups' : t.kind === 'transfer' ? 'airport_shuttle' : 'person')}${T('kind_' + (t.kind || 'private'))}</span><span class="num cnt">${paxText(t)}</span>${w.length ? ` <span class="chk">${T('chk')}</span>` : ''}${off ? ` <span class="tag t-danger">${T('cancelled')}</span>` : ''}${!off && staysN(tourBookings(t.id)) ? ` <span class="tag t-stay num">${T('stay_n', { n: staysN(tourBookings(t.id)) })}</span>` : ''}<span class="row crew">${ppl.length ? ppl.map(id => `<span class="p">${avatar(id)}${esc(pname(id))}</span>`).join('') : `<span class="tag t-warn">${T('unassigned')}</span>`}</span></span>${endOf(t) !== t.date ? `<span class="num muted small">${esc(fmtRange(t.date, endOf(t)))}</span>` : ''}${wxLine(t)}</button>`;
   }
   // ---------- Sunday evening: every guide and driver checks next week's schedule ----------
   const taskTitle = k => (k.kind === 'week_check' ? T('wk_title') : k.title);
@@ -652,7 +652,7 @@
     if (!nt && !asks.length && isAdmin()) return '';
     const bk = nt ? tourBookings(nt.id) : [];
     return `${!isAdmin() && state.mine && state.mode === 'week' ? '' : weekCardHtml()}${asks.map(q => { const t = db.tours.find(x => x.id === q.tour_id); return t ? `<div class="card"><b>${T('swap_ask_title', { name: pname(q.user_id) })}</b><span class="row nw">${emblem(t, true)}<span class="grow-l"><span class="ttl">${esc(t.title)}</span><span class="muted small num">${esc(dateText(t))} ${esc(t.start_time || '')}</span></span></span><div class="actions"><button class="btn sm" data-act="swapagree" data-id="${q.id}" data-s="0">${T('decline')}</button><button class="btn sm primary" data-act="swapagree" data-id="${q.id}" data-s="1">${T('swap_agree')}</button></div></div>` : ''; }).join('')}
-      <div class="nextrow">${nt ? `<button class="card" data-act="tour" data-id="${nt.id}"><span class="muted small">${T('next_tour')}</span><span class="row nw">${emblem(nt, true)}<span class="grow-l"><span class="ttl">${esc(nt.title)}</span></span></span><span class="num"><b>${esc(nt.date === td ? T('today') : dateText(nt))} ${esc(nt.start_time || '')}</b> <span class="muted small">· ${esc(acText(nt))}${cashDue(bk) ? ' · ' + T('cash_collect') + ' ' + cashDue(bk) + ' ' + esc(guestCur()) : ''}</span></span>${nt.pickup ? `<span class="muted small only-wide">${esc(nt.pickup)}</span>` : ''}</button>` : `<div class="card"><span class="muted small">${T('next_tour')}</span><span>${T('next_none')}</span></div>`}
+      <div class="nextrow">${nt ? `<button class="card nxt" data-act="tour" data-id="${nt.id}"><span class="nxwhen num">${(() => { const n = Math.round((D(nt.date) - D(td)) / 864e5); return n <= 0 ? T('today') : n === 1 ? T('tomorrow') : T('in_days', { n }); })()} ›</span><span class="muted small">${T('next_tour')}</span><span class="row nw">${emblem(nt, true)}<span class="grow-l"><span class="ttl">${esc(nt.title)}</span></span></span><span class="num"><b>${esc(nt.date === td ? T('today') : dateText(nt))} ${esc(nt.start_time || '')}</b> <span class="muted small">· ${esc(acText(nt))}${cashDue(bk) ? ' · ' + T('cash_collect') + ' ' + cashDue(bk) + ' ' + esc(guestCur()) : ''}</span></span>${nt.pickup ? `<span class="muted small only-wide">${esc(nt.pickup)}</span>` : ''}</button>` : `<div class="card"><span class="muted small">${T('next_tour')}</span><span>${T('next_none')}</span></div>`}
       <button class="card offc" data-act="${off ? 'view' : 'offnew'}" data-v="timeoff"><span class="muted small">${T('next_off')}</span><span class="num"><b>${off ? esc(fmtRange(off.date_from, off.date_to)) : T('next_off_none')}</b></span>${off ? `<span>${offTag(off)}</span>` : `<span class="muted small">${T('request')}</span>`}</button></div>`;
   }
   // ---------- guide and driver home: only what matters, day by day ----------
@@ -2480,7 +2480,7 @@
       ${notifCardHtml(perm)}<div class="checks col">${Object.keys(NOTE_GROUPS).map(g => `<label><input type="checkbox" id="mute-${g}" data-ch="mutepref" data-g="${g}" ${(m.mute || []).includes(g) ? '' : 'checked'}>${T('note_' + g)}</label>`).join('')}</div></div>
       </div><div class="list">${installCardHtml(true)}<div class="card f">
       <details class="sect"><summary>${T('privacy_link')}</summary><p class="muted small">${T('privacy_text', { n: pv().guideDays })}</p></details>
-      <button class="btn" data-act="signout">${T('signout')}</button><span class="muted small num">${T('version')} ${APP_VERSION}${S.syncedAt ? ' · ' + T('updated_at', { time: new Intl.DateTimeFormat(LOCALES[lang()], { hour: '2-digit', minute: '2-digit' }).format(new Date(S.syncedAt)) }) : ''}</span></div></div></div>`;
+      <button class="btn" data-act="signout">${T('signout')}</button>${testOn() ? `<button class="lnk" data-act="testinfo">${T('tb_chip')}: ${T('tb_title')}</button>` : ''}<span class="muted small num">${T('version')} ${APP_VERSION}${S.syncedAt ? ' · ' + T('updated_at', { time: new Intl.DateTimeFormat(LOCALES[lang()], { hour: '2-digit', minute: '2-digit' }).format(new Date(S.syncedAt)) }) : ''}</span></div></div></div>`;
   }
   function bellHtml() {
     const ns = myNotes().slice(0, 40);
@@ -2540,7 +2540,9 @@
   ['input', 'change'].forEach(t => document.addEventListener(t, ev => { if (ev.target && ev.target.form && ev.target.form.querySelector('.qsave')) { dirty.add(ev.target); qsaveOn(); } }, true));
   document.addEventListener('submit', ev => { [...(ev.target.elements || [])].forEach(el => dirty.delete(el)); }, true);
 
-  function render() { if (rendering) return; rendering = true; try { renderNow(); } finally { rendering = false; } }
+  // The weekly money bar sits exactly on top of the bottom menu, whatever its height is on this phone and text size.
+  function fitBars() { const n = document.querySelector('nav.tabs'); if (n && n.offsetHeight) document.documentElement.style.setProperty('--tabs-full', n.offsetHeight + 'px'); }
+  function render() { if (rendering) return; rendering = true; try { renderNow(); } finally { rendering = false; } fitBars(); }
   function renderNow() {
     if (me() && me().active && maintHtml() === null) { const app = $('#app'); if (app) app.innerHTML = maintScreen(); return; }
     const t0 = performance.now(); memo = {};
@@ -2555,10 +2557,10 @@
     const body = state.view === 'calendar' ? calendarHtml() : state.view === 'timeoff' ? timeoffHtml() : state.view === 'tasks' ? tasksHtml() : state.view === 'admin' ? adminHtml() : meHtml();
     const demo = S.mode === 'demo' ? `<div class="banner slim"><b>${T('demo_title')}</b><span class="small only-wide">${T('demo_text')}</span><label class="small" for="demo-as">${T('demo_as')}</label><select id="demo-as" data-ch="demoas">${db.profiles.filter(p => p.active !== false).map(p => opt(p.id, `${p.name} · ${T('role_' + p.role)}`, me().id)).join('')}</select></div>` : '';
     const upd = S.syncedAt ? T('updated_at', { time: new Intl.DateTimeFormat(LOCALES[lang()], { hour: '2-digit', minute: '2-digit' }).format(new Date(S.syncedAt)) }) : T('refresh');
-    const shell = `<header class="top"><div class="brand"><i></i>Friendly Schedule</div><nav class="nav" aria-label="Main">${nav}</nav><span class="spacer only-phone"></span>
+    const shell = `<header class="top"><div class="brand"><i class="sdot s-${syncState()}" title="${esc(upd)}"></i>Friendly Schedule</div><nav class="nav" aria-label="Main">${nav}</nav><span class="spacer only-phone"></span>
       
       <button class="iconbtn ${state.refreshing ? 'spin' : ''}" data-act="refresh" aria-label="${T('refresh')}" title="${esc(upd)}">${ico('refresh')}</button>
-      <button class="iconbtn" data-act="bell" aria-label="${T('notifications')}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>${unread ? `<span class="badge">${unread}</span>` : ''}</button><div class="subtop">${syncRow()}${testChip()}</div></header>
+      <button class="iconbtn" data-act="bell" aria-label="${T('notifications')}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>${unread ? `<span class="badge">${unread}</span>` : ''}</button>${syncRow()}</header>
       ${maintHtml() || ''}${state.viewAs ? `<div class="vabar"><span>${T('va_now', { name: esc(me().name) })}</span><button class="btn sm" data-act="vaexit">${T('va_exit')}</button></div>` : ''}<main data-key="v-${state.view}-${state.view === 'admin' ? (state.adminTab || '') : state.view === 'me' ? state.meTab : ''}">${demo}${body}</main><nav class="tabs" aria-label="Main">${nav}</nav>`;
     const t1 = performance.now(); morph(app, shell + '<div id="modal"></div><div id="toasts"></div>');
     const hd = app.querySelector('header.top'); if (hd) document.documentElement.style.setProperty('--toph', hd.offsetHeight + 'px'); const sp = app.querySelector('.strip'); if (sp && sp.offsetHeight) document.documentElement.style.setProperty('--striph', sp.offsetHeight + 'px');
@@ -2566,11 +2568,13 @@
   }
   // ---------- one line that says how fresh the schedule is and whether my changes were delivered ----------
   const hm = iso => new Intl.DateTimeFormat(LOCALES[lang()], { hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+  function syncState() { const n = S.pending || 0, at = S.syncedAt || S.cachedAt, old = at && Date.now() - new Date(at).getTime() > 10 * 60000; return S.offline ? 'off' : (n || S.syncing) ? 'send' : old ? 'old' : 'ok'; }
+  // All fine: only the green dot before the app name. Offline, old data, sending or a failed save: a line under the header says so.
   function syncRow() {
-    const n = S.pending || 0, at = S.syncedAt || S.cachedAt, old = at && Date.now() - new Date(at).getTime() > 10 * 60000;
-    const st = S.offline ? 'off' : (n || S.syncing) ? 'send' : old ? 'old' : 'ok'; document.documentElement.classList.toggle('syncing', st === 'send');
+    const n = S.pending || 0, at = S.syncedAt || S.cachedAt, st = syncState(); document.documentElement.classList.toggle('syncing', st === 'send');
+    if (st === 'ok' && !S.failed) return '';
     const tx = st === 'off' ? T('st_off', { time: at ? hm(at) : '—' }) + (n ? ' ' + T('st_wait', { n }) : '') : st === 'send' ? T('sync_wait', { n }) : st === 'old' ? T('st_old', { time: hm(at) }) : T('st_ok', { time: at ? hm(at) : '—' });
-    return `<button class="syncrow s-${st}" data-act="refresh" aria-live="polite"><i></i><span class="num">${esc(tx)}</span>${S.failed ? `<span class="tag t-warn num">${T('st_failed', { n: S.failed })}</span>` : ''}${st === 'ok' ? '' : `<span class="lnk">${T(st === 'send' ? 'st_sending' : 'st_retry')}</span>`}</button>`;
+    return `<div class="subtop"><button class="syncrow s-${st}" data-act="refresh" aria-live="polite"><i></i><span class="num">${esc(tx)}</span>${S.failed ? `<span class="tag t-warn num">${T('st_failed', { n: S.failed })}</span>` : ''}${st === 'ok' ? '' : `<span class="lnk">${T(st === 'send' ? 'st_sending' : 'st_retry')}</span>`}</button></div>`;
   }
   // Delivery notices: saved on the phone while offline, and sent when the internet is back.
   let lastPending = 0;

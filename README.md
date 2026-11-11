@@ -349,3 +349,9 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 
 ## 3.30
 - Badges are cute round stickers instead of metal medals: a soft colour by group, one simple friendly picture with a little face, one to three small stars for the step on the ladder. Not earned yet: pale, with a ring that fills up. The 38 pictures are drawn by hand in `cute.js` (no picture files, no outside service); `CUTE.map` says which badge gets which picture.
+
+## 3.31
+- Header is one line. The dot before "Friendly Schedule" is the connection status (green = up to date, amber = sending or old data, grey = no internet). A status line appears under the header only when something needs attention. The "Test version" chip moved to Me > Settings, next to the version.
+- The weekly money bar sits exactly on the bottom menu (no strip of the list between them), on any phone and text size.
+- Tour cards: the crew sits on the same line as the kind and guest count; one person who guides and drives is shown once.
+- "My next tour" shows how soon it is (Today, Tomorrow, in 3 days) on the right.

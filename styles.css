@@ -1000,3 +1000,18 @@ html[data-theme="dark"]:not([data-accent]){--accent:#8fc7a4;--accent-ink:#10231a
 html[data-accent="amber"]{--accent:#f0901e;--accent-ink:#20251f;--accent-soft:#f6ecd6}
 .btn.primary,a.btn.primary,.fab{background:var(--action);border-color:var(--action);color:var(--action-ink)}
 .brand i{background:var(--action)}
+
+/* 3.31 One-line header: the dot before the name is the connection status; a status line appears only when something is wrong */
+.brand i.sdot{width:10px;height:10px;background:var(--ok)}
+.brand i.sdot.s-old,.brand i.sdot.s-send{background:var(--warn)}.brand i.sdot.s-off{background:var(--muted)}
+.brand i.sdot.s-send{animation:pulse 1s infinite}
+@media (prefers-reduced-motion:reduce){.brand i.sdot.s-send{animation:none}}
+.subtop .syncrow i{display:none}
+/* the weekly bar touches the bottom menu: no strip of the list showing between them */
+.incbar{bottom:var(--tabs-full,calc(var(--tabs-h,62px) + env(safe-area-inset-bottom,0px)))}
+/* tour cards: the crew sits on the same line as the kind and guest count, pushed to the right; it wraps under on narrow cards */
+.acard .kindrow .crew{gap:4px 10px;color:var(--ink);font-size:var(--t-sm)}
+.acard .kindrow .crew .p{display:inline-flex;align-items:center;gap:6px}
+/* next tour: how soon, on the right, where the card was empty */
+.card.nxt{position:relative;padding-right:112px}
+.card.nxt .nxwhen{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:var(--accent-soft);color:var(--ink);border-radius:999px;padding:6px 12px;font-weight:700;font-size:var(--t-sm);white-space:nowrap}
