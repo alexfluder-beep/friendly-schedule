@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.28';
+  const APP_VERSION = '3.29';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -1358,7 +1358,7 @@
     if (bSecret(b)) return `${head}<div class="ccard"><span class="mdl big secret" style="--p:0">${medalArt(b)}</span><h2>${T('b_secret')}</h2><p class="muted">${T('bd_secret')}</p></div>`;
     return `${head}<div class="ccard"><span class="mdl big ${b.done ? 'done' : ''}" data-t="${b.track}" style="--p:${Math.round(b.have / b.goal * 100)}">${medalArt(b)}</span><h2>${esc(bName(b))}</h2><p class="muted">${esc(bDesc(b))}</p>
         ${b.track === 'titles' ? '' : `<b class="num">${nf(b.raw)} / ${nf(b.goal)} ${esc(b.unit)}</b><span class="meter" style="width:100%"><i style="width:${Math.round(b.have / b.goal * 100)}%"></i></span>`}${b.done && b.track !== 'master' ? `<span class="tag t-ok">${T('b_done')}</span>` : ''}${b.done && badgeAt(b.k) ? `<span class="muted small num">${T('b_on', { date: fmt(badgeAt(b.k), { day: 'numeric', month: 'long', year: 'numeric' }) })}</span>` : ''}</div>
-      ${b.done ? `<div class="actions"><button class="btn" data-act="badgesave" data-k="${esc(b.k)}">${T('b_save')}</button><button class="btn primary" data-act="badgeshare" data-k="${esc(b.k)}">${ico('share')}${T('share')}</button></div>` : ''}`;
+      ${b.done ? `<div class="actions"><button class="btn" data-act="celereplay" data-k="${esc(b.k)}">${T('b_replay')}</button><button class="btn" data-act="badgesave" data-k="${esc(b.k)}">${T('b_save')}</button><button class="btn primary" data-act="badgeshare" data-k="${esc(b.k)}">${ico('share')}${T('share')}</button></div>` : ''}`;
   }
   // ---------- a newly earned badge gets a full-screen moment ----------
   const seenKey = () => 'fs-badges-' + me().id;
@@ -2676,6 +2676,7 @@
     car2(el) { run(async () => { const nid = await secondCar(el.dataset.id); if (nid) { toast(T('car2_done')); openTour(nid); state.modal.edit = true; } }).then(renderModal); },
     celeopen() { const m = state.modal; if (!m || m.type !== 'celebrate') return; m.opened = true; fx.box(); renderModal(); setTimeout(() => fx.badge(), 380); },
     celeok() { state.modal = null; renderModal(); checkBadges(); },
+    celereplay(el) { state.modal = { type: 'celebrate', k: el.dataset.k, more: 0 }; renderModal(); fx.sheet(); },
     badge(el) { state.modal = { type: 'badge', k: el.dataset.k }; renderModal(); },
     catedit(el) { const i = Number(el.dataset.i), c = i >= 0 ? catalog()[i] : { title: '', kind: 'private', days: 1 }; state.modal = { type: 'cat', i, draft: { ...c, dur: c.start && c.end ? durOf({ start_time: c.start, end_time: c.end }) : '', regions: [...regionsOf(c.title || '')] } }; renderModal(); },
     catdel() { const m = state.modal, items = catalog().slice(); confirmDo(T('cat_del_q', { name: m.draft.title }), T('cat_del'), async () => { items.splice(m.i, 1); await S.save('settings', { id: 'catalog', value: { items } }); toast(T('saved')); }); },
@@ -3069,7 +3070,7 @@
   S.authEvent = ev => { if (ev === 'PASSWORD_RECOVERY') { state.auth = 'newpass'; render(); } };
   // Text size, colours and contrast: kept on this phone and on the account, so they follow the person to another phone.
   const DKEYS = { fs: 'fs-fsize', theme: 'fs-theme', contrast: 'fs-contrast', accent: 'fs-accent' };
-  const ACCENTS = [['', '#f0901e'], ['forest', '#314b3c'], ['sea', '#1f5f7a'], ['plum', '#5b3f7a'], ['terra', '#b8441c'], ['sky', '#5aa9e6'], ['mint', '#45b88a'], ['lilac', '#b39ddb'], ['rose', '#f28fad'], ['sun', '#f2c94c']];
+  const ACCENTS = [['', '#314b3c'], ['sea', '#1f5f7a'], ['plum', '#5b3f7a'], ['terra', '#b8441c'], ['sky', '#5aa9e6'], ['mint', '#45b88a'], ['lilac', '#b39ddb'], ['rose', '#f28fad'], ['sun', '#f2c94c'], ['amber', '#f0901e']];
   const dget = k => { try { return localStorage.getItem(DKEYS[k]) || ''; } catch (e) { return ''; } };
   if (/iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) { const vp = document.querySelector('meta[name=viewport]'); if (vp) vp.setAttribute('content', 'width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover'); }
   document.documentElement.dataset.os = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ? 'ios' : /Android/i.test(navigator.userAgent) ? 'android' : 'other';

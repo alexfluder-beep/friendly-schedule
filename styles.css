@@ -990,3 +990,13 @@ html[data-accent="terra"]{--accent:#b8441c;--accent-ink:#ffffff;--accent-soft:#f
 @media (prefers-color-scheme:dark){html:not([data-theme="light"])[data-accent="forest"]{--accent:#8fc7a4;--accent-ink:#10231a}html:not([data-theme="light"])[data-accent="sea"]{--accent:#8cc4ea;--accent-ink:#0c2230}html:not([data-theme="light"])[data-accent="plum"]{--accent:#c9b3ee;--accent-ink:#231533}html:not([data-theme="light"])[data-accent="terra"]{--accent:#f0a07f;--accent-ink:#30140a}}
 html[data-theme="dark"][data-accent="forest"]{--accent:#8fc7a4;--accent-ink:#10231a}html[data-theme="dark"][data-accent="sea"]{--accent:#8cc4ea;--accent-ink:#0c2230}html[data-theme="dark"][data-accent="plum"]{--accent:#c9b3ee;--accent-ink:#231533}html[data-theme="dark"][data-accent="terra"]{--accent:#f0a07f;--accent-ink:#30140a}
 .tnote{white-space:pre-line;line-height:1.5}
+
+/* 3.29 Default look = the Friendly.ge brand book: green for structure, one orange for action, sand for soft bands.
+   --action is the colour of the main button; other schemes use their own colour for both. */
+:root{--action:var(--accent);--action-ink:var(--accent-ink)}
+html:not([data-accent]){--accent:#314b3c;--accent-ink:#ffffff;--accent-soft:#e6e8dd;--action:#b94a2f;--action-ink:#ffffff}
+@media (prefers-color-scheme:dark){html:not([data-theme="light"]):not([data-accent]){--accent:#8fc7a4;--accent-ink:#10231a;--accent-soft:#263029;--action:#f0a07f;--action-ink:#30140a}}
+html[data-theme="dark"]:not([data-accent]){--accent:#8fc7a4;--accent-ink:#10231a;--accent-soft:#263029;--action:#f0a07f;--action-ink:#30140a}
+html[data-accent="amber"]{--accent:#f0901e;--accent-ink:#20251f;--accent-soft:#f6ecd6}
+.btn.primary,a.btn.primary,.fab{background:var(--action);border-color:var(--action);color:var(--action-ink)}
+.brand i{background:var(--action)}

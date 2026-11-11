@@ -342,3 +342,7 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 - Four calmer colour schemes in Me > Settings > Colour of buttons: Forest green, Sea blue, Plum, Terracotta (white text on the colour; lighter versions in the dark theme). Orange stays the default until the owner picks another.
 - "1 tour needs a guide or driver" instead of "1 tours need".
 - Long task notes keep their line breaks.
+
+## 3.29
+- Default colours follow the Friendly.ge brand book: green for structure (selected tabs and chips), one orange for the main button, sand for soft bands. Me > Settings > Colour of buttons keeps the other schemes; the old bright orange is there as "Bright orange".
+- Badge page: "Open the box again" replays the gift-box opening of an earned badge.
