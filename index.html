@@ -11,12 +11,29 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Schedule">
-<style>:root{padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}[hidden]{display:none!important}</style>
+<style>:root{padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}[hidden]{display:none!important}.hello{min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:24px}.hello b{font-size:26px;font-weight:700;letter-spacing:-.01em}</style>
 <link rel="preload" href="app.js" as="script">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<div id="app"><main><p class="muted">Loading…</p></main></div>
+<div id="app"><main class="hello" aria-live="polite"><svg id="hello-art" viewBox="0 0 48 48" width="96" height="96" aria-hidden="true"></svg><b id="hello-t">Friendly Schedule</b><span id="hello-s" class="muted"></span></main></div>
+<script>
+// While the schedule loads: a greeting by the time of day, with the person's first name from their last visit (kept on this phone only).
+(function () {
+  try {
+    var h = JSON.parse(localStorage.getItem('fs-hello') || '{}'), hr = new Date().getHours(), part = hr >= 5 && hr < 12 ? 0 : hr < 18 ? 1 : hr < 23 ? 2 : 3;
+    var L = { en: ['Good morning', 'Good afternoon', 'Good evening', 'Good night', 'Opening your schedule…'], ru: ['Доброе утро', 'Добрый день', 'Добрый вечер', 'Доброй ночи', 'Открываю расписание…'], ka: ['დილა მშვიდობისა', 'გამარჯობა', 'საღამო მშვიდობისა', 'ღამე მშვიდობისა', 'განრიგი იხსნება…'] }[h.l] || null;
+    if (!L) L = ['Good morning', 'Good afternoon', 'Good evening', 'Good night', 'Opening your schedule…'];
+    document.getElementById('hello-t').textContent = L[part] + (h.n ? ', ' + h.n : '');
+    document.getElementById('hello-s').textContent = L[4];
+    var O = '#4a3526', S = 'stroke="' + O + '" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"';
+    var face = '<circle cx="19.5" cy="23" r="1.5" fill="' + O + '"/><circle cx="28.5" cy="23" r="1.5" fill="' + O + '"/><path d="M21.3 26q2.7 3.200 5.400 0" fill="none" stroke="' + O + '" stroke-width="1.8" stroke-linecap="round"/><circle cx="16.900" cy="25.600" r="1.700" fill="#ff9aa2" opacity=".75"/><circle cx="31.100" cy="25.600" r="1.700" fill="#ff9aa2" opacity=".75"/>';
+    var sun = '<path d="M24 3v6M24 39v6M3 24h6M39 24h6M9.200 9.200l4.200 4.200M34.600 34.600l4.200 4.200M9.200 38.800l4.200-4.200M34.600 13.400l4.200-4.200" stroke="#ffb26b" stroke-width="3.400" stroke-linecap="round"/><circle cx="24" cy="24" r="12" fill="#ffd166" ' + S + '/>' + face;
+    var moon = '<path d="M31 6a17 17 0 1 0 11 27A14 14 0 0 1 31 6z" fill="#ffd166" ' + S + '/><circle cx="20" cy="24" r="1.500" fill="' + O + '"/><path d="M17 29q3.500 3 7 .500" fill="none" stroke="' + O + '" stroke-width="1.800" stroke-linecap="round"/><path d="M38 9v6M35 12h6M42 19v6M39 22h6" stroke="' + O + '" stroke-width="1.600" stroke-linecap="round"/>';
+    document.getElementById('hello-art').innerHTML = part < 2 ? sun : moon;
+  } catch (e) { /* the page still opens */ }
+})();
+</script>
 <script src="config.js" defer></script>
 <script src="catalog.js" defer></script>
 <script src="icons.js" defer></script>

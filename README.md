@@ -407,3 +407,11 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 - **Badges page, what matters first:** level, Almost there, My badges (earned ones, titles first), team goal and challenge, My road, thanks. Folded away: Badges still to earn, Tour mastery, This month. A section you open stays open.
 - **Stars mean a level.** One to three stars only on badges that come in steps and on tour mastery, on a small white label under the sticker. One-off badges and titles have none.
 - **Abano Pass:** My road counts crossings ("Crossed the Abano Pass (Tusheti) ×N", twice per trip), and three badges: Over the Abano (2), Abano regular (10), Master of the Abano (30).
+
+## 3.41
+- **Week strip is easier to read.** Under each date: a dot with the number of tours (amber when a tour still needs a guide or driver, office only) and a small umbrella for days off (filled when it is your own day off, with a number for how many people are off). A one-line key under the strip says what the marks mean. Marks no longer hide under the dates on narrow phones.
+- The day-off icon is an umbrella everywhere (strip, Time off tab), not a sun.
+- **Messages do not pile up.** The same message is shown once (tapping Refresh ten times shows one message), and at most two messages are on screen. With no internet, Refresh says "No internet right now. You see the data saved on this phone."
+- **A greeting instead of "Loading…".** While the app opens you see a small sun or moon and "Good morning / Good afternoon / Good evening, <first name>" in your language. The first name and language are remembered on the phone only (`fs-hello`), and removed on sign-out.
+- A photo that is still loading shows a quiet camera, not an empty square.
+- **Photo of the day moved down.** The schedule comes first; the Photo of the day line is now under the week's tours (guides and drivers) and under the calendar (office), not at the top of the first screen.

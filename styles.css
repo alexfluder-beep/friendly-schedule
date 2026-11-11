@@ -1087,3 +1087,23 @@ html[data-accent="amber"]{--accent:#f0901e;--accent-ink:#20251f;--accent-soft:#f
 .bpmore{margin-top:8px}.bpmore>summary{font-weight:700;font-size:var(--t-h3)}.bpmore .medals,.bpmore .stats{margin-top:10px}
 
 .banner.warn{background:color-mix(in srgb,var(--warn) 14%,var(--surface));border-color:var(--warn)}
+
+/* 3.41 Week strip: two plain marks under each date. A dot with a number = tours; an umbrella with a number = people off. */
+.smk{display:inline-flex;align-items:center;justify-content:center;gap:3px;height:18px;min-width:26px;padding:0 5px;border-radius:999px;font-size:12px;font-weight:600;line-height:1;color:var(--ink);text-transform:none;letter-spacing:0}
+.smk.none{visibility:hidden}
+.smk.tr i{width:8px;height:8px;border-radius:50%;background:var(--accent);flex:none}
+.smk.tr.need{background:color-mix(in srgb,var(--warn) 22%,var(--surface))}.smk.tr.need i{background:var(--warn)}
+.smk.off{color:var(--dayoff);background:color-mix(in srgb,var(--dayoff) 14%,var(--surface))}
+.smk.off .msi{width:13px;height:13px}
+.smk.off.me{background:var(--dayoff);color:#fff}
+:root[data-theme="dark"] .smk.off.me{color:#0d1d24}
+.strip button{gap:3px}
+.striplg{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;padding:6px 2px 0}
+.striplg span{display:inline-flex;align-items:center;gap:5px}.striplg .msi{width:14px;height:14px;color:var(--dayoff)}
+.lgd{width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block}.lgd.need{background:var(--warn)}
+.offm .msi{width:12px;height:12px}
+.tabic .msi{width:22px;height:22px}
+.smk.gone{display:none}
+
+/* 3.41 a photo that is still loading shows a quiet camera, not an empty square */
+.wait{display:grid;place-items:center;color:var(--muted)}.wait .msi{width:40%;max-width:28px;height:auto;opacity:.5}
