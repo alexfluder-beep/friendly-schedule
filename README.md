@@ -485,3 +485,7 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 
 ## 3.54
 - **Guides and drivers see only their own schedule.** The Team / Mine switch, the "Whole team's calendar" link and the T key are for the office only; every view (day, week, month, agenda) shows a guide or driver their own tours. They still see tours that need someone, the team-ready percentages without names, and their partner on their own tours.
+
+## 3.55
+- **Time off: your days off are on the Team ready calendar.** Approved days off (umbrella), sick days and requests still waiting (dashed) are marked on the same calendar as the team percentages. Arrows move four weeks back or forward, so past days off can be looked up too. Tapping one of your days says what it is.
+- **My requests is short.** It lists only what is coming up or still waiting; everything earlier is folded under "Earlier requests".

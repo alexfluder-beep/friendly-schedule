@@ -1198,3 +1198,10 @@ code.ref{font:inherit;font-variant-numeric:tabular-nums;letter-spacing:.02em;use
 
 /* tour card buttons on a phone: one compact row, icon above a short label */
 @media (max-width:760px){.tacts{display:grid;grid-template-columns:repeat(auto-fit,minmax(56px,1fr));gap:6px}.tacts .btn,.tacts .btn.primary{flex:none;flex-direction:column;gap:3px;min-height:54px;padding:6px 2px;font-size:11px;line-height:1.15;white-space:normal;text-align:center;border-radius:var(--r-l)}.tacts .btn .msi{width:20px;height:20px}}
+
+/* 3.55 Team ready calendar: pages of four weeks; own days off, sick days and waiting requests are on it */
+.tcnav{display:flex;align-items:center;gap:8px;margin-bottom:8px}.tcnav b{flex:1;text-align:center;font-size:var(--t-sm)}.tcnav .iconbtn{width:40px;height:40px}
+.tcd.mine{background:color-mix(in srgb,var(--dayoff) 18%,var(--surface));border-color:var(--dayoff)}.tcd.mine.sickd{background:color-mix(in srgb,var(--sick) 16%,var(--surface));border-color:var(--sick)}.tcd.mine.sickd .msi{color:var(--sick)}
+.tcd.mine.pend{border-style:dashed;background:var(--surface)}.tcd.past.mine{opacity:.7}
+.pendmk{display:inline-block;width:14px;height:14px;border:1.500px dashed var(--dayoff);border-radius:4px;vertical-align:-2px}
+.tcd.past.mine:not(.pend){border-style:solid}

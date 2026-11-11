@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.54';
+  const APP_VERSION = '3.55';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -1683,7 +1683,7 @@
     const sug = (suggestDaysOff(4)[me().id] || []).filter(x => x.st === 'sug').map(x => x.d);
     if (!isAdmin() && sug.length) h += `<div class="card"><b>${T('sug_title')}</b><span class="muted small">${T('sug_text')}</span><div class="bar">${sug.map(d => `<button class="btn sm" data-act="offnew" data-date="${d}">${esc(fmtDay(d))}</button>`).join('')}</div></div>`;
     if (isAdmin()) h += `<h3>${T('to_approve')} (${pending.length})</h3><div class="list">${pending.length ? pending.map(o => offRow(o, true)).join('') : `<div class="empty">${T('nothing_pending')}</div>`}</div>`;
-    h += `<div class="cols"><div class="list"><h3>${T('my_requests')}</h3>${mine.length ? mine.map(o => offRow(o, isAdmin())).join('') : `<div class="empty">${T('no_requests')}</div>`}</div>
+    h += `<div class="cols"><div class="list"><h3>${T('my_requests')}</h3>${(() => { const td0 = today(), now = mine.filter(o => o.date_to >= td0 || o.status === 'pending'), old = mine.filter(o => !now.includes(o)); return (now.length ? now.map(o => offRow(o, isAdmin())).join('') : `<div class="empty">${T(mine.length ? 'req_none_now' : 'no_requests')}</div>`) + (old.length ? `<details class="sect bpmore" data-keep="req-old" ${(state.keep || {})['req-old'] ? 'open' : ''}><summary data-s="${T('show')}" data-h="${T('hide')}"><span>${T('req_old')} <span class="tag t-muted num">${old.length}</span></span></summary><div class="list">${old.map(o => offRow(o, isAdmin())).join('')}</div></details>` : ''); })()}</div>
       <div class="list"><h3>${T(isAdmin() ? 'team_off' : 'tc_title')}</h3>${!isAdmin() ? teamOffCounts(upcoming) : !upcoming.length ? `<div class="empty">${T('nobody_off')}</div>` : isAdmin() ? upcoming.map(o => `<div class="card lrow">${avatar(o.user_id)}<span class="lmain"><b>${esc(pname(o.user_id))}</b>${offTag(o)}</span><span class="num ldate">${esc(fmtRange(o.date_from, o.date_to))}</span></div>`).join('') : teamOffCounts(upcoming)}
       <h3>${T('holidays')}</h3>${hol.length ? hol.map(x => `<div class="card lrow nohead"><span class="lmain"><span class="tag ${x.kind === 'event' ? 't-group' : 't-hol'}">${esc(trName(x.name))}</span></span><span class="num ldate">${esc(fmtRange(x.date_from, x.date_to))}</span>${x.notes ? `<div class="muted small">${esc(x.notes)}</div>` : ''}</div>`).join('') : `<div class="empty">${T('no_holidays')}</div>`}</div></div>`;
     return h;
@@ -1752,15 +1752,18 @@
   const RIDE_4X4 = /4\s*[x×х]\s*4|4\s*wd|delica/i;   // by the tour name only: not every Kazbegi tour is a 4x4 ride (owner, 11 Nov)
   // For guides and drivers the team's days off are numbers per day, never names: "2 guides, 1 driver off" and the share of the team.
   function teamOffCounts(list) {
-    const td = today(), m = me(), team = staff().filter(p => p.role !== 'admin'), n = team.length || 1, start = monday(td), r = rules(), pk = peaks();
+    const td = today(), m = me(), team = staff().filter(p => p.role !== 'admin'), n = team.length || 1, pg = Number(state.tcPage) || 0, start = addDays(monday(td), 28 * pg), r = rules(), pk = peaks();
+    const own = d => db.time_off.find(o => twin(o.user_id) === m.id && o.status !== 'declined' && o.date_from <= d && o.date_to >= d);
     const wd = [...Array(7)].map((_, i) => `<div class="hd">${esc(fmt(addDays(start, i), { weekday: 'short' }))}</div>`).join('');
     const cells = [...Array(28)].map((_, i) => {
       const d = addDays(start, i), past = d < td, off = new Set(list.filter(o => o.date_from <= d && o.date_to >= d).map(o => twin(o.user_id))), others = [...off].filter(id => id !== m.id).length, ready = Math.round((n - off.size) / n * 100);
       const why = []; if (!past) { if (db.tours.some(t => live(t) && involves(t, m.id) && t.date <= d && endOf(t) >= d)) why.push(T('tc_mytour')); if (pk.some(p => p.from <= d && p.to >= d)) why.push(T('tc_peak')); if (others >= Math.max(2, Math.ceil(n * 0.2))) why.push(T('tc_many', { n: others })); }
-      const mine = off.has(m.id), ho = holidayOn(d);
-      return `<button class="tcd ${past ? 'past' : ''} ${d === td ? 'tdy' : ''} ${mine ? 'mine' : ''} ${why.length ? 'no' : ''}" ${past ? 'disabled' : `data-act="tcday" data-date="${d}" data-why="${esc(why.join(' · '))}"`} aria-label="${esc(fmtDay(d))}: ${T('tc_ready', { p: ready })}${why.length ? '. ' + esc(T('tc_no')) + ': ' + esc(why.join(', ')) : ''}"><b class="num">${D(d).getDate()}</b><span class="num pc">${past ? '' : ready + '%'}</span>${mine ? msi('beach_access') : why.length && !past ? `<i class="nomk" aria-hidden="true">!</i>` : ''}${ho ? `<i class="hold" title="${esc(trName(ho.name))}"></i>` : ''}</button>`;
+      const mo = own(d), mine = !!mo, ho = holidayOn(d);
+      const myTx = mo ? `${T(mo.type === 'sick' ? 'sick' : mo.type === 'half' ? 'halfday' : 'dayoff')} · ${T(mo.status)}` : '';
+      return `<button class="tcd ${past ? 'past' : ''} ${d === td ? 'tdy' : ''} ${mine ? 'mine' : ''} ${mo && mo.type === 'sick' ? 'sickd' : ''} ${mo && mo.status === 'pending' ? 'pend' : ''} ${why.length && !mine ? 'no' : ''}" ${past && !mine ? 'disabled' : `data-act="tcday" data-date="${d}" data-mine="${esc(myTx)}" data-why="${esc(mine ? '' : why.join(' · '))}"`} aria-label="${esc(fmtDay(d))}: ${T('tc_ready', { p: ready })}${why.length ? '. ' + esc(T('tc_no')) + ': ' + esc(why.join(', ')) : ''}"><b class="num">${D(d).getDate()}</b><span class="num pc">${past ? '' : ready + '%'}</span>${mine ? msi(mo.type === 'sick' ? 'sick' : 'beach_access') : why.length && !past ? `<i class="nomk" aria-hidden="true">!</i>` : ''}${ho ? `<i class="hold" title="${esc(trName(ho.name))}"></i>` : ''}</button>`;
     }).join('');
-    return `<div class="card tcal"><div class="tcgrid">${wd}${cells}</div><div class="striplg muted small"><span><b class="num">90%</b> ${T('tc_lg_ready')}</span><span><i class="nomk">!</i> ${T('tc_lg_no')}</span><span>${msi('beach_access')} ${T('sm_lg_myoff')}</span></div>${state.tcWhy ? `<div class="banner small"><span>${esc(state.tcWhy)}</span></div>` : ''}</div>`;
+    const nav = `<div class="tcnav"><button class="iconbtn" data-act="tcpage" data-d="-1" aria-label="${T('prev')}">‹</button><b class="num">${esc(fmtRange(start, addDays(start, 27)))}</b>${pg ? `<button class="btn sm" data-act="tcpage" data-d="0">${T('today')}</button>` : ''}<button class="iconbtn" data-act="tcpage" data-d="1" aria-label="${T('next')}">›</button></div>`;
+    return `<div class="card tcal">${nav}<div class="tcgrid">${wd}${cells}</div><div class="striplg muted small"><span><b class="num">90%</b> ${T('tc_lg_ready')}</span><span><i class="nomk">!</i> ${T('tc_lg_no')}</span><span>${msi('beach_access')} ${T('sm_lg_myoff')}</span><span><i class="pendmk"></i> ${T('tc_lg_pend')}</span></div>${state.tcWhy ? `<div class="banner small"><span>${esc(state.tcWhy)}</span></div>` : ''}</div>`;
   }
   // Work and rest (Time off page, guides and drivers). Personal: the person's own answers (tours a week that feel right, rest days,
   // more work or more rest) plus what the schedule shows about them. Counted again on every open; no guest names.
@@ -3076,7 +3079,8 @@
     invdel(el) { run(() => S.remove('invites', el.dataset.id)); },
     wsame(el) { const box = el.closest('.wweek'), rows = [...box.querySelectorAll('.wrow')], src = rows.find(r => r.querySelector('[type=checkbox]').checked && r.querySelector('[name^=wf]').value) || rows[0], f = src.querySelector('[name^=wf]').value, t = src.querySelector('[name^=wt]').value; rows.forEach(r => { r.querySelector('[name^=wf]').value = f; r.querySelector('[name^=wt]').value = t; r.querySelectorAll("input").forEach(x => dirty.add(x)); }); qsaveOn(); },
     showpw() { state.showPw = !state.showPw; render(); },
-    tcday(el) { const d = el.dataset.date, why = el.dataset.why; if (why) { state.tcWhy = `${fmtDay(d)}: ${T('tc_no')} (${why})`; render(); } else { state.tcWhy = ''; acts.offnew({ dataset: { date: d } }); } },
+    tcpage(el) { const d = Number(el.dataset.d); state.tcPage = d ? Math.max(-12, Math.min(12, (Number(state.tcPage) || 0) + d)) : 0; state.tcWhy = ''; render(); },
+    tcday(el) { const d = el.dataset.date, why = el.dataset.why; if (el.dataset.mine) { state.tcWhy = `${fmtDay(d)}: ${el.dataset.mine}`; render(); } else if (d < today()) { return; } else if (why) { state.tcWhy = `${fmtDay(d)}: ${T('tc_no')} (${why})`; render(); } else { state.tcWhy = ''; acts.offnew({ dataset: { date: d } }); } },
     print() { window.print(); },
     usf(el) { state.usageF = { ...(state.usageF || {}), [el.dataset.k]: el.dataset.v }; render(); },
     refresh() { if (state.refreshing) return; state.refreshing = true; render(); (async () => { try { if (S.offline) await S.sync(); else await S.pulse(); } catch (e) { console.error(e); } state.refreshing = false; render(); if (!S.warming) toast(T(S.offline ? 'rf_off' : 'up_to_date')); })(); },
