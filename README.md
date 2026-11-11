@@ -322,3 +322,10 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 - Badges are drawn as medals: a ribbon, a shaped medal (seal, shield, hexagon or star by kind) and the symbol in the middle. Bronze, silver and gold by the step on the ladder; grey with a progress arc until earned; a short shine when an earned badge is opened. The shared badge picture uses the same medal.
 - Getting started: the Telegram step has "I don't use Telegram", which ticks it off.
 - Tasks: when tours are waiting, a line at the top says so and opens the second section.
+
+## 3.25
+- New app icon (calendar page, mountains, sun) and a small picture on the sign-in page (mountains and trees, no buildings).
+- Sounds and vibration: a short tone when something is saved, a lower one on an error, a light tap on Android. Settings > Sounds turns both off.
+- A new big badge arrives as a gift box: tap to open, the medal comes out with a shine.
+- Each badge keeps the day it was earned ("Earned on 11 November 2026") on its page. Badges earned before 3.25 show no date.
+- Links to friendly.ge in the offer text carry Google Analytics tags (source friendly_schedule, medium guide_offer, campaign = the promo code or "team", content = the tour), so visits and bookings from guide messages show in GA4 under Traffic acquisition. Tip QR codes and review links go to other sites and are not tagged.

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#2f6b48"/>
+  <!-- calendar page -->
+  <rect x="116" y="124" width="280" height="276" rx="44" fill="#f7f5ef"/>
+  <path d="M116 168a44 44 0 0 1 44-44h192a44 44 0 0 1 44 44v36H116z" fill="#f0901e"/>
+  <rect x="176" y="98" width="24" height="64" rx="12" fill="#20251f"/>
+  <rect x="312" y="98" width="24" height="64" rx="12" fill="#20251f"/>
+  <!-- mountains and sun -->
+  <circle cx="326" cy="262" r="22" fill="#f0901e"/>
+  <path d="M148 360l72-106 40 58 30-40 74 88z" fill="#20251f"/>
+  <path d="M220 254l22 34-16 10-12-12-14 10z" fill="#f7f5ef"/>
+</svg>

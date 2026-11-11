@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 150" role="img" aria-label="">
+  <rect width="400" height="150" fill="#e9e8dc"/>
+  <circle cx="318" cy="46" r="20" fill="#f0901e"/>
+  <path d="M0 118 70 52l44 44 40-58 62 80 46-46 138 60V150H0z" fill="#b9c4ae"/>
+  <path d="M154 38l22 30-14 8-10-10-12 10z" fill="#f7f5ef"/>
+  <path d="M0 150v-30c60-22 120-6 170-14s120-30 230-6v50z" fill="#314b3c"/>
+  <g fill="#20251f"><path d="M246 98l10-26 10 26z"/><path d="M262 100l8-20 8 20z"/><path d="M232 100l7-16 7 16z"/></g>
+  <!-- road and van -->
+  <path d="M20 150c40-26 110-18 170-26" fill="none" stroke="#f7f5ef" stroke-width="5" stroke-linecap="round" stroke-dasharray="14 12"/>
+  <g transform="translate(96 108)"><rect x="0" y="4" width="44" height="18" rx="5" fill="#f7f5ef" stroke="#20251f" stroke-width="2.5"/><path d="M26 6h10l6 8H26z" fill="#9fb7c9" stroke="#20251f" stroke-width="2"/><rect x="6" y="0" width="22" height="4" rx="2" fill="#20251f"/><circle cx="11" cy="23" r="5" fill="#20251f"/><circle cx="33" cy="23" r="5" fill="#20251f"/></g>
+</svg>

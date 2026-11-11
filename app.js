@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.24';
+  const APP_VERSION = '3.25';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -517,6 +517,27 @@
     return 'E9';
   }
   const ERR_CODES = ['E1', 'E2', 'E3', 'E4', 'E5', 'E6', 'E9'];
+  // ---------- small sounds and vibration: quiet, short, made in the browser; one switch in Settings ----------
+  let actx = null;
+  const sndOn = () => { try { return localStorage.getItem('fs-sound') !== 'off'; } catch (e) { return true; } };
+  function tone(seq, vol) {
+    if (!sndOn()) return;
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume();
+      let t = actx.currentTime + 0.01;
+      seq.forEach(([f, d, type]) => { const o = actx.createOscillator(), g = actx.createGain(); o.type = type || 'sine'; o.frequency.value = f; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol || 0.06, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + d); o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + d + 0.02); t += d * 0.82; });
+    } catch (e) { /* no sound on this phone */ }
+  }
+  const buzz = p => { if (sndOn() && navigator.vibrate) { try { navigator.vibrate(p); } catch (e) { /* not allowed */ } } };
+  const fx = {
+    tap() { buzz(8); },
+    ok() { tone([[660, 0.09], [880, 0.14]]); buzz(14); },
+    err() { tone([[233, 0.16, 'triangle'], [185, 0.22, 'triangle']], 0.08); buzz([24, 50, 24]); },
+    sheet() { tone([[520, 0.06]], 0.03); },
+    box() { tone([[392, 0.07, 'triangle'], [523, 0.09, 'triangle']], 0.05); buzz(20); },
+    badge() { tone([[523, 0.11], [659, 0.11], [784, 0.11], [1047, 0.32]], 0.07); buzz([16, 40, 16, 40, 60]); },
+  };
+  document.addEventListener('click', ev => { if (ev.target.closest && ev.target.closest('button,a,summary,label,select')) fx.tap(); }, true);
   function toast(text) {
     const el = document.createElement('div'); el.className = 'toast'; el.textContent = text;
     $('#toasts').appendChild(el); setTimeout(() => el.remove(), 3500);
@@ -550,16 +571,18 @@
   }
   async function run(fn, okText) {
     if (state.viewAs) { toast(T('va_readonly')); return; }
-    try { await fn(); if (okText) toast(okText); } catch (e) { console.error(e); const m = String((e && e.message) || ''); logErr('save', `${errCode(e)} ${m || 'Save failed'}`, e && e.stack); toast(/invalid login/i.test(m) ? T('err_login') : /already registered|already exists/i.test(m) ? T('err_exists') : `${T('err_save')} (${errCode(e)}): ${T('ec_' + errCode(e))}`); }
+    try { await fn(); if (okText) { toast(okText); fx.ok(); } } catch (e) { fx.err(); console.error(e); const m = String((e && e.message) || ''); logErr('save', `${errCode(e)} ${m || 'Save failed'}`, e && e.stack); toast(/invalid login/i.test(m) ? T('err_login') : /already registered|already exists/i.test(m) ? T('err_exists') : `${T('err_save')} (${errCode(e)}): ${T('ec_' + errCode(e))}`); }
     render();
   }
 
   // ---------- auth screens ----------
+  // A small flat picture of our world (mountains, a hill church, the road and the van) for the login page.
+  const HERO_ART = '<svg class="authart" viewBox="0 0 400 150" aria-hidden="true"><rect width="400" height="150" fill="#e9e8dc"/><circle cx="318" cy="46" r="20" fill="#f0901e"/><path d="M0 118 70 52l44 44 40-58 62 80 46-46 138 60V150H0z" fill="#b9c4ae"/><path d="M154 38l22 30-14 8-10-10-12 10z" fill="#f7f5ef"/><path d="M0 150v-30c60-22 120-6 170-14s120-30 230-6v50z" fill="#314b3c"/><g fill="#20251f"><path d="M246 98l10-26 10 26z"/><path d="M262 100l8-20 8 20z"/><path d="M232 100l7-16 7 16z"/></g><path d="M20 150c40-26 110-18 170-26" fill="none" stroke="#f7f5ef" stroke-width="5" stroke-linecap="round" stroke-dasharray="14 12"/><g transform="translate(96 108)"><rect x="0" y="4" width="44" height="18" rx="5" fill="#f7f5ef" stroke="#20251f" stroke-width="2.5"/><path d="M26 6h10l6 8H26z" fill="#9fb7c9" stroke="#20251f" stroke-width="2"/><rect x="6" y="0" width="22" height="4" rx="2" fill="#20251f"/><circle cx="11" cy="23" r="5" fill="#20251f"/><circle cx="33" cy="23" r="5" fill="#20251f"/></g></svg>';
   function authHtml() {
     const a = state.auth, msg = state.authMsg ? `<div class="banner">${esc(state.authMsg)}</div>` : '', pw = state.showPw;
     // Language sits right under the form, next to the account links: a globe and three short buttons.
     const langSel = `<div class="authlang" role="group" aria-label="${T('language')}">${msi('language')}<div class="seg">${[['en', 'EN', 'English'], ['ru', 'RU', 'Русский'], ['ka', 'KA', 'ქართული']].map(([k, l, n]) => `<button type="button" data-act="prelangb" data-v="${k}" aria-pressed="${lang() === k}" lang="${k}" title="${n}" aria-label="${n}">${l}</button>`).join('')}</div></div>`;
-    const brand = `<div class="authhead"><div class="brand big"><i></i>Friendly Schedule</div><p class="muted">${T('login_sub')}</p></div>`;
+    const brand = `${HERO_ART}<div class="authhead"><div class="brand big"><i></i>Friendly Schedule</div><p class="muted">${T('login_sub')}</p></div>`;
     const privacy = `<details class="sect"><summary>${T('privacy_link')}</summary><p class="muted small">${T('privacy_text', { n: pv().guideDays })}</p></details>`;
     if (me() && !me().active) return `<main><div class="auth f">${brand}<div class="card"><h2>${T(me().left_at ? 'closed_title' : 'pending_title')}</h2><p class="muted">${T(me().left_at ? 'closed_text' : 'pending_text')}</p>${S.loginNote ? `<p class="muted small">${esc(me().email || '')} · ${esc(S.loginNote)}</p>` : ''}</div><button class="btn primary" data-act="reload">${T('refresh')}</button><button class="btn" data-act="signout">${T('signout')}</button>${langSel}</div></main>`;
     if (a === 'newpass') return `<main><form class="auth f" data-form="newpass">${brand}<h2>${T('new_password')}</h2>${msg}<label>${T('password')}<input id="np-pass" name="password" type="password" minlength="8" required autocomplete="new-password"></label><button class="btn primary">${T('save')}</button>${langSel}</form></main>`;
@@ -843,8 +866,12 @@
   // The website page for a tour: exact name, then the name it was joined to, then the most similar catalogue name (same private/group kind).
   const catFor = title => { const c = catFind(title) || catFind(aliasOf(title)); if (c) return c; let best = null, bs = 0; catalog().forEach(x => { const sc = tnScore(x.title, aliasOf(title)); if (sc > bs) { bs = sc; best = x; } }); return bs >= 0.5 ? best : null; };
   const myPromo = () => (rules().promos || {})[me().id] || rules().offerPromo || '';
+  // Our own website links get campaign tags (no names: the promo code or "team"), so GA4 on friendly.ge shows visits and bookings that came from the app.
+  function gaUrl(url, medium, content) {
+    try { const u = new URL(url); if (!/(^|\.)friendly\.ge$/i.test(u.hostname) || u.searchParams.has('utm_source')) return url; u.searchParams.set('utm_source', 'friendly_schedule'); u.searchParams.set('utm_medium', medium); u.searchParams.set('utm_campaign', (myPromo() || 'team').toLowerCase().replace(/[^a-z0-9_-]/g, '')); if (content) u.searchParams.set('utm_content', String(content).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)); return u.toString(); } catch (e) { return url; }
+  }
   function offerText(t, free) {
-    const c = catFor(t.title) || {}, r = rules(), url = c.url || r.siteUrl || 'https://friendly.ge/en/', promo = myPromo();
+    const c = catFor(t.title) || {}, r = rules(), url = gaUrl(c.url || r.siteUrl || 'https://friendly.ge/en/', 'guide_offer', aliasOf(t.title)), promo = myPromo();
     const when = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }).format(D(t.date));
     return `If you would like to see more of Georgia with us: ${t.title}, ${when}${t.start_time ? ' at ' + t.start_time : ''}${free ? ` (${free} ${free === 1 ? 'place' : 'places'} left)` : ''}. You can book here: ${url}${promo ? ` Promo code ${promo}.` : ''}`;
   }
@@ -1306,7 +1333,7 @@
     const head = `<div class="hdr"><span class="spacer"></span><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>`;
     if (bSecret(b)) return `${head}<div class="ccard"><span class="mdl big secret" style="--p:0">${medalArt(b)}</span><h2>${T('b_secret')}</h2><p class="muted">${T('bd_secret')}</p></div>`;
     return `${head}<div class="ccard"><span class="mdl big ${b.done ? 'done' : ''}" data-t="${b.track}" style="--p:${Math.round(b.have / b.goal * 100)}">${medalArt(b)}</span><h2>${esc(bName(b))}</h2><p class="muted">${esc(bDesc(b))}</p>
-        ${b.track === 'titles' ? '' : `<b class="num">${nf(b.raw)} / ${nf(b.goal)} ${esc(b.unit)}</b><span class="meter" style="width:100%"><i style="width:${Math.round(b.have / b.goal * 100)}%"></i></span>`}${b.done && b.track !== 'master' ? `<span class="tag t-ok">${T('b_done')}</span>` : ''}</div>
+        ${b.track === 'titles' ? '' : `<b class="num">${nf(b.raw)} / ${nf(b.goal)} ${esc(b.unit)}</b><span class="meter" style="width:100%"><i style="width:${Math.round(b.have / b.goal * 100)}%"></i></span>`}${b.done && b.track !== 'master' ? `<span class="tag t-ok">${T('b_done')}</span>` : ''}${b.done && badgeAt(b.k) ? `<span class="muted small num">${T('b_on', { date: fmt(badgeAt(b.k), { day: 'numeric', month: 'long', year: 'numeric' }) })}</span>` : ''}</div>
       ${b.done ? `<div class="actions"><button class="btn" data-act="badgesave" data-k="${esc(b.k)}">${T('b_save')}</button><button class="btn primary" data-act="badgeshare" data-k="${esc(b.k)}">${ico('share')}${T('share')}</button></div>` : ''}`;
   }
   // ---------- a newly earned badge gets a full-screen moment ----------
@@ -1322,14 +1349,15 @@
       const acct = Array.isArray(me().badges_seen) ? me().badges_seen : null;
       let seen = acct || local ? [...new Set([...(acct || []), ...(local || [])])] : done.filter(k => k !== 'welcome');
       const fresh = done.filter(k => !seen.includes(k)); if (!fresh.length) { if (!acct && local) saveSeen(seen); return; }
-      seen = [...seen, ...fresh]; S.ls.set(seenKey(), JSON.stringify(seen)); saveSeen(seen); track('badge');
+      seen = [...seen, ...fresh]; S.ls.set(seenKey(), JSON.stringify(seen)); saveSeen(seen, fresh); track('badge');
       // Only the welcome badge and region titles get the full screen; other badges arrive as a small note.
       const big = fresh.find(k => k === 'welcome' || (list.find(b => b.k === k) || {}).track === 'titles');
-      if (big) { state.modal = { type: 'celebrate', k: big, more: fresh.length - 1 }; renderModal(); }
+      if (big) { state.modal = { type: 'celebrate', k: big, more: fresh.length - 1 }; renderModal(); fx.sheet(); }
       else badgeNote(fresh.map(k => list.find(b => b.k === k)).filter(Boolean));
     }, 900);
   }
-  function saveSeen(seen) { if (S.mode === 'demo' && !me()) return; S.save('profiles', { ...stripEmail(me()), badges_seen: seen }).catch(() => { /* kept on this phone until next time */ }); }
+  const badgeAt = k => ((me().display || {}).badgeAt || {})[k] || '';
+  function saveSeen(seen, fresh) { if (S.mode === 'demo' && !me()) return; const d = (me().display && typeof me().display === 'object') ? me().display : {}, at = { ...(d.badgeAt || {}) }; (fresh || []).forEach(k => { if (!at[k]) at[k] = today(); }); S.save('profiles', { ...stripEmail(me()), badges_seen: seen, display: { ...d, badgeAt: at } }).catch(() => { /* kept on this phone until next time */ }); }
   function badgeNote(bs) {
     if (!bs.length) return; const old = document.querySelector('.bnote'); if (old) old.remove();
     const el = document.createElement('div'); el.className = 'bnote'; el.setAttribute('role', 'status');
@@ -1338,10 +1366,14 @@
   }
   function celebrateHtml(m) {
     const b = game(me().id).list.find(x => x.k === m.k); if (!b) return '';
-    const cols = ['#f0901e', '#2f6b48', '#3b5bbd', '#20251f', '#e2b340', '#6243bd'];
+    const cols = ['#f0901e', '#2f6b48', '#3b5bbd', '#20251f', '#e2b340', '#6243bd'], rib = RIBBON[b.track] || '#f0901e';
     const bits = [...Array(28)].map((_, i) => `<i style="left:${(i * 37) % 100}%;background:${cols[i % cols.length]};animation-delay:${(i % 9) * 0.12}s;animation-duration:${2.2 + (i % 5) * 0.35}s"></i>`).join('');
-    return `<div class="celebrate"><div class="confetti" aria-hidden="true">${bits}</div><span class="muted">${T(b.track === 'titles' ? 'ce_title' : 'ce_new')}</span>
-      <span class="mdl big done pop" data-t="${b.track}" style="--p:100">${medalArt(b)}</span><h2>${esc(bName(b))}</h2><p class="muted">${esc(bDesc(b))}</p>
+    // A gift box first: the person opens it with a tap, then the lid flies off and the medal comes out.
+    const box = `<svg class="gbox" viewBox="0 0 200 190" aria-hidden="true"><g class="gbase"><rect x="30" y="86" width="140" height="94" rx="10" fill="#e9e3d2" stroke="#20251f" stroke-width="4"/><rect x="88" y="86" width="24" height="94" fill="${rib}" stroke="#20251f" stroke-width="4"/></g>
+      <g class="glid"><rect x="20" y="56" width="160" height="36" rx="8" fill="#f1efe8" stroke="#20251f" stroke-width="4"/><rect x="88" y="56" width="24" height="36" fill="${rib}" stroke="#20251f" stroke-width="4"/><path d="M100 56c-26-34-58-18-40-2 10 8 26 6 40 2zm0 0c26-34 58-18 40-2-10 8-26 6-40 2z" fill="${rib}" stroke="#20251f" stroke-width="4" stroke-linejoin="round"/></g></svg>`;
+    if (!m.opened) return `<div class="celebrate"><span class="muted">${T(b.track === 'titles' ? 'ce_title' : 'ce_new')}</span><button class="gboxbtn shake" data-act="celeopen" aria-label="${T('ce_open')}">${box}</button><h2>${T('ce_box')}</h2><div class="actions"><button class="btn primary big" data-act="celeopen">${T('ce_open')}</button></div></div>`;
+    return `<div class="celebrate opened"><div class="confetti" aria-hidden="true">${bits}</div><span class="muted">${T(b.track === 'titles' ? 'ce_title' : 'ce_new')}</span>
+      <div class="gstage"><span class="grays" aria-hidden="true"></span><span class="mdl big done pop" data-t="${b.track}" style="--p:100">${medalArt(b)}</span><span class="gboxbtn gone" aria-hidden="true">${box}</span></div><h2>${esc(bName(b))}</h2><p class="muted">${esc(bDesc(b))}</p><span class="muted small num">${T('b_on', { date: fmt(badgeAt(b.k) || today(), { day: 'numeric', month: 'long', year: 'numeric' }) })}</span>
       <div class="actions"><button class="btn" data-act="badgeshare" data-k="${esc(b.k)}">${ico('share')}${T('share')}</button><button class="btn primary big" data-act="celeok">${T('ce_ok')}</button></div></div>`;
   }
 
@@ -2618,6 +2650,7 @@
     weekok(el) { const k = db.tasks.find(x => x.id === el.dataset.id); if (k) run(() => S.save('tasks', { ...k, status: 'done', done_by: me().id, done_at: new Date().toISOString() }), T('wk_done')); },
     tgcode() { const code = String(Math.floor(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296) * 900000)); run(() => S.save('profiles', { ...stripEmail(me()), link_code: code })); },
     car2(el) { run(async () => { const nid = await secondCar(el.dataset.id); if (nid) { toast(T('car2_done')); openTour(nid); state.modal.edit = true; } }).then(renderModal); },
+    celeopen() { const m = state.modal; if (!m || m.type !== 'celebrate') return; m.opened = true; fx.box(); renderModal(); setTimeout(() => fx.badge(), 380); },
     celeok() { state.modal = null; renderModal(); checkBadges(); },
     badge(el) { state.modal = { type: 'badge', k: el.dataset.k }; renderModal(); },
     catedit(el) { const i = Number(el.dataset.i), c = i >= 0 ? catalog()[i] : { title: '', kind: 'private', days: 1 }; state.modal = { type: 'cat', i, draft: { ...c, dur: c.start && c.end ? durOf({ start_time: c.start, end_time: c.end }) : '', regions: [...regionsOf(c.title || '')] } }; renderModal(); },
@@ -2715,6 +2748,7 @@
       state.mergeAsk = null;
       run(async () => { await S.save('clients', merged); await S.mergeClients(target.id, others.map(o => o.id)); logAct(`Merged guests into ${target.name}: ${others.map(o => o.name).join(', ')}`); }, T('dup_done', { name: target.name }));
     },
+    soundset(el) { try { localStorage.setItem('fs-sound', el.dataset.v); } catch (e) { /* private mode */ } if (!el.dataset.v) fx.ok(); render(); if (state.modal && state.modal.type === 'display') renderModal(); },
     dset(el) { setDisplay(el.dataset.k, el.dataset.v); render(); if (state.modal && state.modal.type === 'display') renderModal(); },
     displaybtn() { state.modal = { type: 'display' }; renderModal(); },
     payshow() { state.payEdit = !state.payEdit; render(); },
@@ -3023,7 +3057,7 @@
     return `<span class="muted small">${T('ds_size')}</span>${seg('fs', [['s', T('ds_small')], ['', T('ds_normal')], ['l', T('ds_big')], ['xl', T('ds_xl')]])}
       <span class="muted small">${T('ds_theme')}</span>${seg('theme', [['', T('ds_system')], ['light', T('ds_light')], ['dark', T('ds_dark')]])}
       <span class="muted small">${T('ds_contrast')}</span>${seg('contrast', [['', T('ds_c_normal')], ['high', T('ds_c_high')]])}
-      <span class="muted small">${T('ds_accent')}</span><div class="accents">${ACCENTS.map(([v, c]) => `<button class="acc" data-act="dset" data-k="accent" data-v="${v}" style="background:${c}" aria-pressed="${dget('accent') === v}" aria-label="${T('ds_acc_' + (v || 'orange'))}" title="${T('ds_acc_' + (v || 'orange'))}"></button>`).join('')}</div><span class="muted small">${T('ds_hint')}</span>`;
+      <span class="muted small">${T('ds_accent')}</span><div class="accents">${ACCENTS.map(([v, c]) => `<button class="acc" data-act="dset" data-k="accent" data-v="${v}" style="background:${c}" aria-pressed="${dget('accent') === v}" aria-label="${T('ds_acc_' + (v || 'orange'))}" title="${T('ds_acc_' + (v || 'orange'))}"></button>`).join('')}</div><span class="muted small">${T('ds_sound')}</span><div class="seg wrap"><button data-act="soundset" data-v="" aria-pressed="${sndOn()}">${T('ds_on')}</button><button data-act="soundset" data-v="off" aria-pressed="${!sndOn()}">${T('ds_off')}</button></div><span class="muted small">${T('ds_hint')}</span>`;
   }
   applyDisplay();
   (async () => {
