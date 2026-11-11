@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.44';
+  const APP_VERSION = '3.45';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -851,7 +851,7 @@
     }
     const legend = `<div class="row small muted lgrow"><span class="lg"><i class="dotk"></i>${T('lg_tour')}</span><span class="lg"><i class="sq myoff"></i>${T('lg_myoff')}</span><span class="lg"><i class="sq myoff mysick"></i>${T('sick')}</span><span class="lg"><i class="sq hol"></i>${T('holidays')}</span><span class="lg"><i class="sq pub"></i>${T('ph_legend')}</span></div>`;
     const mAt = n => { const d = D(first); d.setMonth(d.getMonth() + n); return fmt(iso(d), { month: 'short' }); };
-    const mnav = `<div class="mnav"><button data-act="nav" data-d="-1" aria-label="${T('prev')}: ${esc(mAt(-1))}"><span aria-hidden="true">‹</span><span class="small">${esc(mAt(-1))}</span></button><b>${esc(fmt(first, { month: 'long', year: 'numeric' }))}</b><button data-act="nav" data-d="1" aria-label="${T('next')}: ${esc(mAt(1))}"><span class="small">${esc(mAt(1))}</span><span aria-hidden="true">›</span></button></div>`;
+    const mnav = `<div class="mnav"><button data-act="nav" data-d="-1" aria-label="${T('prev')}: ${esc(mAt(-1))}"><span aria-hidden="true">‹</span></button><b>${esc(fmt(first, { month: 'long', year: 'numeric' }))}</b><button data-act="nav" data-d="1" aria-label="${T('next')}: ${esc(mAt(1))}"><span aria-hidden="true">›</span></button></div>`;
     return `${mnav}<div class="mgrid">${wd}${cells}</div>${legend}<div class="list">${dayBlock(sel)}</div>`;
   }
 

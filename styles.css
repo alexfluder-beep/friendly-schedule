@@ -1127,3 +1127,6 @@ html[data-accent="amber"]{--accent:#f0901e;--accent-ink:#20251f;--accent-soft:#f
 .mnav button{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 12px;border:1px solid var(--line);border-radius:22px;background:var(--surface);color:var(--ink);font-weight:600;justify-self:start;max-width:100%;min-width:0}
 .mnav button:last-child{justify-self:end}.mnav button>span[aria-hidden]{font-size:1.4rem;line-height:1}.mnav button .small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
 @media (max-width:360px){.mnav button .small{display:none}}
+
+/* 3.45 month arrows: round buttons with the arrow only */
+.mnav button{width:44px;height:44px;padding:0;border-radius:50%;justify-content:center}

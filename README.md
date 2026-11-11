@@ -432,3 +432,6 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 ## 3.44
 - **Month view has clear arrows.** Above the grid: "‹ October | November 2026 | December ›". Each arrow names the month it opens. Swiping left and right still works.
 - **The greeting phrase is removed everywhere** ("Good evening, name" with the phrase of the day): gone from the calendar page and from the opening screen, and `phrases.js` is deleted. The opening screen shows only a short "Good evening, name" while the app starts. Cards on special days (birthday, holiday, sick day, day off) stay.
+
+## 3.45
+- Month arrows are round buttons with the arrow only (the month names did not fit on phones). Screen readers still hear which month each arrow opens.
