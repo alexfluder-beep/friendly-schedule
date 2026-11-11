@@ -391,3 +391,6 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 - Photo of the day looks like a card: taller pictures, the words sit on the photo as a paper label, and the person can put one of their earned badges on it as a sticker (when adding the photo, later with "Save text and sticker", or from a badge page with "Put on my photo of the day").
 - Share: the large view makes one picture to send (photo, label, sticker, name and date, Friendly.ge).
 - Database: `photos.sticker` (in `supabase/update.sql`, already applied).
+
+## 3.38
+- Operations agents: four read-only checks in the database (`agent_board`, `agent_find_refs`, `agent_changes`, `agent_conflicts`), one notice they may write (`agent_notify`, shown as "Assistant (automatic check, can be wrong)") and a run log (`agent_runs`, `agent_run_done`). Only the database owner can run them. In `supabase/update.sql`, already applied.

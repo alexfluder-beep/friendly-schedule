@@ -762,3 +762,110 @@ create policy team_photos_update on storage.objects for update to authenticated 
 create policy team_photos_delete on storage.objects for delete to authenticated using (bucket_id = 'photos' and ((storage.foldername(name))[1] = (select auth.uid())::text or (select public.is_admin())));
 
 alter table public.photos add column if not exists sticker text check (sticker is null or char_length(sticker) <= 80);
+
+-- 3.38 Ready-made read-only checks for the operations agents, one notice they may write, and a log of their runs. Safe to run again.
+-- Only the database owner may run these (not the app, not signed-in users). They never return phones or emails.
+create extension if not exists pg_trgm with schema extensions;
+create index if not exists bookings_ref_trgm_idx on public.bookings using gin (ref extensions.gin_trgm_ops);
+
+create or replace function public.agent_board(d_from int default 0, d_to int default 1)
+returns table (date date, start_time text, title text, kind text, status text, language text, pax int, adults int, children int, capacity int,
+  guide text, driver text, vehicle text, bookings int, booked_pax int, marks text[], sources text[], has_freetour boolean, pickup text, flags text[])
+language sql stable security invoker set search_path = public as $$
+  with r as (select coalesce((select nullif(value->>'carSeats','')::int from settings where id = 'rules'), 6) car,
+                    coalesce((select nullif(value->>'sabaduriMax','')::int from settings where id = 'rules'), 15) sab,
+                    coalesce((select nullif(value->>'walkMax','')::int from settings where id = 'rules'), 10) walk,
+                    (now() at time zone 'Asia/Tbilisi')::date today),
+  b as (select bk.tour_id, count(*)::int n, coalesce(sum(coalesce(bk.pax, coalesce(bk.adults,0) + coalesce(bk.children,0))),0)::int px,
+               array(select distinct m from bookings x, unnest(coalesce(x.marks,'{}')) m where x.tour_id = bk.tour_id order by 1) marks,
+               array(select distinct coalesce(nullif(x.source,''),'?') from bookings x where x.tour_id = bk.tour_id order by 1) sources,
+               bool_or(coalesce(bk.source,'') ilike '%freetour%' or 'freetour' = any(coalesce(bk.marks,'{}'))) ft
+        from bookings bk group by bk.tour_id)
+  select t.date, t.start_time, t.title, t.kind, t.status, t.language, coalesce(t.pax,0), coalesce(t.adults,0), coalesce(t.children,0), coalesce(t.capacity,0),
+         g.name, d.name, d.vehicle, coalesce(b.n,0), coalesce(b.px,0), coalesce(b.marks,'{}'), coalesce(b.sources,'{}'), coalesce(b.ft,false), t.pickup,
+         array_remove(array[
+           case when t.status = 'confirmed' and t.guide_id is null then 'NO_GUIDE' end,
+           case when t.status = 'confirmed' and t.title ~* '4\s*[x×х]\s*4|4\s*wd|delica|tusheti' and coalesce(t.pax,0) > r.car then 'OVER_6_PER_CAR' end,
+           case when t.status = 'confirmed' and t.kind = 'group' and t.title ~* 'sabaduri' and coalesce(t.pax,0) > r.sab then 'SABADURI_OVER_15' end,
+           case when t.status = 'confirmed' and t.kind = 'group' and t.title ~* 'walking|brutal' and coalesce(t.pax,0) > r.walk then 'WALK_OVER_10' end,
+           case when coalesce(b.n,0) > 0 and coalesce(b.px,0) <> coalesce(t.pax,0) then 'PAX_MISMATCH' end], null)
+  from tours t cross join r left join profiles g on g.id = t.guide_id left join profiles d on d.id = t.driver_id left join b on b.tour_id = t.id
+  where t.date <= r.today + d_to and coalesce(t.date_to, t.date) >= r.today + d_from
+  order by t.date, t.start_time nulls last, t.title
+$$;
+
+create or replace function public.agent_find_refs(codes text[])
+returns table (code text, found boolean, tour_date date, start_time text, title text, status text, pax int, adults int, children int, marks text[], source text)
+language sql stable security invoker set search_path = public as $$
+  select c.code, b.id is not null, t.date, t.start_time, t.title, t.status, b.pax, b.adults, b.children, coalesce(b.marks,'{}'), b.source
+  from unnest(codes) c(code) left join bookings b on length(trim(c.code)) >= 4 and b.ref ilike '%' || trim(c.code) || '%' left join tours t on t.id = b.tour_id
+  order by c.code, t.date
+$$;
+
+create or replace function public.agent_changes(since timestamptz)
+returns table (src text, at timestamptz, who text, what text)
+language sql stable security invoker set search_path = public as $$
+  with today as (select (now() at time zone 'Asia/Tbilisi')::date d)
+  select * from (
+    select 'change'::text, l.at, p.name, l.summary from log l left join profiles p on p.id = l.user_id where l.at > since
+    union all
+    select 'new_bookings', max(b.created_at), null, count(*) || ' bookings, ' || coalesce(sum(coalesce(b.pax, coalesce(b.adults,0) + coalesce(b.children,0))),0) || ' guests, source ' || coalesce(nullif(b.source,''),'?')
+      from bookings b join tours t on t.id = b.tour_id, today where b.created_at > since and t.date >= today.d group by coalesce(nullif(b.source,''),'?')
+    union all
+    select 'cancelled', t.cancelled_at, null, t.date || ' ' || coalesce(t.start_time,'') || ' ' || t.title || coalesce(': ' || nullif(t.cancel_reason,''), '') from tours t where t.cancelled_at > since
+    union all
+    select 'needs_admin', q.created_at, p.name, 'Change request: ' || coalesce(t.date::text,'?') || ' ' || coalesce(t.title,'?') from change_requests q left join profiles p on p.id = q.user_id left join tours t on t.id = q.tour_id where q.status = 'pending' and q.created_at > since
+    union all
+    select 'needs_admin', o.created_at, p.name, 'Time off request (' || o.type || '): ' || o.date_from || ' - ' || o.date_to from time_off o left join profiles p on p.id = o.user_id where o.status = 'pending' and o.created_at > since
+    union all
+    select 'app_error', max(e.at), null, count(*) || 'x ' || coalesce(e.kind,'?') || ' v' || coalesce(max(e.version),'?') || ': ' || left(e.message, 160) from app_errors e where e.at > since group by e.kind, left(e.message, 160)
+  ) x(src, at, who, what) order by at desc nulls last
+$$;
+
+create or replace function public.agent_conflicts(days int default 7)
+returns table (kind text, date date, person text, detail text)
+language sql stable security invoker set search_path = public as $$
+  with today as (select (now() at time zone 'Asia/Tbilisi')::date d),
+  t as (select t.* from tours t, today where t.status = 'confirmed' and t.date between today.d and today.d + days),
+  w as (select t.id, t.date, t.title, t.start_time, t.end_time, x.pid from t, lateral (values (t.guide_id), (t.driver_id)) x(pid) where x.pid is not null group by t.id, t.date, t.title, t.start_time, t.end_time, x.pid)
+  select * from (
+    select 'double'::text, a.date, p.name, coalesce(a.start_time,'?') || ' ' || a.title || '  +  ' || coalesce(b.start_time,'?') || ' ' || b.title
+      from w a join w b on b.pid = a.pid and b.date = a.date and a.id < b.id and coalesce(a.start_time,'00:00') < coalesce(nullif(b.end_time,''),'23:59') and coalesce(b.start_time,'00:00') < coalesce(nullif(a.end_time,''),'23:59') join profiles p on p.id = a.pid
+    union all
+    select 'on_time_off', w.date, p.name, coalesce(w.start_time,'?') || ' ' || w.title || ' (' || o.type || ' ' || o.date_from || ' - ' || o.date_to || ')'
+      from w join time_off o on o.user_id = w.pid and o.status = 'approved' and w.date between o.date_from and o.date_to join profiles p on p.id = w.pid
+    union all
+    select 'holiday', t.date, null, coalesce(t.start_time,'?') || ' ' || t.title || ' (' || h.name || ')' from t join holidays h on t.date between h.date_from and h.date_to and coalesce(h.kind,'') <> 'event'
+    union all
+    select 'delica_no_4x4', t.date, p.name, coalesce(t.start_time,'?') || ' ' || t.title from t join profiles p on p.id = t.driver_id where p.vehicle = 'delica' and t.title !~* '4\s*[x×х]\s*4|4\s*wd|delica'
+  ) x(kind, date, person, detail) order by date, kind
+$$;
+
+-- The one thing the agents may write: a short notice to every admin (app bell, phone, Telegram). At most 10 an hour, 500 characters.
+create or replace function public.agent_notify(msg text) returns int
+language plpgsql security definer set search_path = public as $$
+declare n int; same jsonb := coalesce((select value->'sameAs' from settings where id = 'rules'), '{}'::jsonb); body text := left(trim(coalesce(msg,'')), 500);
+begin
+  if body = '' then return 0; end if;
+  if (select count(distinct params->>'text') from notifications where kind = 'agent' and created_at > now() - interval '1 hour') >= 10 then return 0; end if;
+  insert into notifications (user_id, kind, params)
+    select p.id, 'agent', jsonb_build_object('text', body) from profiles p where p.role = 'admin' and p.active and not (same ? p.id::text);
+  get diagnostics n = row_count; return n;
+end $$;
+
+create table if not exists public.agent_runs (id bigserial primary key, at timestamptz not null default now(), run text, summary text);
+alter table public.agent_runs enable row level security;
+drop policy if exists agent_runs_read on public.agent_runs;
+create policy agent_runs_read on public.agent_runs for select to authenticated using ((select public.is_admin()));
+revoke all on public.agent_runs from anon;
+revoke insert, update, delete on public.agent_runs from authenticated;
+create or replace function public.agent_run_done(run text, summary text) returns timestamptz
+language plpgsql security definer set search_path = public as $$
+declare t timestamptz;
+begin
+  insert into agent_runs (run, summary) values (left(coalesce(run,''), 60), left(coalesce(summary,''), 1000)) returning at into t;
+  delete from agent_runs where at < now() - interval '90 days';
+  return t;
+end $$;
+
+revoke execute on function public.agent_board(int, int), public.agent_find_refs(text[]), public.agent_changes(timestamptz), public.agent_conflicts(int), public.agent_notify(text), public.agent_run_done(text, text) from public, anon, authenticated;
