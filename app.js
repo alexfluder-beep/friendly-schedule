@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.50';
+  const APP_VERSION = '3.51';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -639,8 +639,10 @@
   // and how many people are off (the same umbrella as on the Day off card). For one person: their own tours and their own day off.
   function dayMarks(d, id) {
     const ts = toursOnDay(d).filter(t => !id || involves(t, id)), need = !id && isAdmin() && ts.some(t => !t.guide_id || (!t.driver_id && kmOf(t.title) > 0)), mine = offOn(id || me().id, d), n = id ? 0 : offCount(d);
-    return `<span class="smk tr ${need ? 'need' : ''} ${ts.length ? '' : 'none'}" ${ts.length ? `aria-label="${esc(T('sm_tours', { n: ts.length }))}"` : 'aria-hidden="true"'}><i></i>${ts.length > 1 || (!id && ts.length) ? `<span class="num">${ts.length}</span>` : ''}</span><span class="smk off ${mine ? 'me' : ''} ${mine || n ? '' : id ? 'gone' : 'none'}" ${mine || n ? `aria-label="${esc(mine ? T('off_mine') : T('sm_off', { n }))}"` : 'aria-hidden="true"'}>${msi('beach_access')}${!mine && n ? `<span class="num">${n}</span>` : ''}</span>`;
+    return `<span class="smk tr ${need ? 'need' : ''} ${ts.length ? '' : 'none'}" ${ts.length ? `aria-label="${esc(T('sm_tours', { n: ts.length }))}"` : 'aria-hidden="true"'}><i></i>${ts.length > 1 || (!id && ts.length) ? `<span class="num">${ts.length}</span>` : ''}</span><span class="smk off ${mine ? 'me' : ''} ${mine || n ? '' : id ? 'gone' : 'none'}" ${mine || n ? `aria-label="${esc(mine ? T('off_mine') : T('sm_off', { n }))}"` : 'aria-hidden="true"'}>${msi(mine && mine.type === 'sick' ? 'sick' : 'beach_access')}${!mine && n ? `<span class="num">${n}</span>` : ''}</span>`;
   }
+  // On a computer everyone gets the same switches at the top: the view, and whole team or mine.
+  const viewBarHtml = () => `<div class="bar viewbar"><div class="seg vseg">${[['day', 'D'], ['week', 'W'], ['month', 'M'], ['agenda', 'A']].map(([m, k]) => `<button data-act="mode" data-m="${m}" aria-pressed="${state.mode === m}" title="${T('v_key', { k })}">${T('v_' + m)}</button>`).join('')}</div><div class="seg"><button data-act="mine" data-v="0" aria-pressed="${!state.mine}">${T('team')}</button><button data-act="mine" data-v="1" aria-pressed="${!!state.mine}">${T('mine')}</button></div><span class="spacer"></span><button class="btn" data-act="summary">${T('day_summary')}</button></div>`;
   const stripLegend = own => `<div class="striplg muted small" aria-hidden="true"><span><i class="lgd"></i>${T(own ? 'sm_lg_my' : 'sm_lg_tours')}</span>${own || !isAdmin() ? '' : `<span><i class="lgd need"></i>${T('sm_lg_need')}</span>`}<span>${msi('beach_access')}${T(own ? 'sm_lg_myoff' : 'sm_lg_off')}</span></div>`;
   // Whose tours the calendar shows: mine, one chosen person (office, computer view), or everyone.
   const seenBy = () => (state.mine ? me().id : (isAdmin() && state.who) || '');
@@ -757,12 +759,12 @@
   function guideHomeHtml(days, title) {
     const td = today(), sel = state.date, id = me().id, now = days.includes(td) ? tourNow() : null;
     const asks = db.change_requests.filter(q => q.swap_with === id && q.status === 'pending' && !q.agreed);
-    return `${setupCard(true)}${greetHtml()}${weekCardHtml()}${asks.length ? nextHtml() : ''}
+    return `<div class="ghome">${setupCard(true)}${greetHtml()}${PHONE() ? '' : viewBarHtml()}${weekCardHtml()}${asks.length ? nextHtml() : ''}
       <div class="bar homebar"><h2>${esc(fmt(days[3], { month: 'long', year: 'numeric' }))}</h2><label class="jump" title="${T('pick_date')}">${ico('cal')}<input type="date" id="jump" data-ch="jump" value="${esc(state.date)}" aria-label="${T('pick_date')}"></label><span class="spacer"></span><div class="seg"><button data-act="nav" data-d="-1" aria-label="${T('prev')}">‹</button><button data-act="today">${T('today')}</button><button data-act="nav" data-d="1" aria-label="${T('next')}">›</button></div></div>
       <div class="list home"><div class="strip">${days.map(d => `<button data-act="day" data-date="${d}" aria-pressed="${d === sel}" class="${d === td ? 'tdy' : ''} ${offCls(offOn(id, d))} ${holidayOn(d) ? 'hol' : ''}"><span>${esc(fmt(d, { weekday: 'short' }))}</span><b class="num">${D(d).getDate()}</b>${dayMarks(d, id)}</button>`).join('')}</div>${stripLegend(true)}
       ${now ? nowCardHtml(now) : ''}${days.map(myDayHtml).join('')}</div>
       ${photoStripHtml()}
-      <div class="bar homelinks"><button class="lnk" data-act="mode" data-m="month">${T('month')}</button><button class="lnk" data-act="mine" data-v="0">${T('home_team')}</button><button class="lnk" data-act="summary">${T('day_summary')}</button></div>`;
+      <div class="bar homelinks"><button class="lnk" data-act="mode" data-m="month">${T('month')}</button><button class="lnk" data-act="mine" data-v="0">${T('home_team')}</button><button class="lnk" data-act="summary">${T('day_summary')}</button></div></div>`;
   }
   // Exchange rates to the pay currency (Rules), so money in USD, EUR and GEL can be added up.
   // Exchange rates. Official rates of the National Bank of Georgia, one per working day, are loaded by the admin's app

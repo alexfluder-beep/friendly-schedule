@@ -466,3 +466,7 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 
 ## 3.50
 - Time off: the two lists look the same again. What it is (the guide, the holiday or the event) is on the left, the dates are on the right.
+
+## 3.51
+- **Guides and drivers on a computer** get the same switches at the top as the office: Day / Week / Month / Agenda and Team / Mine, with Day summary on the right (the three links at the bottom are for phones only). The home page is one centred column and the week strip uses its full width.
+- Week strip: a sick day shows the sick icon, not the umbrella. The chosen day keeps dark text when it is also a day off or sick day (it was white on pink).

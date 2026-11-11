@@ -1186,3 +1186,9 @@ code.ref{font:inherit;font-variant-numeric:tabular-nums;letter-spacing:.02em;use
 
 /* 3.49 guest card: the phone and a flag on one line */
 .pflag{font-size:1.15em;margin-left:6px;vertical-align:-1px}
+
+/* 3.51 guide and driver home on a computer: the same switches at the top as the office, one centred column, full-width week strip */
+@media (min-width:761px){.ghome{max-width:980px;margin:0 auto}.ghome .list.home{max-width:none}.ghome .homelinks{display:none}.ghome .strip{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}}
+/* a chosen day that is also a day off or a sick day keeps dark text (it was white on pink) */
+.strip button.myoff[aria-pressed="true"]{color:var(--ink);border-color:var(--ink)}.strip button.myoff[aria-pressed="true"] b,.strip button.myoff[aria-pressed="true"] span{color:var(--ink)}
+@media (min-width:761px){.ghome{display:flex;flex-direction:column;gap:12px}.ghome>.bar{margin:0}}
