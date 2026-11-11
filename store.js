@@ -132,7 +132,8 @@
   }
   async function loadAll(since) {
     since = since || windowStart(); store.loadedFrom = since;
-    for (const t of TABLES) { const rows = await fetchTable(t, since); db[t] = rows || []; }
+    // All tables are asked for at the same time (one after another took many seconds on a slow phone); the screen changes only when all have arrived.
+    const got = await Promise.all(TABLES.map(t => fetchTable(t, since))); TABLES.forEach((t, i) => { db[t] = got[i] || []; });
     store.syncedAt = new Date().toISOString();
   }
   function subscribe() {
@@ -194,7 +195,7 @@
     return db.clients.filter(c => !c.anonymised_at && last[c.id] && last[c.id] < cut).map(c => c.id);
   }
   const store = {
-    mode, db, TABLES, uid, ls, offline: false, pending: 0, failed: 0, cachedAt: null, loadedFrom: null, syncedAt: null, live: false, pulse,
+    mode, db, TABLES, uid, ls, offline: false, warming: false, pending: 0, failed: 0, cachedAt: null, loadedFrom: null, syncedAt: null, live: false, pulse,
     // Older years for reports and statistics.
     async loadOlder(since) { if (mode !== 'supabase' || store.offline || !store.loadedFrom || since >= store.loadedFrom) return; await loadAll(since); emit(null, null, 'BULK'); },
     // Full booking history of one client, including tours older than the loaded window.
@@ -227,6 +228,9 @@
       window.addEventListener('online', () => store.sync());
       window.addEventListener('offline', () => { store.offline = true; emit(null, null, 'STATE', true); });
       if (!navigator.onLine && await useCache()) return;
+      // Quick start: someone who used the app on this phone before sees the saved copy at once, and fresh data is fetched behind it.
+      // Until it arrives the app behaves as offline (a change made in that second waits in the outbox), but says "loading", not "offline".
+      if (await useCache()) { store.warming = true; store.sync().catch(e => console.error('warm start', e)).finally(() => { store.warming = false; emit(null, null, 'STATE', true); }); return; }
       try {
         const { data: { session }, error } = await sb.auth.getSession();
         // A token that could not be refreshed because of a weak connection is not a sign-out: work from the saved copy and try again later.
@@ -240,12 +244,12 @@
       try {
         const { data: { session }, error } = await sb.auth.getSession();
         if (!session && error) throw error;   // could not reach the server to renew the sign-in: stay signed in, offline
-        if (!session) { store.offline = false; me = null; emit(null, null, 'STATE', true); return; }
+        if (!session) { store.offline = false; me = null; await idb.set('cache', null); emit(null, null, 'STATE', true); return; }   // signed out: the saved copy goes too
         while (outbox.length) { try { await sendOp(outbox[0]); } catch (e) { if (isNetErr(e)) throw e; console.error('sync skipped', outbox[0], e.message); store.failed = (store.failed || 0) + 1; } outbox.shift(); store.pending = outbox.length; }
         await idb.set('outbox', outbox);
         await afterLogin(session.user); store.offline = false; emit(null, null, 'STATE', true);
       } catch (e) { store.offline = true; emit(null, null, 'STATE', true); }
-      finally { store.syncing = false; }
+      finally { store.syncing = false; if (!store.offline && me && outbox.length) setTimeout(() => store.sync(), 50); }   // a change queued while the fresh data was loading goes out now
     },
     demoViewAs(id) { me = db.profiles.find(p => p.id === id) || me; ls.set('fs-demo-as', me.id); emit('profiles', me, 'UPDATE'); },
     demoReset() { ls.del(DEMO_KEY); ls.del('fs-demo-as'); TABLES.forEach(t => db[t] = []); seedDemo(); me = db.profiles[0]; emit('profiles', me, 'UPDATE'); },

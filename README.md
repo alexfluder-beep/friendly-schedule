@@ -421,3 +421,10 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 - **Wishes on special days** (a card with a sticker): own birthday or anniversary, a holiday from the team calendar, **a sick day ("Get well soon")** and an approved day off ("Enjoy your day off").
 - The screen shown while the app opens uses the same words: the phrase of the day, or the birthday, holiday or get-well wish. The words for the next seven days are kept on the phone only.
 - **Bottom bar lines up.** The day-off icon is now a line drawing like the other three, in the same 20px box, so all four labels sit on one line.
+
+## 3.43
+- **Opens at once.** A person who used the app on this phone before sees the saved schedule immediately; fresh data is fetched behind it and swapped in (a thin line at the top shows it is loading). Before, the app waited for the server first. A change made in that first second waits and is sent when the fresh data is in. If the person was signed out, the saved copy is removed and the sign-in page shows.
+- All tables are asked for at the same time instead of one after another, so the first open and Refresh are faster too.
+- **The greeting is not on the first screen any more.** Ordinary days: the phrase of the day sits at the bottom of the calendar page, and on the short opening screen. Special days (birthday, holiday, sick day, day off) keep their card at the top.
+- Time off: dates in "Team off soon" stay on one line; "1 day", not "1 days". The "All" chip in the calendar header fits its Georgian word.
+- **Back office > Usage:** choose Everyone / Guides / Drivers / Office and an age group (only where the birthday with a year is in the profile). New card "Phones and settings": how many people use iPhone, Android or a computer, have the app installed, a small screen or large text. A device column in the people table. More buttons are counted (badges, photo likes, thanks, refresh, bell, week arrows). Only counts are stored: no phone model, no location.

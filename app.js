@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.42';
+  const APP_VERSION = '3.43';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -525,7 +525,7 @@
   let napped = false, lastTick = Date.now();
   setInterval(() => { if (Date.now() - lastTick > 20000 && offSince) napped = true; lastTick = Date.now(); }, 5000);
   document.addEventListener('visibilitychange', () => { if (document.hidden && offSince) napped = true; });
-  function watchConn() { if (S.mode === 'demo') return; if (S.offline && !offSince) { offSince = Date.now(); napped = !!document.hidden; } else if (!S.offline && offSince) { const sec = Math.round((Date.now() - offSince) / 1000), from = new Date(offSince), slept = napped; offSince = null; napped = false; if (sec >= 30 && !slept) logErr('offline', `No connection for ${sec >= 120 ? Math.round(sec / 60) + ' min' : sec + ' s'}, from ${from.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`, navigator.onLine ? 'phone was online: database or network did not answer' : 'phone had no internet'); else flushErr(); } }
+  function watchConn() { if (S.mode === 'demo') return; if (S.warming) return; if (S.offline && !offSince) { offSince = Date.now(); napped = !!document.hidden; } else if (!S.offline && offSince) { const sec = Math.round((Date.now() - offSince) / 1000), from = new Date(offSince), slept = napped; offSince = null; napped = false; if (sec >= 30 && !slept) logErr('offline', `No connection for ${sec >= 120 ? Math.round(sec / 60) + ' min' : sec + ' s'}, from ${from.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`, navigator.onLine ? 'phone was online: database or network did not answer' : 'phone had no internet'); else flushErr(); } }
   // Short codes for troubleshooting: the same code shows on screen, in the Problems list and in Back office > Problems > What the codes mean.
   function errCode(e) {
     const m = String((e && (e.message || e.code)) || e || '');
@@ -742,7 +742,7 @@
       <div class="bar homebar"><h2>${esc(fmt(days[3], { month: 'long', year: 'numeric' }))}</h2><label class="jump" title="${T('pick_date')}">${ico('cal')}<input type="date" id="jump" data-ch="jump" value="${esc(state.date)}" aria-label="${T('pick_date')}"></label><span class="spacer"></span><div class="seg"><button data-act="nav" data-d="-1" aria-label="${T('prev')}">‹</button><button data-act="today">${T('today')}</button><button data-act="nav" data-d="1" aria-label="${T('next')}">›</button></div></div>
       <div class="list home"><div class="strip">${days.map(d => `<button data-act="day" data-date="${d}" aria-pressed="${d === sel}" class="${d === td ? 'tdy' : ''} ${offCls(offOn(id, d))} ${holidayOn(d) ? 'hol' : ''}"><span>${esc(fmt(d, { weekday: 'short' }))}</span><b class="num">${D(d).getDate()}</b>${dayMarks(d, id)}</button>`).join('')}</div>${stripLegend(true)}
       ${now ? nowCardHtml(now) : ''}${days.map(myDayHtml).join('')}</div>
-      ${photoStripHtml()}
+      ${photoStripHtml()}${phraseLineHtml()}
       <div class="bar homelinks"><button class="lnk" data-act="mode" data-m="month">${T('month')}</button><button class="lnk" data-act="mine" data-v="0">${T('home_team')}</button><button class="lnk" data-act="summary">${T('day_summary')}</button></div>`;
   }
   // Exchange rates to the pay currency (Rules), so money in USD, EUR and GEL can be added up.
@@ -811,7 +811,7 @@
     let h = `${setupCard(true)}${window.matchMedia('(max-width:760px)').matches ? installCardHtml(false) : ''}${greetHtml()}${nextHtml()}${fabHtml()}
       ${!PHONE() ? '' : `<div class="calhd"><button class="calttl" data-act="mode" data-m="${state.mode === 'month' ? 'week' : 'month'}" aria-expanded="${state.mode === 'month'}" aria-label="${T(state.mode === 'month' ? 'week' : 'month')}"><b>${esc(fmt(state.date, { month: 'long' }))}</b> <span class="yr num">${state.date.slice(0, 4)}</span>${msi(state.mode === 'month' ? 'keyboard_arrow_up' : 'keyboard_arrow_down')}</button><label class="jump" title="${T('pick_date')}">${ico('cal')}<input type="date" id="jump" data-ch="jump" value="${esc(state.date)}" aria-label="${T('pick_date')}"></label><span class="spacer"></span>
         ${monday(state.date) !== monday(td) ? `<button class="btn sm calnow" data-act="today">${T('today')}</button>` : ''}<button class="iconbtn" data-act="nav" data-d="-1" aria-label="${T('prev')}">‹</button><button class="iconbtn" data-act="nav" data-d="1" aria-label="${T('next')}">›</button>
-        <button class="whochip" data-act="mine" data-v="${state.mine ? '0' : '1'}" aria-label="${T(state.mine ? 'mine' : 'team')}">${state.mine ? avatar(me().id) : `<span>${T('who_all')}</span>`}</button></div>`}
+        <button class="whochip ${state.mine ? '' : 'txt'}" data-act="mine" data-v="${state.mine ? '0' : '1'}" aria-label="${T(state.mine ? 'mine' : 'team')}">${state.mine ? avatar(me().id) : `<span>${T('who_all')}</span>`}</button></div>`}
       ${PHONE() ? '' : `<div class="bar">
       <div class="seg"><button data-act="mode" data-m="week" aria-pressed="${state.mode === 'week'}">${T('week')}</button><button data-act="mode" data-m="month" aria-pressed="${state.mode === 'month'}">${T('month')}</button></div>
       <div class="seg"><button data-act="mine" data-v="0" aria-pressed="${!state.mine}">${T('team')}</button><button data-act="mine" data-v="1" aria-pressed="${!!state.mine}">${T('mine')}</button></div>
@@ -819,7 +819,7 @@
       <div class="bar"><h2>${esc(title)}</h2><label class="jump" title="${T('pick_date')}">${ico('cal')}<input type="date" id="jump" data-ch="jump" value="${esc(state.date)}" aria-label="${T('pick_date')}"></label><span class="spacer"></span><div class="seg"><button data-act="nav" data-d="-1" aria-label="${T('prev')}">‹</button><button data-act="today">${T('today')}</button><button data-act="nav" data-d="1" aria-label="${T('next')}">›</button></div></div>`}`;
     const pFrom_To = [state.mode === 'month' ? state.date.slice(0, 8) + '01' : days[0], state.mode === 'month' ? addDays(addDays(state.date.slice(0, 8) + '01', 32).slice(0, 8) + '01', -1) : days[6]];
     const pstats = !(isAdmin() && !state.mine) ? '' : `<div class="only-wide">${periodStatsHtml(pFrom_To[0], pFrom_To[1])}</div>${incBarHtml(pFrom_To[0], pFrom_To[1])}`;
-    if (state.mode === 'month') return h + monthHtml() + photoStripHtml() + pstats;
+    if (state.mode === 'month') return h + monthHtml() + photoStripHtml() + phraseLineHtml() + pstats;
     // wide: team grid
     const hd = days.map(d => { const ho = holidayOn(d), ev = eventOn(d); return `<div class="hd ${d === td ? 'today' : ''}">${esc(fmtDay(d))}${ho ? `<span class="hol">${esc(ho.name)}</span>` : ''}${ev ? `<span class="hol ev">${esc(ev.name)}</span>` : ''}</div>`; }).join('');
     const rowFor = (label, sub, id, filter) => `<div class="who">${id ? avatar(id) : ''}<div>${esc(label)}<span class="r">${esc(sub)}</span></div></div>` + days.map(d => {
@@ -838,7 +838,7 @@
     h += `<div class="only-phone list"><div class="strip">${days.map(d => `<button data-act="day" data-date="${d}" data-drop="${d}" aria-pressed="${d === sel}" class="${d === td ? 'tdy' : ''} ${offCls(offOn(me().id, d))} ${holidayOn(d) ? 'hol' : ''}"><span>${esc(fmt(d, { weekday: 'short' }))}</span><b class="num">${D(d).getDate()}</b>${dayMarks(d, state.mine ? me().id : '')}</button>`).join('')}</div>${stripLegend(!!state.mine)}`;
     for (const d of days) h += dayBlock(d);
     h += `</div>`;
-    return h + photoStripHtml() + pstats;
+    return h + photoStripHtml() + phraseLineHtml() + pstats;
   }
   function monthHtml() {
     const first = state.date.slice(0, 8) + '01', start = monday(first), td = today(), mo = state.date.slice(0, 7), sel = state.date, my = me().id;
@@ -1625,7 +1625,7 @@
   }
   function offRow(o, admin) {
     const w = o.status === 'pending' ? offWarnings(o) : [];
-    return `<div class="card"><div class="row">${avatar(o.user_id)}<b>${esc(pname(o.user_id))}</b>${offTag({ ...o, status: 'x' })}<span class="tag ${o.status === 'approved' ? 't-ok' : o.status === 'declined' ? 't-danger' : 't-warn'}">${T(o.status)}</span><span class="num">${esc(fmtRange(o.date_from, o.date_to))}</span><span class="muted num">${daysBetween(o.date_from, o.date_to) + 1} ${T('days')}</span></div>
+    return `<div class="card"><div class="row">${avatar(o.user_id)}<b>${esc(pname(o.user_id))}</b>${offTag({ ...o, status: 'x' })}<span class="tag ${o.status === 'approved' ? 't-ok' : o.status === 'declined' ? 't-danger' : 't-warn'}">${T(o.status)}</span><span class="num">${esc(fmtRange(o.date_from, o.date_to))}</span><span class="muted num">${(n => `${n} ${T(n === 1 ? 'day1' : 'days')}`)(daysBetween(o.date_from, o.date_to) + 1)}</span></div>
       ${o.note ? `<div class="muted small">${esc(o.note)}</div>` : ''}${w.map(x => `<div class="warnline soft">! ${esc(x)}</div>`).join('')}
       <div class="actions">${admin && o.status === 'pending' ? `<button class="btn sm danger" data-act="offdecide" data-id="${o.id}" data-s="declined">${T('decline')}</button><button class="btn sm primary" data-act="offdecide" data-id="${o.id}" data-s="approved">${T('approve')}</button>` : ''}${(admin || (o.user_id === me().id && o.status === 'pending')) ? `<button class="btn sm" data-act="offdel" data-id="${o.id}">${T('remove')}</button>` : ''}</div></div>`;
   }
@@ -1713,7 +1713,7 @@
     const td = today(), team = staff().filter(p => p.role !== 'admin'), rows = [];
     for (let i = 0; i < 21 && rows.length < 10; i++) { const d = addDays(td, i), ids = new Set(list.filter(o => o.date_from <= d && o.date_to >= d).map(o => twin(o.user_id))); if (!ids.size) continue;
       const g = team.filter(p => ids.has(p.id) && p.role !== 'driver').length, dr = team.filter(p => ids.has(p.id) && p.role === 'driver').length, n = g + dr; if (!n) continue;
-      rows.push(`<div class="card lrow"><span class="lmain"><b>${esc(fmtDay(d))}</b></span><span class="ldate">${esc([g ? T('to_guides', { n: g }) : '', dr ? T('to_drivers', { n: dr }) : ''].filter(Boolean).join(', '))} <span class="muted small num">${Math.round(n / (team.length || 1) * 100)}%</span></span></div>`); }
+      rows.push(`<div class="card lrow nohead"><span class="lmain"><b class="nw">${esc(fmtDay(d))}</b></span><span class="ldate">${esc([g ? T('to_guides', { n: g }) : '', dr ? T('to_drivers', { n: dr }) : ''].filter(Boolean).join(', '))} <span class="muted small num">${Math.round(n / (team.length || 1) * 100)}%</span></span></div>`); }
     return rows.join('') || `<div class="empty">${T('nobody_off')}</div>`;
   }
   // Work and rest (Time off page, guides and drivers). Personal: the person's own answers (tours a week that feel right, rest days,
@@ -2079,13 +2079,25 @@
       h += `<div class="list">${qs.map(q => { const t = db.tours.find(x => x.id === q.tour_id); return `<div class="card"><div class="row">${avatar(q.user_id)}<b>${esc(pname(q.user_id))}</b><span class="tag ${q.status === 'approved' ? 't-ok' : q.status === 'declined' ? 't-danger' : 't-warn'}">${T(q.status)}</span>${t ? `<button class="btn sm" data-act="tour" data-id="${t.id}">${esc(t.title)} · ${esc(dateText(t))}</button>` : ''}</div><div class="small">${esc(creqText(q))}</div>${q.status === 'pending' ? `<div class="actions"><button class="btn sm danger" data-act="creqdecide" data-id="${q.id}" data-s="0">${T('decline')}</button><button class="btn sm primary" data-act="creqdecide" data-id="${q.id}" data-s="1">${T('approve')}</button></div>` : ''}</div>`; }).join('') || `<div class="empty">${T('creq_none')}</div>`}</div>`;
     }
     if (tab === 'usage') {
-      const since = addDays(today(), -30), rows = db.usage.filter(u => u.day >= since), by = {};
-      rows.forEach(u => { const x = by[u.action] = by[u.action] || { n: 0, people: new Set() }; x.n += u.n || 1; x.people.add(u.user_id); });
+      // Who: everyone, or one role, or one age group (age only where the person put a birthday with a year in their profile).
+      const f = state.usageF || {}, since = addDays(today(), -30), yr = Number(today().slice(0, 4)), age = {};
+      db.personal_dates.forEach(d => { const y = Number(String(d.date).slice(0, 4)); if (pdKind(d.title) === 'birthday' && y > 1930 && y <= yr - 16) age[twin(d.user_id)] = yr - y; });
+      const grp = a => (a == null ? '' : a < 35 ? 'a1' : a < 50 ? 'a2' : 'a3'), known = crew().filter(p => age[p.id] != null).length;
+      const who = crew().filter(p => (!f.role || (f.role === 'office' ? p.role === 'admin' : p.role === f.role)) && (!f.age || grp(age[p.id]) === f.age)), ids = new Set(who.map(p => p.id));
+      const rows = db.usage.filter(u => u.day >= since && ids.has(twin(u.user_id))), by = {};
+      rows.forEach(u => { const x = by[u.action] = by[u.action] || { n: 0, people: new Set() }; x.n += u.n || 1; x.people.add(twin(u.user_id)); });
       const list = Object.keys(TRACKED).map(k => ({ k, n: (by[k] || {}).n || 0, people: by[k] ? by[k].people.size : 0 })).sort((x, y) => y.n - x.n), max = Math.max(1, ...list.map(x => x.n));
-      const per = crew().map(p => ({ p, days: new Set(rows.filter(u => u.user_id === p.id).map(u => u.day)).size, taps: rows.filter(u => u.user_id === p.id).reduce((s2, u) => s2 + (u.n || 1), 0), offers: db.offers.filter(o => o.user_id === p.id && (o.at || '').slice(0, 10) >= since).length }));
-      h += `<p class="muted small">${T('usage_text')}</p><div class="cols"><div class="card"><b>${T('usage_used')}</b>${list.filter(x => x.n).map(x => `<div class="row"><span style="flex:1;min-width:0">${esc(TRACKED[x.k])}</span><span class="meter"><i style="width:${Math.round(x.n / max * 100)}%"></i></span><b class="num">${x.n}</b><span class="muted small num">${x.people} ${T('usage_people')}</span></div>`).join('') || `<span class="muted small">${T('usage_none')}</span>`}</div>
-        <div class="list"><div class="card"><b>${T('usage_unused')}</b><div class="row">${list.filter(x => !x.n).map(x => `<span class="tag t-muted">${esc(TRACKED[x.k])}</span>`).join('') || `<span class="muted small">—</span>`}</div></div>
-        <div class="tablewrap"><table><tr><th>${T('name')}</th><th class="n">${T('usage_days')}</th><th class="n">${T('usage_taps')}</th><th class="n">${T('offers_sent')}</th></tr>${per.map(x => `<tr><td>${esc(x.p.name)}</td><td class="n">${x.days}</td><td class="n">${x.taps}</td><td class="n">${x.p.role === 'driver' ? '—' : x.offers}</td></tr>`).join('')}</table></div></div></div>`;
+      const devOf = id => DEVICES.filter(k => by[k] && by[k].people.has(id)).map(k => T('us_' + k)).join(', ');
+      const per = who.map(p => ({ p, days: new Set(rows.filter(u => twin(u.user_id) === p.id && TRACKED[u.action]).map(u => u.day)).size, taps: rows.filter(u => twin(u.user_id) === p.id && TRACKED[u.action]).reduce((s2, u) => s2 + (u.n || 1), 0), offers: db.offers.filter(o => o.user_id === p.id && (o.at || '').slice(0, 10) >= since).length })).sort((x, y) => y.taps - x.taps);
+      const chip = (k, v, l) => `<button data-act="usf" data-k="${k}" data-v="${v}" aria-pressed="${(f[k] || '') === v}">${esc(l)}</button>`;
+      h += `<p class="muted small">${T('usage_text')}</p>
+        <div class="bar"><div class="seg">${chip('role', '', T('us_all'))}${chip('role', 'guide', T('us_guides'))}${chip('role', 'driver', T('us_drivers'))}${chip('role', 'office', T('us_office'))}</div>
+        ${known ? `<div class="seg">${chip('age', '', T('us_anyage'))}${chip('age', 'a1', T('us_a1'))}${chip('age', 'a2', '35–49')}${chip('age', 'a3', '50+')}</div>` : ''}</div>
+        <p class="muted small">${T('us_who', { n: who.length })} ${T('us_ageknown', { n: known, m: crew().length })}</p>
+        <div class="cols"><div class="card"><b>${T('usage_used')}</b>${list.filter(x => x.n).map(x => `<div class="row"><span style="flex:1;min-width:0">${esc(TRACKED[x.k])}</span><span class="meter"><i style="width:${Math.round(x.n / max * 100)}%"></i></span><b class="num">${x.n}</b><span class="muted small num">${x.people} ${T('usage_people')}</span></div>`).join('') || `<span class="muted small">${T('usage_none')}</span>`}</div>
+        <div class="list"><div class="card"><b>${T('us_devices')}</b>${DEVICES.filter(k => by[k]).map(k => `<div class="row"><span style="flex:1;min-width:0">${T('us_' + k)}</span><b class="num">${by[k].people.size}</b><span class="muted small">${T('usage_people')}</span></div>`).join('') || `<span class="muted small">${T('us_nodev')}</span>`}</div>
+        <div class="card"><b>${T('usage_unused')}</b><div class="row">${list.filter(x => !x.n).map(x => `<span class="tag t-muted">${esc(TRACKED[x.k])}</span>`).join('') || `<span class="muted small">—</span>`}</div></div>
+        <div class="tablewrap"><table><tr><th>${T('name')}</th><th>${T('us_phone')}</th><th class="n">${T('usage_days')}</th><th class="n">${T('usage_taps')}</th><th class="n">${T('offers_sent')}</th></tr>${per.map(x => `<tr><td>${esc(x.p.name)}</td><td class="small">${esc(devOf(x.p.id)) || '—'}</td><td class="n">${x.days}</td><td class="n">${x.taps}</td><td class="n">${x.p.role === 'driver' ? '—' : x.offers}</td></tr>`).join('')}</table></div></div></div>`;
     }
     if (tab === 'catalog') {
       const cs = catalog();
@@ -2580,7 +2592,11 @@
   function greetHtml() {
     const m = me(); if (!m || !m.active || state.viewAs) return ''; const td = today(), sp = specialOn(td), art = k => (window.CUTE && window.CUTE.art[k]) || '';
     if (sp) { const [h, t] = specialText(sp); return `<div class="card greet"><svg viewBox="0 0 48 48" aria-hidden="true">${art(sp.art)}</svg><span class="grow-l"><b>${esc(h)}</b><span class="muted small">${esc(t)}</span></span></div>`; }
-    const part = dayPart(), ph = phraseFor(td, part);
+    return '';
+  }
+  function phraseLineHtml() {
+    const m = me(); if (!m || !m.active || state.viewAs) return ''; const td = today(); if (specialOn(td)) return ''; const art = k => (window.CUTE && window.CUTE.art[k]) || '';
+    const part = dayPart(), ph = phraseFor(td, part); if (!ph) return '';
     return `<div class="hi"><svg viewBox="0 0 48 48" aria-hidden="true">${art(part === 0 ? 'sunrise' : part === 1 ? 'sun' : 'moon')}</svg><span class="grow-l"><b>${esc(hiText('gr_p' + part, firstName(m)))}</b>${ph ? `<span class="muted small">${esc(ph.t)}${ph.by ? ` <i class="by">${esc(ph.by)}</i>` : ''}</span>` : ''}</span></div>`;
   }
   // For the greeting shown while the app opens next time: first name, language, and the words for the next seven days. Kept on this phone only.
@@ -2809,11 +2825,11 @@
   }
   // ---------- one line that says how fresh the schedule is and whether my changes were delivered ----------
   const hm = iso => new Intl.DateTimeFormat(LOCALES[lang()], { hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
-  function syncState() { const n = S.pending || 0, at = S.syncedAt || S.cachedAt, old = at && Date.now() - new Date(at).getTime() > 10 * 60000; return S.offline ? 'off' : (n || S.syncing) ? 'send' : old ? 'old' : 'ok'; }
+  function syncState() { const n = S.pending || 0, at = S.syncedAt || S.cachedAt, old = at && Date.now() - new Date(at).getTime() > 10 * 60000; return S.warming ? 'warm' : S.offline ? 'off' : (n || S.syncing) ? 'send' : old ? 'old' : 'ok'; }   // warm: the saved copy is on screen, fresh data is on its way
   // All fine: only the green dot before the app name. Offline, old data, sending or a failed save: a line under the header says so.
   function syncRow() {
-    const n = S.pending || 0, at = S.syncedAt || S.cachedAt, st = syncState(); document.documentElement.classList.toggle('syncing', st === 'send');
-    if (st === 'ok' && !S.failed) return '';
+    const n = S.pending || 0, at = S.syncedAt || S.cachedAt, st = syncState(); document.documentElement.classList.toggle('syncing', st === 'send' || st === 'warm');
+    if ((st === 'ok' || st === 'warm') && !S.failed) return '';
     const tx = st === 'off' ? T('st_off', { time: at ? hm(at) : '—' }) + (n ? ' ' + T('st_wait', { n }) : '') : st === 'send' ? T('sync_wait', { n }) : st === 'old' ? T('st_old', { time: hm(at) }) : T('st_ok', { time: at ? hm(at) : '—' });
     return `<div class="subtop"><button class="syncrow s-${st}" data-act="refresh" aria-live="polite"><i></i><span class="num">${esc(tx)}</span>${S.failed ? `<span class="tag t-warn num">${T('st_failed', { n: S.failed })}</span>` : ''}${st === 'ok' ? '' : `<span class="lnk">${T(st === 'send' ? 'st_sending' : 'st_retry')}</span>`}</button></div>`;
   }
@@ -2999,7 +3015,8 @@
     invdel(el) { run(() => S.remove('invites', el.dataset.id)); },
     wsame(el) { const box = el.closest('.wweek'), rows = [...box.querySelectorAll('.wrow')], src = rows.find(r => r.querySelector('[type=checkbox]').checked && r.querySelector('[name^=wf]').value) || rows[0], f = src.querySelector('[name^=wf]').value, t = src.querySelector('[name^=wt]').value; rows.forEach(r => { r.querySelector('[name^=wf]').value = f; r.querySelector('[name^=wt]').value = t; r.querySelectorAll("input").forEach(x => dirty.add(x)); }); qsaveOn(); },
     showpw() { state.showPw = !state.showPw; render(); },
-    refresh() { if (state.refreshing) return; state.refreshing = true; render(); (async () => { try { if (S.offline) await S.sync(); else await S.pulse(); } catch (e) { console.error(e); } state.refreshing = false; render(); toast(T(S.offline ? 'rf_off' : 'up_to_date')); })(); },
+    usf(el) { state.usageF = { ...(state.usageF || {}), [el.dataset.k]: el.dataset.v }; render(); },
+    refresh() { if (state.refreshing) return; state.refreshing = true; render(); (async () => { try { if (S.offline) await S.sync(); else await S.pulse(); } catch (e) { console.error(e); } state.refreshing = false; render(); if (!S.warming) toast(T(S.offline ? 'rf_off' : 'up_to_date')); })(); },
     pvcount() { run(async () => { state.staleN = await S.staleGuests(pv().keepMonths); }); },
     pvrun() { confirmDo(T('pv_run_q', { n: state.staleN }), T('pv_run'), async () => { const n = await S.purgeGuests(pv().keepMonths); logAct(`Privacy clean-up: contact details of ${n} old guests removed`); state.staleN = 0; toast(T('pv_done', { n })); }); },
     gexport(el) { exportGuest(el.dataset.id); },
@@ -3259,7 +3276,19 @@
 
   const toToday = () => { const x = document.getElementById('day-' + today()); if (x && window.matchMedia('(max-width:760px)').matches) x.scrollIntoView({ block: 'start' }); };
   // ---------- usage: counts of what people tap, sent in small batches ----------
-  const TRACKED = { photos: 'Open photo of the day', recap: 'Open my year', tour: 'Open tour card', guest: 'Open guest', client: 'Open client card', attend: 'Guest check-in', summary: 'Day summary', creq: 'Suggest a change', score: 'Tour score', offer: 'Offer a tour', offersend: 'Send tour offer', copy: 'Copy', mode: 'Week / month switch', mine: 'Team / mine switch', offnew: 'Day-off request', taskdone: 'Task ticked', statmonth: 'Statistics', metab: 'Me tabs', swapagree: 'Handover answer', rate: 'Guest mark', help: 'Help', csv: 'Export CSV', statement: 'Pay statement', swipe: 'Swipe', wa: 'WhatsApp tap', call: 'Call tap', map: 'Map tap', view_calendar: 'Calendar screen', view_timeoff: 'Time off screen', view_tasks: 'Tasks screen', view_me: 'Me screen', view_admin: 'Back office screen', view_clients: 'Clients screen' };
+  const TRACKED = { photos: 'Open photo of the day', recap: 'Open my year', tour: 'Open tour card', guest: 'Open guest', client: 'Open client card', attend: 'Guest check-in', summary: 'Day summary', creq: 'Suggest a change', score: 'Tour score', offer: 'Offer a tour', offersend: 'Send tour offer', copy: 'Copy', mode: 'Week / month switch', mine: 'Team / mine switch', offnew: 'Day-off request', taskdone: 'Task ticked', statmonth: 'Statistics', metab: 'Me tabs', swapagree: 'Handover answer', rate: 'Guest mark', help: 'Help', csv: 'Export CSV', statement: 'Pay statement', swipe: 'Swipe', wa: 'WhatsApp tap', call: 'Call tap', map: 'Map tap', view_calendar: 'Calendar screen', view_timeoff: 'Time off screen', view_tasks: 'Tasks screen', view_me: 'Me screen', view_admin: 'Back office screen', view_clients: 'Clients screen', badge: 'Badges', phlike: 'Like a photo', thnew: 'Say thank you', refresh: 'Refresh button', bell: 'Notifications bell', wrset: 'Work and rest wishes', nav: 'Week arrows', day: 'Tap a day in the week strip', today: 'Today button', phshare: 'Share a photo picture', drag: 'Drag a tour' };
+  // What kind of device each person opens the app on: noted once a day per device, as counts only (no model names, nothing else about the phone).
+  const DEVICES = ['dev_ios', 'dev_android', 'dev_desktop', 'dev_app', 'dev_small', 'dev_bigtext'];
+  function trackDevice() {
+    try {
+      if (!me() || !me().active || state.viewAs || S.mode === 'demo' && !window.__devTest || localStorage.getItem('fs-dev-day') === today()) return; localStorage.setItem('fs-dev-day', today());
+      const ua = navigator.userAgent || '', marks = ['dev_' + (/iPhone|iPad|iPod/.test(ua) ? 'ios' : /Android/.test(ua) ? 'android' : 'desktop')];
+      if (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone) marks.push('dev_app');
+      if (Math.min(screen.width, screen.height) <= 360) marks.push('dev_small');
+      if (parseFloat(getComputedStyle(document.documentElement).fontSize) > 17) marks.push('dev_bigtext');
+      marks.forEach(m => { usageBuf[m] = 1; });
+    } catch (e) { /* private mode */ }
+  }
   let usageBuf = {};
   function track(name) { if (!TRACKED[name] || !me()) return; usageBuf[name] = (usageBuf[name] || 0) + 1; }
   function flushUsage() {
@@ -3369,6 +3398,7 @@
     const v = location.hash.slice(1); if (['calendar', 'timeoff', 'tasks', 'admin', 'me'].includes(v)) state.view = v;
     try { await S.init(); } catch (e) { console.error(e); logErr('offline', `${errCode(e)} App could not start: ${(e && e.message) || e}`, navigator.onLine ? 'phone was online' : 'phone had no internet'); $('#app').innerHTML = `<main><div class="banner f"><b>${esc(T('err_connect'))}</b><span class="small">${esc(errCode(e) + ': ' + T('ec_' + errCode(e)))}</span><span class="small">${esc(T('err_retry'))}</span><button class="btn primary" onclick="location.reload()">${esc(T('refresh'))}</button></div></main>`; setTimeout(() => { if (navigator.onLine) location.reload(); }, 20000); return; }
     saveHello(); document.addEventListener('visibilitychange', () => { if (document.hidden) saveHello(); });
+    if (S.warming) { let warm = true; S.onChange((t, r, type) => { if (warm && type === 'STATE' && !S.warming) { warm = false; PH.asked.clear(); displayFromAccount(); saveHello(); weekCheck(); } }); }
     if (S.mode === 'demo') window.__test = { pageFor: (title, kind) => { const u = pageFor({ title, kind }), m = /\/activity\/(\d+)/.exec(u); return m ? { id: Number(m[1]) } : null; } };          // for the automatic tests only
     if (me() && !isAdmin()) state.mine = true;
     displayFromAccount();
@@ -3378,7 +3408,7 @@
     document.addEventListener('visibilitychange', () => { if (!document.hidden && state.newVersion && !state.modal && !document.querySelector('form [data-dirty], .qsave.on')) { try { location.reload(); } catch (e) { /* stays on the banner */ } } });
     // A folded section the person opened stays open while the page redraws.
     document.addEventListener('toggle', e => { const d = e.target; if (d && d.dataset && d.dataset.keep) { state.keep = state.keep || {}; state.keep[d.dataset.keep] = d.open; } }, true);
-    setTimeout(privacyAuto, 4000); checkBadges(); weekCheck(); setInterval(weekCheck, 30 * 60000); setTimeout(fxRefresh, 6000); setInterval(fxRefresh, 6 * 3600000);
+    setTimeout(trackDevice, 3000); setTimeout(privacyAuto, 4000); checkBadges(); weekCheck(); setInterval(weekCheck, 30 * 60000); setTimeout(fxRefresh, 6000); setInterval(fxRefresh, 6 * 3600000);
     setInterval(() => { if (me() && me().active && !isAdmin() && state.view === 'calendar' && !state.modal && !document.hidden) render(); }, 5 * 60000);
     if ('serviceWorker' in navigator && location.protocol === 'https:' && S.mode === 'supabase') { try { swReg = await navigator.serviceWorker.register('sw.js'); const had = !!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange', () => { if (had) { state.newVersion = true; render(); } }); setInterval(() => { try { swReg.update(); } catch (e) { /* later */ } }, 30 * 60000); } catch (e) { /* no service worker here */ } }
   })();
