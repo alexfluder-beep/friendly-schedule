@@ -453,3 +453,9 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 - **Print** button: prints the view on screen without the menus.
 - Not added from Setmore, on purpose: slot size, slot frequency, default duration, off-hours and double-booking switches (the app works with tours, and already warns about two tours at once). "Hide weekends" is not built yet.
 - **Back office > Backup > Offline copy on this computer.** In Chrome or Edge on a computer the owner chooses a folder once (for example inside Google Drive). While changes wait for the internet, the app writes one file there, `friendly-schedule-offline-copy.json`, with the whole schedule and the waiting changes, and again when they are sent. Drive uploads it by itself when the connection is back. "Save a copy now" works in any browser. The file has guest details: the folder must stay private. The app still sends the changes itself; the file is a safety copy.
+
+## 3.48
+- **Month view:** each tour row has its own tour colour (before, the guide's colour was used, and the team all had the same grey). A tour can be dragged to another day (office). One frame on the chosen day. The day-off mark sits in the top right corner of the day, on the line of the date.
+- **Tour card:** Edit, Move, Copy, Cancel and Delete are smaller and sit in one row.
+- **Guest card:** "‹ Back" returns to the card it was opened from, and ✕ closes everything. Each mark (Good, Fine, Bad, Trouble maker) is one small button. Every booking ref of the guest is listed, with the tour date, as text that selects with one click. Fields and section titles start at the same left edge.
+- **Why a guest is VIP**, in facts about that person: how many tours and since which year, which tours, which extras and how often, good marks from the team, and whether they ever missed a tour.

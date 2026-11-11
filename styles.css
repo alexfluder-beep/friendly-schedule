@@ -1167,3 +1167,19 @@ button.agr{cursor:pointer}button.agr:hover{background:var(--surface2)}
 .agw{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;justify-content:flex-start}.agw .avatar{width:24px;height:24px;font-size:10px}.agr.cx{opacity:.6}
 .whosel{width:auto;max-width:220px;min-height:40px}.vseg button{min-width:64px}.daylist{max-width:760px}
 @media print{header.top,.tabs,.nav,.fab,.bar,.calhd,.banner,.subtop,#toasts,.demo,.vabar,.phstrip,.incbar,.homelinks,button.add{display:none!important}body{background:#fff}main{padding:0;max-width:none}.card,.agenda{border:0;box-shadow:none}.agr{break-inside:avoid}.only-wide{display:block!important}}
+
+/* 3.48 guest marks: one small button each (the coloured tag is the button) */
+.tagbtn{cursor:pointer;min-height:36px;padding:6px 14px;font:inherit;font-weight:600;font-size:var(--t-sm)}.tagbtn:active{transform:scale(.96)}
+/* tour card buttons: smaller, in one tidy row */
+.tacts{display:flex;flex-wrap:wrap;gap:8px}.tacts .btn{min-height:40px;padding:6px 14px;font-size:var(--t-sm);white-space:nowrap;flex:0 1 auto}.tacts .btn .msi{width:18px;height:18px}
+@media (max-width:420px){.tacts .btn{flex:1 1 calc(50% - 8px)}.tacts .btn.primary{flex-basis:100%}}
+/* Back to the card this one was opened from */
+.backbtn{flex:none}.hdr.backrow{margin-bottom:-4px}
+/* guest card: everything starts at the same left edge; refs are text to copy */
+.sheet dl.fields{padding:0 2px;margin-left:0}.sheet details.sect>summary{padding-left:2px;padding-right:2px}
+.refs{display:flex;flex-direction:column;gap:4px}.refrow{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+code.ref{font:inherit;font-variant-numeric:tabular-nums;letter-spacing:.02em;user-select:all;-webkit-user-select:all;cursor:text;background:var(--surface2);padding:2px 8px;border-radius:6px}
+.vipwhy{max-width:46ch;margin:6px auto 0;color:var(--ink);text-align:center;line-height:1.45}
+/* month view: one frame on the chosen day; day-off mark in the top right corner, on the line of the date */
+.mgrid button.sel,.mgrid button.sel:focus,.mgrid button.sel:focus-visible{outline:0}
+@media (min-width:761px){.mgrid button{position:relative}.mgrid button>.offm{position:absolute;top:6px;right:6px;margin:0;width:auto}.mrow[data-drag]{cursor:grab}}
