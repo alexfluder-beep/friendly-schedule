@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.15';
+  const APP_VERSION = '3.16';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -370,6 +370,28 @@
   }
   const admins = () => db.profiles.filter(p => p.role === 'admin' && p.active !== false).map(p => p.id);
   const myNotes = () => db.notifications.filter(n => n.user_id === me().id).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+  // "X asks to change their tours": the admin answers right on the notice. Older notices have no ids, so the tours are found by their names.
+  const tcWho = n => { const q = n.params || {}; return db.profiles.find(x => x.id === q.user_id) || db.profiles.find(x => x.name === q.name); };
+  const tcIds = (n, k) => { const q = n.params || {}; if (Array.isArray(q[k + '_ids'])) return q[k + '_ids'].map(String); const txt = String(q[k] || ''); return catalog().filter(c => c.id && c.title && txt.includes(c.title)).map(c => String(c.id)); };
+  function tcBtns(n) {
+    if (n.kind !== 'tours_change' || !isAdmin() || state.viewAs) return '';
+    const done = (n.params || {}).done;
+    if (done) return `<div><span class="tag ${done === 'applied' ? 't-ok' : 't-muted'}">${T(done === 'applied' ? 'tc_applied' : 'tc_declined')}</span></div>`;
+    if (!tcWho(n)) return '';
+    return `<div class="bar tcbar"><button class="btn sm primary" data-act="tcapply" data-id="${n.id}">${T('tc_apply')}</button><button class="btn sm" data-act="tccorrect" data-id="${n.id}">${T('tc_correct')}</button><button class="btn sm" data-act="tcdecline" data-id="${n.id}">${T('tc_decline')}</button></div>`;
+  }
+  async function tcAnswer(id, ok) {
+    const n = db.notifications.find(x => String(x.id) === String(id)), who = n && tcWho(n); if (!who) return;
+    if (ok) {
+      const all = catalog().filter(c => c.id).map(c => String(c.id)), cur = new Set((who.skills || []).length ? who.skills.map(String) : all);
+      tcIds(n, 'drop').forEach(x => cur.delete(x)); tcIds(n, 'add').forEach(x => cur.add(x));
+      await S.save('profiles', { ...stripEmail(who), skills: all.filter(x => cur.has(x)) });
+    }
+    const L = window.I18N.t(['en', 'ru', 'ka'].includes(who.lang) ? who.lang : 'en', 'tc_list');
+    await notify([who.id], ok ? 'creq_approved' : 'creq_declined', { title: L });
+    await S.save('notifications', { ...n, read: true, params: { ...(n.params || {}), done: ok ? 'applied' : 'declined' } });
+    toast(T(ok ? 'tc_applied' : 'tc_declined')); renderModal();
+  }
   function noteText(n) { const p = { ...(n.params || {}) }; if (p.date) p.date = fmtDay(p.date); if (p.from) p.range = fmtRange(p.from, p.to || p.from); return T('n_' + n.kind, p); }
   let swReg = null;
   function systemNotify(text) {
@@ -816,7 +838,7 @@
           ${scoreHtml(d)}
           ${tasks.length ? `<div class="list"><b>${T('tasks')}</b>${tasks.map(taskCard).join('')}</div>` : ''}
           <div class="actions">${canOffer() ? `<button class="btn" data-act="offer">${T('offer_title')}</button>` : ''}${isAdmin() ? `<button class="btn" data-act="tasknew" data-tour="${d.id}">+ ${T('task_for_tour')}</button>` : (mine && endOf(d) >= today() && live(d) ? `<button class="btn" data-act="creq" data-id="${d.id}">${T('suggest_change')}</button><button class="btn danger" data-act="cancelask" data-id="${d.id}">${T('report_cancel')}</button>` : '')}</div></div></details>
-        ${isAdmin() ? `<div class="actions">${live(d) ? `<button class="btn danger" data-act="cancelask" data-id="${d.id}">${T('cancel_tour')}</button>` : `<button class="btn" data-act="tourrestore" data-id="${d.id}">${T('restore')}</button>`}${live(d) ? `<button class="btn" data-act="move" data-id="${d.id}">${T('mv_btn')}</button>` : ''}<button class="btn primary" data-act="touredit">${T('edit')}</button></div>` : ''}`;
+        ${isAdmin() ? `<div class="actions">${live(d) ? `<button class="btn danger" data-act="cancelask" data-id="${d.id}">${T('cancel_tour')}</button>` : `<button class="btn" data-act="tourrestore" data-id="${d.id}">${T('restore')}</button>`}${live(d) ? `<button class="btn" data-act="move" data-id="${d.id}">${T('mv_btn')}</button>` : ''}<button class="btn primary" data-act="touredit">${T('edit')}</button></div><div class="actions"><button class="lnk dellnk" data-act="tourdelask" data-id="${d.id}">${msi('delete')}${T('del_tour')}</button></div>` : ''}`;
     }
     const titles = [...new Set([...catalog().map(c => c.title), ...db.tours.map(t => t.title)])].sort(), marks = allMarks(), r = rules().pay || {};
     return `<div class="hdr"><h2>${T(m.isNew ? 'new_tour' : 'edit_tour')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>
@@ -2302,7 +2324,7 @@
   function bellHtml() {
     const ns = myNotes().slice(0, 40);
     return `<div class="hdr"><h2>${T('notifications')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>
-      <div class="nlist">${ns.length ? ns.map(n => `<div class="nitem ${n.read ? '' : 'unread'}">${esc(noteText(n))}<div class="muted small">${esc(new Intl.DateTimeFormat(LOCALES[lang()], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(n.created_at)))}</div></div>`).join('') : `<div class="empty">${T('no_notifications')}</div>`}</div>`;
+      <div class="nlist">${ns.length ? ns.map(n => `<div class="nitem ${n.read ? '' : 'unread'}">${esc(noteText(n))}${tcBtns(n)}<div class="muted small">${esc(new Intl.DateTimeFormat(LOCALES[lang()], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(n.created_at)))}</div></div>`).join('') : `<div class="empty">${T('no_notifications')}</div>`}</div>`;
   }
 
   // ---------- render ----------
@@ -2415,6 +2437,7 @@
   function navPop() { if (navStack > 0) { navStack--; skipPop++; try { history.back(); } catch (e) { skipPop--; } } }
   window.addEventListener('popstate', () => {
     if (skipPop) { skipPop--; return; } if (navStack > 0) navStack--;
+    if (state.modal && state.modal.touched) { navPush(); guardClose(() => { state.modal = null; renderModal(); render(); }); return; }
     if (state.modal) { modalHist = false; state.modal = null; renderModal(); render(); }
     else if (state.view === 'admin' && state.adminTab) { adminHist = false; state.adminTab = null; render(); window.scrollTo(0, 0); }
   });
@@ -2429,6 +2452,17 @@
     refreshTourWarn(); refreshOffWarn();
   }
   const confirmDo = (text, yes, fn) => { state.modal = { type: 'confirm', text, yes, fn }; renderModal(); };
+  // Closing a window with typed but unsaved data asks first. The question is drawn on top, so nothing typed is lost if the person stays.
+  document.addEventListener('input', ev => { const el = ev.target; if (state.modal && el && el.closest && el.closest('#modal form') && el.type !== 'search') state.modal.touched = true; }, true);
+  document.addEventListener('submit', ev => { if (state.modal && ev.target.closest && ev.target.closest('#modal')) state.modal.touched = false; }, true);
+  function guardClose(go) {
+    const m = state.modal; if (!m || !m.touched) { go(); return; }
+    if (document.getElementById('askbox')) return;
+    const box = document.createElement('div'); box.id = 'askbox'; box.className = 'askbox'; box.setAttribute('role', 'alertdialog');
+    box.innerHTML = `<div class="askcard"><b>${T('unsaved_ask')}</b><div class="actions"><button type="button" class="btn" data-a="drop">${T('unsaved_drop')}</button><button type="button" class="btn primary" data-a="keep">${T('unsaved_keep')}</button></div></div>`;
+    box.addEventListener('click', ev => { const a = ev.target.closest('[data-a]'); if (!a) return; ev.stopPropagation(); box.remove(); if (a.dataset.a === 'drop') { m.touched = false; go(); } });
+    document.body.appendChild(box); box.querySelector('[data-a=keep]').focus();
+  }
   const closeModal = () => { state.modal = (state.modal && state.modal.back) || null; if (state.modal && state.modal.type === 'tour' && !state.modal.edit) { const fresh = db.tours.find(x => x.id === state.modal.draft.id); if (fresh) { state.modal.draft = { ...fresh, bookings: tourBookings(fresh.id).map(b => ({ ...b, marks: [...(b.marks || [])] })) }; } } renderModal(); };
 
   // ---------- events ----------
@@ -2554,7 +2588,7 @@
     async mytoursok() {
       const m = me(), list = catalog().filter(c => c.id), was = new Set((m.skills || []).length ? m.skills : list.map(c => String(c.id))), now = state.myTours || was;
       const add = list.filter(c => now.has(String(c.id)) && !was.has(String(c.id))).map(c => c.title), drop = list.filter(c => !now.has(String(c.id)) && was.has(String(c.id))).map(c => c.title);
-      if (add.length || drop.length) await notify(admins(), 'tours_change', { name: m.name, add: add.join(', ') || '—', drop: drop.join(', ') || '—' });
+      if (add.length || drop.length) await notify(admins(), 'tours_change', { name: m.name, add: add.join(', ') || '—', drop: drop.join(', ') || '—', user_id: m.id, add_ids: list.filter(c => now.has(String(c.id)) && !was.has(String(c.id))).map(c => String(c.id)), drop_ids: list.filter(c => !now.has(String(c.id)) && was.has(String(c.id))).map(c => String(c.id)) });
       state.myTours = null; await run(() => S.save('profiles', { ...stripEmail(m), display: { ...((m.display && typeof m.display === 'object') ? m.display : {}), toursOk: today() } }), T(add.length || drop.length ? 'mt_sent' : 'saved'));
     },
     tnames() { state.modal = { type: 'tnames' }; renderModal(); },
@@ -2599,8 +2633,13 @@
     msclear(el) { const m = state.modal, b = m && m.draft && m.draft.bookings[Number(el.dataset.i)]; if (!b) return; const had = needsAddr(b); b.marks = []; el.closest('.mspanel').querySelectorAll('input[type=checkbox]').forEach(x => { x.checked = false; }); const sm = $('#ms-' + el.dataset.i); if (sm) { sm.textContent = optSummary(b); sm.nextElementSibling.textContent = ''; } if (had) setTimeout(renderModal, 0); },
     badd() { state.modal.draft.bookings.push({ id: S.uid(), guest: '', adults: 1, children: 0, phone: '', ref: '', notes: '', marks: [] }); renderModal(); },
     bdel(el) { state.modal.draft.bookings.splice(Number(el.dataset.i), 1); renderModal(); },
-    close() { closeModal(); },
-    backdrop(el, ev) { if (ev.target === el) closeModal(); },
+    close() { guardClose(closeModal); },
+    backdrop(el, ev) { if (ev.target === el) guardClose(closeModal); },
+    tcapply(el) { run(() => tcAnswer(el.dataset.id, true)); },
+    tcdecline(el) { run(() => tcAnswer(el.dataset.id, false)); },
+    tccorrect(el) { const n = db.notifications.find(x => String(x.id) === String(el.dataset.id)), who = n && tcWho(n); if (who) { state.modal = { type: 'person', draft: { ...who }, back: state.modal }; renderModal(); } },
+    tourdelask(el) { const t = db.tours.find(x => x.id === el.dataset.id); if (!t) return; const n = tourBookings(t.id).length;
+      confirmDo(T('del_ask', { title: t.title, date: fmtDay(t.date), n }), T('del_yes'), async () => { for (const b of tourBookings(t.id)) await S.remove('bookings', b.id); await S.remove('tours', t.id); toast(T('del_done')); render(); }); },
     bell() { state.modal = { type: 'bell' }; renderModal(); const un = myNotes().filter(n => !n.read); (async () => { for (const n of un) { try { await S.save('notifications', { ...n, read: true }); } catch (e) { /* ignore */ } } render(); })(); },
     offnew(el) { const d0 = el.dataset.date || (state.date > today() ? state.date : addDays(today(), 1)); state.modal = { type: 'off', draft: { user_id: el.dataset.who || me().id, type: 'dayoff', date_from: d0, date_to: d0, note: '' } }; renderModal(); },
     offdecide(el) { const o = db.time_off.find(x => x.id === el.dataset.id); logAct(`Time off ${el.dataset.s} for ${pname(o.user_id)}: ${o.date_from} to ${o.date_to}`); run(async () => { await S.save('time_off', { ...o, status: el.dataset.s, decided_by: me().id }); await notify([o.user_id], el.dataset.s === 'approved' ? 'off_approved' : 'off_declined', { from: o.date_from, to: o.date_to }); }); },
@@ -2762,7 +2801,7 @@
     const f = ev.target.closest('[data-form]'); if (!f) return; ev.preventDefault();
     const fn = forms[f.dataset.form]; if (fn) busyWhile(ev.submitter || f.querySelector('button.primary, button:not([type=button])'), run(() => fn(new FormData(f), f)));
   });
-  document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && state.modal) closeModal(); });
+  document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && state.modal) guardClose(closeModal); });
   window.addEventListener('hashchange', () => { const v = location.hash.slice(1); if (['calendar', 'timeoff', 'tasks', 'admin', 'me'].includes(v) && v !== state.view) { state.view = v; render(); } });
 
   const toToday = () => { const x = document.getElementById('day-' + today()); if (x && window.matchMedia('(max-width:760px)').matches) x.scrollIntoView({ block: 'start' }); };

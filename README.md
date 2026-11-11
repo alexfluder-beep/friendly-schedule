@@ -282,3 +282,8 @@ Art (tools/art): `make_art.py` makes avatar and badge pictures with Gemini once,
 ## 3.15
 - Login page: brand on top, the form on one soft card, and under it the account links with the language buttons (globe, EN / RU / KA) right below them. Gentle entrance and a press effect on the button; off when the phone asks for less motion.
 - Nightly copy of the database to Google Drive: see tools/backup/README.md.
+
+## 3.16
+- "X asks to change their tours" notice: the admin answers on the notice with **Apply** (the person's tour list is updated), **Correct** (opens the person to edit the list by hand) or **Decline**. The person gets "Your request was approved / declined: your tour list". Works for notices sent before this version too.
+- Tour card (admin): **Delete tour**. It asks first, says how many guest bookings go with it, and cannot be undone; Cancel tour is still the way to keep a tour in the history.
+- Closing a window with typed but unsaved data asks "Keep editing / Close without saving" (close button, tap outside, Esc and the phone Back button).
