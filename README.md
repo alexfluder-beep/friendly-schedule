@@ -463,3 +463,6 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 ## 3.49
 - Guest card: the phone and a country flag are on one line (the country name shows on hover); the phone selects with one click.
 - Guest card, office only: **Income** from this guest, after the booking site fee, per currency, with what the guest paid. It counts only bookings that have a price saved, and says how many. Guide pay and costs are not taken off, so it is income, not profit.
+
+## 3.50
+- Time off: the two lists look the same again. What it is (the guide, the holiday or the event) is on the left, the dates are on the right.

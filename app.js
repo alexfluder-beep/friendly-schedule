@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.49';
+  const APP_VERSION = '3.50';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -1676,7 +1676,7 @@
     if (isAdmin()) h += `<h3>${T('to_approve')} (${pending.length})</h3><div class="list">${pending.length ? pending.map(o => offRow(o, true)).join('') : `<div class="empty">${T('nothing_pending')}</div>`}</div>`;
     h += `<div class="cols"><div class="list"><h3>${T('my_requests')}</h3>${mine.length ? mine.map(o => offRow(o, isAdmin())).join('') : `<div class="empty">${T('no_requests')}</div>`}</div>
       <div class="list"><h3>${T(isAdmin() ? 'team_off' : 'tc_title')}</h3>${!isAdmin() ? teamOffCounts(upcoming) : !upcoming.length ? `<div class="empty">${T('nobody_off')}</div>` : isAdmin() ? upcoming.map(o => `<div class="card lrow">${avatar(o.user_id)}<span class="lmain"><b>${esc(pname(o.user_id))}</b>${offTag(o)}</span><span class="num ldate">${esc(fmtRange(o.date_from, o.date_to))}</span></div>`).join('') : teamOffCounts(upcoming)}
-      <h3>${T('holidays')}</h3>${hol.length ? hol.map(x => `<div class="card lrow nohead"><span class="lmain"><b class="nw num">${esc(fmtRange(x.date_from, x.date_to))}</b></span><span class="ldate"><span class="tag ${x.kind === 'event' ? 't-group' : 't-hol'}">${esc(trName(x.name))}</span></span>${x.notes ? `<div class="muted small">${esc(x.notes)}</div>` : ''}</div>`).join('') : `<div class="empty">${T('no_holidays')}</div>`}</div></div>`;
+      <h3>${T('holidays')}</h3>${hol.length ? hol.map(x => `<div class="card lrow nohead"><span class="lmain"><span class="tag ${x.kind === 'event' ? 't-group' : 't-hol'}">${esc(trName(x.name))}</span></span><span class="num ldate">${esc(fmtRange(x.date_from, x.date_to))}</span>${x.notes ? `<div class="muted small">${esc(x.notes)}</div>` : ''}</div>`).join('') : `<div class="empty">${T('no_holidays')}</div>`}</div></div>`;
     return h;
   }
   function offModalHtml(m) {
