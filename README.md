@@ -428,3 +428,7 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 - **The greeting is not on the first screen any more.** Ordinary days: the phrase of the day sits at the bottom of the calendar page, and on the short opening screen. Special days (birthday, holiday, sick day, day off) keep their card at the top.
 - Time off: dates in "Team off soon" stay on one line; "1 day", not "1 days". The "All" chip in the calendar header fits its Georgian word.
 - **Back office > Usage:** choose Everyone / Guides / Drivers / Office and an age group (only where the birthday with a year is in the profile). New card "Phones and settings": how many people use iPhone, Android or a computer, have the app installed, a small screen or large text. A device column in the people table. More buttons are counted (badges, photo likes, thanks, refresh, bell, week arrows). Only counts are stored: no phone model, no location.
+
+## 3.44
+- **Month view has clear arrows.** Above the grid: "‹ October | November 2026 | December ›". Each arrow names the month it opens. Swiping left and right still works.
+- **The greeting phrase is removed everywhere** ("Good evening, name" with the phrase of the day): gone from the calendar page and from the opening screen, and `phrases.js` is deleted. The opening screen shows only a short "Good evening, name" while the app starts. Cards on special days (birthday, holiday, sick day, day off) stay.

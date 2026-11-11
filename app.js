@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.43';
+  const APP_VERSION = '3.44';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -742,7 +742,7 @@
       <div class="bar homebar"><h2>${esc(fmt(days[3], { month: 'long', year: 'numeric' }))}</h2><label class="jump" title="${T('pick_date')}">${ico('cal')}<input type="date" id="jump" data-ch="jump" value="${esc(state.date)}" aria-label="${T('pick_date')}"></label><span class="spacer"></span><div class="seg"><button data-act="nav" data-d="-1" aria-label="${T('prev')}">‹</button><button data-act="today">${T('today')}</button><button data-act="nav" data-d="1" aria-label="${T('next')}">›</button></div></div>
       <div class="list home"><div class="strip">${days.map(d => `<button data-act="day" data-date="${d}" aria-pressed="${d === sel}" class="${d === td ? 'tdy' : ''} ${offCls(offOn(id, d))} ${holidayOn(d) ? 'hol' : ''}"><span>${esc(fmt(d, { weekday: 'short' }))}</span><b class="num">${D(d).getDate()}</b>${dayMarks(d, id)}</button>`).join('')}</div>${stripLegend(true)}
       ${now ? nowCardHtml(now) : ''}${days.map(myDayHtml).join('')}</div>
-      ${photoStripHtml()}${phraseLineHtml()}
+      ${photoStripHtml()}
       <div class="bar homelinks"><button class="lnk" data-act="mode" data-m="month">${T('month')}</button><button class="lnk" data-act="mine" data-v="0">${T('home_team')}</button><button class="lnk" data-act="summary">${T('day_summary')}</button></div>`;
   }
   // Exchange rates to the pay currency (Rules), so money in USD, EUR and GEL can be added up.
@@ -819,7 +819,7 @@
       <div class="bar"><h2>${esc(title)}</h2><label class="jump" title="${T('pick_date')}">${ico('cal')}<input type="date" id="jump" data-ch="jump" value="${esc(state.date)}" aria-label="${T('pick_date')}"></label><span class="spacer"></span><div class="seg"><button data-act="nav" data-d="-1" aria-label="${T('prev')}">‹</button><button data-act="today">${T('today')}</button><button data-act="nav" data-d="1" aria-label="${T('next')}">›</button></div></div>`}`;
     const pFrom_To = [state.mode === 'month' ? state.date.slice(0, 8) + '01' : days[0], state.mode === 'month' ? addDays(addDays(state.date.slice(0, 8) + '01', 32).slice(0, 8) + '01', -1) : days[6]];
     const pstats = !(isAdmin() && !state.mine) ? '' : `<div class="only-wide">${periodStatsHtml(pFrom_To[0], pFrom_To[1])}</div>${incBarHtml(pFrom_To[0], pFrom_To[1])}`;
-    if (state.mode === 'month') return h + monthHtml() + photoStripHtml() + phraseLineHtml() + pstats;
+    if (state.mode === 'month') return h + monthHtml() + photoStripHtml() + pstats;
     // wide: team grid
     const hd = days.map(d => { const ho = holidayOn(d), ev = eventOn(d); return `<div class="hd ${d === td ? 'today' : ''}">${esc(fmtDay(d))}${ho ? `<span class="hol">${esc(ho.name)}</span>` : ''}${ev ? `<span class="hol ev">${esc(ev.name)}</span>` : ''}</div>`; }).join('');
     const rowFor = (label, sub, id, filter) => `<div class="who">${id ? avatar(id) : ''}<div>${esc(label)}<span class="r">${esc(sub)}</span></div></div>` + days.map(d => {
@@ -838,7 +838,7 @@
     h += `<div class="only-phone list"><div class="strip">${days.map(d => `<button data-act="day" data-date="${d}" data-drop="${d}" aria-pressed="${d === sel}" class="${d === td ? 'tdy' : ''} ${offCls(offOn(me().id, d))} ${holidayOn(d) ? 'hol' : ''}"><span>${esc(fmt(d, { weekday: 'short' }))}</span><b class="num">${D(d).getDate()}</b>${dayMarks(d, state.mine ? me().id : '')}</button>`).join('')}</div>${stripLegend(!!state.mine)}`;
     for (const d of days) h += dayBlock(d);
     h += `</div>`;
-    return h + photoStripHtml() + phraseLineHtml() + pstats;
+    return h + photoStripHtml() + pstats;
   }
   function monthHtml() {
     const first = state.date.slice(0, 8) + '01', start = monday(first), td = today(), mo = state.date.slice(0, 7), sel = state.date, my = me().id;
@@ -850,7 +850,9 @@
       cells += `<button class="${d.slice(0, 7) !== mo ? 'out' : ''} ${d === td ? 'today' : ''} ${d === sel ? 'sel' : ''} ${offCls(myOff)} ${ho ? 'hol' : ''} ${pubHolOn(d) ? 'pub' : ''}" title="${esc(pubHolOn(d) ? T(pubHolOn(d)) : '')}" data-act="pickday" data-date="${d}" data-drop="${d}" aria-pressed="${d === sel}" aria-label="${esc(fmtDay(d))}: ${ts.length} ${T('tours_n')}"><b class="num">${D(d).getDate()}</b><span class="dots">${ts.slice(0, 4).map(t => `<i style="background:${esc(tourStyle(t.title).color)}"></i>`).join('')}${ts.length > 4 ? `<span class="num">+${ts.length - 4}</span>` : ''}</span><span class="mrows">${ts.slice().sort((x, y) => (x.start_time || '').localeCompare(y.start_time || '')).slice(0, 4).map(t => `<span class="mrow${live(t) ? '' : ' cx'}" data-act="tour" data-id="${t.id}"><i style="background:${esc((person(t.guide_id) || {}).color || tourStyle(t.title).color)}"></i><span class="num">${esc(t.start_time || '')}</span> ${esc(t.title)} <span class="num muted">${paxText(t)}</span></span>`).join('')}${ts.length > 4 ? `<span class="mrow more">${T('more_n', { n: ts.length - 4 })}</span>` : ''}</span>${offMark(d)}</button>`;
     }
     const legend = `<div class="row small muted lgrow"><span class="lg"><i class="dotk"></i>${T('lg_tour')}</span><span class="lg"><i class="sq myoff"></i>${T('lg_myoff')}</span><span class="lg"><i class="sq myoff mysick"></i>${T('sick')}</span><span class="lg"><i class="sq hol"></i>${T('holidays')}</span><span class="lg"><i class="sq pub"></i>${T('ph_legend')}</span></div>`;
-    return `<div class="mgrid">${wd}${cells}</div>${legend}<div class="list">${dayBlock(sel)}</div>`;
+    const mAt = n => { const d = D(first); d.setMonth(d.getMonth() + n); return fmt(iso(d), { month: 'short' }); };
+    const mnav = `<div class="mnav"><button data-act="nav" data-d="-1" aria-label="${T('prev')}: ${esc(mAt(-1))}"><span aria-hidden="true">‹</span><span class="small">${esc(mAt(-1))}</span></button><b>${esc(fmt(first, { month: 'long', year: 'numeric' }))}</b><button data-act="nav" data-d="1" aria-label="${T('next')}: ${esc(mAt(1))}"><span class="small">${esc(mAt(1))}</span><span aria-hidden="true">›</span></button></div>`;
+    return `${mnav}<div class="mgrid">${wd}${cells}</div>${legend}<div class="list">${dayBlock(sel)}</div>`;
   }
 
   // ---------- tour modal ----------
@@ -2575,11 +2577,6 @@
   const dayPart = () => { const h = new Date().getHours(); return h >= 5 && h < 12 ? 0 : h < 18 ? 1 : h < 23 ? 2 : 3; };
   const firstName = m => String((m && m.name) || '').replace(/\(.*?\)/g, '').trim().split(/\s+/)[0] || '';
   const hiText = (k, name) => T(k, { name }).replace(/[,،]\s*$/, '').replace(/,\s*!/, '!');
-  function phraseFor(day, part) {
-    const all = window.PHRASES || {}, P = all[lang()] || all.en; if (!P || !me()) return null;
-    const n = hashN(day + me().id), list = part === 0 ? P.am : part >= 2 ? P.pm : (n % 2 ? P.joke : P.geo), x = list[n % list.length];
-    return Array.isArray(x) ? { t: x[0], by: x[1] } : { t: x, by: '' };
-  }
   function specialOn(day) {
     const m = me(); if (!m) return null; const md = day.slice(5);
     const mine = db.personal_dates.filter(d => twin(d.user_id) === m.id && (d.yearly ? String(d.date).slice(5) === md : d.date === day)).map(d => pdKind(d.title));
@@ -2594,17 +2591,12 @@
     if (sp) { const [h, t] = specialText(sp); return `<div class="card greet"><svg viewBox="0 0 48 48" aria-hidden="true">${art(sp.art)}</svg><span class="grow-l"><b>${esc(h)}</b><span class="muted small">${esc(t)}</span></span></div>`; }
     return '';
   }
-  function phraseLineHtml() {
-    const m = me(); if (!m || !m.active || state.viewAs) return ''; const td = today(); if (specialOn(td)) return ''; const art = k => (window.CUTE && window.CUTE.art[k]) || '';
-    const part = dayPart(), ph = phraseFor(td, part); if (!ph) return '';
-    return `<div class="hi"><svg viewBox="0 0 48 48" aria-hidden="true">${art(part === 0 ? 'sunrise' : part === 1 ? 'sun' : 'moon')}</svg><span class="grow-l"><b>${esc(hiText('gr_p' + part, firstName(m)))}</b>${ph ? `<span class="muted small">${esc(ph.t)}${ph.by ? ` <i class="by">${esc(ph.by)}</i>` : ''}</span>` : ''}</span></div>`;
-  }
   // For the greeting shown while the app opens next time: first name, language, and the words for the next seven days. Kept on this phone only.
   function saveHello() {
     try {
       if (!me()) { localStorage.removeItem('fs-hello'); return; }
       const d = {}, td = today();
-      for (let i = 0; i < 7; i++) { const day = addDays(td, i), sp = specialOn(day), one = x => { const f = phraseFor(day, x); return f ? f.t + (f.by ? '\n' + f.by : '') : ''; }; d[day] = sp ? { h: specialText(sp)[0], s: specialText(sp)[1] } : { p: [one(0), one(1), one(2)] }; }
+      for (let i = 0; i < 7; i++) { const day = addDays(td, i), sp = specialOn(day); if (sp) d[day] = { h: specialText(sp)[0], s: specialText(sp)[1] }; }
       localStorage.setItem('fs-hello', JSON.stringify({ n: firstName(me()), l: lang(), d }));
     } catch (e) { /* private mode */ }
   }
