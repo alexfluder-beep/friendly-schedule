@@ -394,3 +394,9 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 
 ## 3.38
 - Operations agents: four read-only checks in the database (`agent_board`, `agent_find_refs`, `agent_changes`, `agent_conflicts`), one notice they may write (`agent_notify`, shown as "Assistant (automatic check, can be wrong)") and a run log (`agent_runs`, `agent_run_done`). Only the database owner can run them. In `supabase/update.sql`, already applied.
+
+## 3.39
+- Guide's own tour rows: the time ("10:30") and the guest count ("(1/6)") never break in the middle; the long name wraps.
+- Time off, for guides and drivers: "Team off soon" shows numbers per day ("guides off: 2, drivers off: 1" and the share of the team), not names. The office still sees names.
+- Me: one Save for phone, languages and Telegram username.
+- The meeting place of the Brutalist group tour is shown as "Paragraph Hotel" (app, catalogue and bot); the map link is the same.

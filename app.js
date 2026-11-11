@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.38';
+  const APP_VERSION = '3.39';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -200,6 +200,9 @@
   const GUEST_LANGS = ['EN', 'RU', 'KA', 'DE', 'FR', 'ES', 'IT', 'HE', 'ZH', 'AR', 'TR', 'UK', 'PL', 'NL', 'JA', 'KO'];
   const LANG_NAMES = { EN: 'English', RU: 'Русский', KA: 'ქართული', DE: 'Deutsch', FR: 'Français', ES: 'Español', IT: 'Italiano', HE: 'עברית', ZH: '中文', AR: 'العربية', TR: 'Türkçe', UK: 'Українська', PL: 'Polski', NL: 'Nederlands', JA: '日本語', KO: '한국어' };
   const langName = c => LANG_NAMES[c] || c;
+  // A booking system's label for a place ("Brutalist group tour meeting point") is shown as the real place people know.
+  const PLACE = { 'brutalist group tour meeting point': 'Paragraph Hotel' };
+  const placeName = v => PLACE[String(v || '').trim().toLowerCase()] || v || '';
   const tourMap = t => t.pickup_url || (t.pickup ? mapsLink(t.pickup) : '');
   const allMarks = () => [...MARKS, ...String(rules().customMarks || '').split(',').map(x => x.trim()).filter(Boolean)];
   const markLabel = m => (MARKS.includes(m) ? T('mark_' + m) : m);
@@ -324,7 +327,7 @@
   const cashText = bk => { const m = {}; bk.filter(b => b.payment === 'cash' || b.payment === 'unpaid').forEach(b => { const cu = b.currency || guestCur(); m[cu] = (m[cu] || 0) + (Number(b.amount_due) || 0); }); return Object.entries(m).filter(x => x[1]).map(([k, v]) => `${nf(v)} ${k}`).join(' + '); };
   function tourText(t) {
     const bk = t.bookings || tourBookings(t.id), L = [t.title, `${dateText(t)}${t.start_time ? ', ' + t.start_time : ''}${t.end_time ? '–' + t.end_time : ''}`];
-    if (t.pickup) L.push(`${T('pickup')}: ${t.pickup}`, tourMap(t));
+    if (t.pickup) L.push(`${T('pickup')}: ${placeName(t.pickup)}`, tourMap(t));
     L.push(`${T('guide')}: ${pname(t.guide_id)}${t.driver_id ? ' · ' + T('driver') + ': ' + pname(t.driver_id) : ''}`, `${T('guest_list')}: ${acText(t)}`);
     bk.forEach(b => L.push(`- ${b.guest} (${acText(b)})${(b.marks || []).length ? ' · ' + b.marks.map(markLabel).join(', ') : ''}`));
     bk.filter(b => b.pickup_addr).forEach(b => L.push(`  ${b.guest}: ${b.pickup_addr}`));
@@ -667,7 +670,7 @@
     if (!nt && !asks.length && isAdmin()) return '';
     const bk = nt ? tourBookings(nt.id) : [];
     return `${!isAdmin() && state.mine && state.mode === 'week' ? '' : weekCardHtml()}${asks.map(q => { const t = db.tours.find(x => x.id === q.tour_id); return t ? `<div class="card"><b>${T('swap_ask_title', { name: pname(q.user_id) })}</b><span class="row nw">${emblem(t, true)}<span class="grow-l"><span class="ttl">${esc(t.title)}</span><span class="muted small num">${esc(dateText(t))} ${esc(t.start_time || '')}</span></span></span><div class="actions"><button class="btn sm" data-act="swapagree" data-id="${q.id}" data-s="0">${T('decline')}</button><button class="btn sm primary" data-act="swapagree" data-id="${q.id}" data-s="1">${T('swap_agree')}</button></div></div>` : ''; }).join('')}
-      <div class="nextrow">${nt ? `<button class="card nxt" data-act="tour" data-id="${nt.id}"><span class="nxwhen num">${(() => { const n = Math.round((D(nt.date) - D(td)) / 864e5); return n <= 0 ? T('today') : n === 1 ? T('tomorrow') : T('in_days', { n }); })()} ›</span><span class="muted small">${T('next_tour')}</span><span class="row nw">${emblem(nt, true)}<span class="grow-l"><span class="ttl">${esc(nt.title)}</span></span></span><span class="num"><b>${esc(nt.date === td ? T('today') : dateText(nt))} ${esc(nt.start_time || '')}</b> <span class="muted small">· ${esc(acText(nt))}${cashDue(bk) ? ' · ' + T('cash_collect') + ' ' + cashDue(bk) + ' ' + esc(guestCur()) : ''}</span></span>${nt.pickup ? `<span class="muted small only-wide">${esc(nt.pickup)}</span>` : ''}</button>` : `<div class="card"><span class="muted small">${T('next_tour')}</span><span>${T('next_none')}</span></div>`}
+      <div class="nextrow">${nt ? `<button class="card nxt" data-act="tour" data-id="${nt.id}"><span class="nxwhen num">${(() => { const n = Math.round((D(nt.date) - D(td)) / 864e5); return n <= 0 ? T('today') : n === 1 ? T('tomorrow') : T('in_days', { n }); })()} ›</span><span class="muted small">${T('next_tour')}</span><span class="row nw">${emblem(nt, true)}<span class="grow-l"><span class="ttl">${esc(nt.title)}</span></span></span><span class="num"><b>${esc(nt.date === td ? T('today') : dateText(nt))} ${esc(nt.start_time || '')}</b> <span class="muted small">· ${esc(acText(nt))}${cashDue(bk) ? ' · ' + T('cash_collect') + ' ' + cashDue(bk) + ' ' + esc(guestCur()) : ''}</span></span>${nt.pickup ? `<span class="muted small only-wide">${esc(placeName(nt.pickup))}</span>` : ''}</button>` : `<div class="card"><span class="muted small">${T('next_tour')}</span><span>${T('next_none')}</span></div>`}
       <button class="card offc" data-act="${off ? 'view' : 'offnew'}" data-v="timeoff"><span class="muted small">${T('next_off')}</span><span class="num"><b>${off ? esc(fmtRange(off.date_from, off.date_to)) : T('next_off_none')}</b></span>${off ? `<span>${offTag(off)}</span>` : `<span class="muted small">${T('request')}</span>`}</button></div>`;
   }
   // ---------- guide and driver home: only what matters, day by day ----------
@@ -696,7 +699,7 @@
     const bks = tourBookings(t.id), other = t.guide_id === me().id ? t.driver_id : t.guide_id, op = person(other);
     return `<div class="card f nowcard" data-key="now${t.id}"><div class="row"><span class="tag t-ok">${T('now_tag')}</span><b class="num">${esc(t.start_time || '')}${t.end_time ? '–' + esc(t.end_time) : ''}</b><span class="spacer"></span><button class="lnk" data-act="tour" data-id="${t.id}">${T('open_tour')} ›</button></div>
       <div class="row nw">${emblem(t, true)}<b class="ttl grow-l">${esc(t.title)}</b></div>
-      ${t.pickup ? `<div class="meet">${ico('pin')}<span class="grow-l">${esc(t.pickup)}</span><a class="btn sm" href="${esc(tourMap(t))}" target="_blank" rel="noopener">${T('map')}</a></div>` : ''}
+      ${t.pickup ? `<div class="meet">${ico('pin')}<span class="grow-l">${esc(placeName(t.pickup))}</span><a class="btn sm" href="${esc(tourMap(t))}" target="_blank" rel="noopener">${T('map')}</a></div>` : ''}
       <div class="row"><b>${T('guests_title')} (${bks.length})</b><span class="muted small num">${esc(acText(t))}${bks.length ? ' · ' + T('att_sum', { a: bks.filter(b => b.attendance === 'arrived').length, n: bks.length, x: bks.filter(b => b.attendance === 'noshow').length }) : ''}</span></div>
       ${guestRowsHtml(t)}
       ${op ? `<div class="row nw">${avatar(other)}<span class="grow-l"><b>${esc(op.name)}</b>&nbsp;<span class="muted small">${T('role_' + (t.guide_id === other ? 'guide' : 'driver'))}</span></span>${staffBtns(op)}</div>` : ''}
@@ -940,7 +943,7 @@
         <div class="when"><b>${esc(dateText(d))}</b><b class="num">${esc(d.start_time || '')}${d.end_time ? '–' + esc(d.end_time) : ''}</b>${d.status === 'cancelled' ? `<span class="tag t-danger">${T('cancelled')}</span>` : ''}</div>
         ${wxLine(d, true)}
         ${d.status === 'cancelled' && d.cancel_reason ? `<div class="warnline">${T('cancel_info', { reason: d.cancel_reason })}</div>` : ''}
-        ${d.pickup ? `<div class="meet">${ico('pin')}<span class="grow-l">${esc(d.pickup)}</span><a class="btn sm" href="${esc(tourMap(d))}" target="_blank" rel="noopener" aria-label="${T('open_map')}">${T('map')}</a></div>` : ''}
+        ${d.pickup ? `<div class="meet">${ico('pin')}<span class="grow-l">${esc(placeName(d.pickup))}</span><a class="btn sm" href="${esc(tourMap(d))}" target="_blank" rel="noopener" aria-label="${T('open_map')}">${T('map')}</a></div>` : ''}
         ${d.notes ? `<div class="small"><span class="muted">${T('notes')}:</span> ${esc(d.notes)}</div>` : ''}
         ${d.bookings.length ? `<div class="tsum num"><div>${esc(acText(d))}${d.bookings.some(isFree) ? ' · ' + T('free_n', { n: d.bookings.filter(isFree).reduce((n, b) => n + (Number(b.pax) || 1), 0) }) : ''}</div>${staysN(d.bookings) ? `<div>${T('stay_line', { n: staysN(d.bookings), back: Math.max(0, (d.pax || 0) - staysN(d.bookings)) })}</div>` : ''}${cashDue(d.bookings) ? `<div class="due">${T('cash_collect')}: ${esc(cashText(d.bookings))}</div>` : ''}</div>` : ''}
         ${isAdmin() ? warnHtml : ''}${isAdmin() && live(d) && (d.pax || 0) > (rules().carSeats || 6) && kmOf(d.title) > 0 ? `<div><button class="btn sm" data-act="car2" data-id="${d.id}">${ico('car')}${T('car2_btn')}</button></div>` : ''}${isAdmin() && costOf(d.id).total ? `<div class="muted small num">${T('cost_title')}: <b>${nf(costOf(d.id).total)} ${esc(rules().currency || 'GEL')}</b></div>` : ''}
@@ -1624,7 +1627,7 @@
     if (!isAdmin() && sug.length) h += `<div class="card"><b>${T('sug_title')}</b><span class="muted small">${T('sug_text')}</span><div class="bar">${sug.map(d => `<button class="btn sm" data-act="offnew" data-date="${d}">${esc(fmtDay(d))}</button>`).join('')}</div></div>`;
     if (isAdmin()) h += `<h3>${T('to_approve')} (${pending.length})</h3><div class="list">${pending.length ? pending.map(o => offRow(o, true)).join('') : `<div class="empty">${T('nothing_pending')}</div>`}</div>`;
     h += `<div class="cols"><div class="list"><h3>${T('my_requests')}</h3>${mine.length ? mine.map(o => offRow(o, isAdmin())).join('') : `<div class="empty">${T('no_requests')}</div>`}</div>
-      <div class="list"><h3>${T('team_off')}</h3>${upcoming.length ? upcoming.map(o => `<div class="card lrow">${avatar(o.user_id)}<span class="lmain"><b>${esc(pname(o.user_id))}</b>${offTag(o)}</span><span class="num ldate">${esc(fmtRange(o.date_from, o.date_to))}</span></div>`).join('') : `<div class="empty">${T('nobody_off')}</div>`}
+      <div class="list"><h3>${T('team_off')}</h3>${!upcoming.length ? `<div class="empty">${T('nobody_off')}</div>` : isAdmin() ? upcoming.map(o => `<div class="card lrow">${avatar(o.user_id)}<span class="lmain"><b>${esc(pname(o.user_id))}</b>${offTag(o)}</span><span class="num ldate">${esc(fmtRange(o.date_from, o.date_to))}</span></div>`).join('') : teamOffCounts(upcoming)}
       <h3>${T('holidays')}</h3>${hol.length ? hol.map(x => `<div class="card lrow nohead"><span class="lmain"><span class="tag ${x.kind === 'event' ? 't-group' : 't-hol'}">${esc(x.name)}</span></span><span class="num ldate">${esc(fmtRange(x.date_from, x.date_to))}</span>${x.notes ? `<div class="muted small">${esc(x.notes)}</div>` : ''}</div>`).join('') : `<div class="empty">${T('no_holidays')}</div>`}</div></div>`;
     return h;
   }
@@ -1690,6 +1693,14 @@
   const langTags = t => { const l = tourLangs(t); return l.length ? ` <span class="tag t-muted ltag" title="${T('lang_tour')}">${msi('language')}${esc(l.join(' · '))}</span>` : ''; };
   // Delica drivers are offered only the off-road rides the Delica is for.
   const RIDE_4X4 = /4\s*[x×х]\s*4|4\s*wd|delica/i;   // by the tour name only: not every Kazbegi tour is a 4x4 ride (owner, 11 Nov)
+  // For guides and drivers the team's days off are numbers per day, never names: "2 guides, 1 driver off" and the share of the team.
+  function teamOffCounts(list) {
+    const td = today(), team = staff().filter(p => p.role !== 'admin'), rows = [];
+    for (let i = 0; i < 21 && rows.length < 10; i++) { const d = addDays(td, i), ids = new Set(list.filter(o => o.date_from <= d && o.date_to >= d).map(o => twin(o.user_id))); if (!ids.size) continue;
+      const g = team.filter(p => ids.has(p.id) && p.role !== 'driver').length, dr = team.filter(p => ids.has(p.id) && p.role === 'driver').length, n = g + dr; if (!n) continue;
+      rows.push(`<div class="card lrow"><span class="lmain"><b>${esc(fmtDay(d))}</b></span><span class="ldate">${esc([g ? T('to_guides', { n: g }) : '', dr ? T('to_drivers', { n: dr }) : ''].filter(Boolean).join(', '))} <span class="muted small num">${Math.round(n / (team.length || 1) * 100)}%</span></span></div>`); }
+    return rows.join('') || `<div class="empty">${T('nobody_off')}</div>`;
+  }
   // Work and rest (Time off page, guides and drivers). Personal: the person's own answers (tours a week that feel right, rest days,
   // more work or more rest) plus what the schedule shows about them. Counted again on every open; no guest names.
   // These are automatic suggestions, not decisions: the card says so.
@@ -2631,8 +2642,7 @@
       <div class="row">${avatar(m.id, true)}<div><b>${esc(m.name)}</b> <span class="tag t-muted">${T('role_' + m.role)}</span>${m.email ? `<div class="muted small">${esc(m.email)}</div>` : ''}</div></div>
       <div class="bar"><label class="btn filebtn">${msi('photo_camera')}${T('photo_upload')}<input type="file" id="me-photo" class="vh" accept="image/*" data-ch="avatar"></label></div>
       <details class="sect avpick" ${state.avOpen ? 'open' : ''}><summary>${T('av_choose')}</summary>${(() => { const cur = avLib(m.avatar) || { icon: '', color: state.avColor || m.color || AV_COLORS[0] }, col = state.avColor || cur.color; return `<b class="small">${T('av_pics')}</b><div class="avgrid art">${AV_ART.map(k => `<button type="button" class="avopt pic" data-act="avpick" data-v="art:${k}" aria-pressed="${m.avatar === 'art:' + k}" aria-label="${k}"><img src="art/avatars/${k}.webp" alt="" loading="lazy" decoding="async"></button>`).join('')}</div><b class="small">${T('av_icons')}</b><div class="avcols">${AV_COLORS.map(c => `<button type="button" class="avcol" data-act="avcolor" data-v="${c}" style="background:${c}" aria-pressed="${c === col}" aria-label="${c}"></button>`).join('')}</div><div class="avgrid">${AV_ICONS.map(k => `<button type="button" class="avopt" data-act="avpick" data-v="ms:${k}:${col}" aria-pressed="${cur.icon === k}" style="background:${col}">${msi(k)}</button>`).join('')}</div>${m.avatar ? `<button type="button" class="lnk" data-act="avpick" data-v="">${T('av_none')}</button>` : ''}`; })()}</details>
-      <form class="f" data-form="mydetails" id="me-details"><b>${T('md_title')}</b><div class="two"><label>${T('phone')}<input name="phone" type="tel" value="${esc(m.phone || '')}" placeholder="+995…" autocomplete="tel"></label><label>${T('md_langs')}<input name="languages" value="${esc(m.languages || '')}" placeholder="EN, RU, KA"></label></div>${(rules().promos || {})[m.id] ? `<div class="tsum">${T('promo_mine', { code: rules().promos[m.id] })}</div>` : ''}<div class="actions"><button class="btn qsave">${T('save')}</button></div></form>
-      <form class="f" data-form="mytg"><b>Telegram</b><span class="muted small">${T('tg_mine_text')}</span><div class="bar"><input class="inp" id="me-tg" name="telegram" value="${esc(m.telegram ? '@' + m.telegram : '')}" placeholder="@username" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1;min-width:150px"><button class="btn qsave">${T('save')}</button></div></form>
+      <form class="f" data-form="mydetails" id="me-details"><b>${T('md_title')}</b><div class="two"><label>${T('phone')}<input name="phone" type="tel" value="${esc(m.phone || '')}" placeholder="+995…" autocomplete="tel"></label><label>${T('md_langs')}<input name="languages" value="${esc(m.languages || '')}" placeholder="EN, RU, KA"></label></div><label>Telegram<input id="me-tg" name="telegram" value="${esc(m.telegram ? '@' + m.telegram : '')}" placeholder="@username" autocomplete="off" autocapitalize="off" spellcheck="false"><span class="muted small">${T('tg_mine_text')}</span></label>${(rules().promos || {})[m.id] ? `<div class="tsum">${T('promo_mine', { code: rules().promos[m.id] })}</div>` : ''}<div class="actions"><button class="btn primary qsave">${T('save')}</button></div></form>
       ${/^https:\/\/t\.me\//.test(rules().botUrl || '') || m.telegram_id ? `<div class="f" id="me-tgbot"><b>${T('tg_title')}</b>${m.telegram_id ? `<span class="row"><span class="tag t-ok">${T('tg_on')}</span><span class="muted small">${T('tg_on_text')}</span></span>` : `<span class="muted small">${T('tg_text')}</span>${m.link_code ? `<div class="row"><b class="num tgcode">/link ${esc(m.link_code)}</b><button class="btn sm" data-act="copy" data-v="/link ${esc(m.link_code)}">${ico('copy')}${T('copy')}</button></div>` : ''}<div class="bar"><button class="btn sm" data-act="tgcode">${T(m.link_code ? 'tg_new' : 'tg_get')}</button>${/^https:\/\/t\.me\//.test(rules().botUrl || '') ? `<a class="btn sm" href="${esc(rules().botUrl)}" target="_blank" rel="noopener">${T('tg_open')}</a>` : ''}</div>`}</div>` : ''}
       </div>
       <div class="card f"><b>${T('pd_title')}</b><span class="muted small">${T('pd_text')}</span>
@@ -3124,7 +3134,7 @@
     async move() { await moveSubmit(); },
     async cedit(fd, form) { const cl = db.clients.find(x => x.id === (form || document.querySelector('form[data-form=cedit]')).dataset.id); if (!cl) return; const em = cleanEmail(fd.get('email')) || String(fd.get('email') || '').trim().toLowerCase(); if (em && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { toast(T('err_email')); return; } await S.save('clients', { ...cl, name: String(fd.get('name') || '').trim() || cl.name, phone: normPhone(fd.get('phone')) || null, email: em || null, notes: String(fd.get('notes') || '').trim() || null }); logAct(`Edited guest: ${cl.name}`); toast(T('saved')); },
     async bugnote(fd) { const n = String(fd.get('note') || '').trim(); if (!n) return; logErr('report', n, ''); toast(T('pr_thanks')); closeModal(); },
-    async mydetails(fd) { const ph = normPhone(String(fd.get('phone') || '').trim()), lg = String(fd.get('languages') || '').toUpperCase().split(/[\s,;/]+/).filter(Boolean).join(', '); await S.save('profiles', { ...stripEmail(me()), phone: ph || null, languages: lg || null }); toast(T('saved')); },
+    async mydetails(fd) { const ph = normPhone(String(fd.get('phone') || '').trim()), lg = String(fd.get('languages') || '').toUpperCase().split(/[\s,;/]+/).filter(Boolean).join(', '), raw = String(fd.get('telegram') || '').trim(), u = tgUser(raw); if (raw && !u) { toast(T('tg_bad')); return; } await S.save('profiles', { ...stripEmail(me()), phone: ph || null, languages: lg || null, telegram: fd.has('telegram') ? (u || null) : (me().telegram || null) }); toast(T('saved')); },
     async mytg(fd) { const raw = String(fd.get('telegram') || '').trim(), u = tgUser(raw); if (raw && !u) { toast(T('tg_bad')); return; } await S.save('profiles', { ...stripEmail(me()), telegram: u || null }); toast(T('saved')); },
     async cancel(fd) { await cancelSubmit((fd.get('reason') || '').trim()); },
     async bulkteam(fd) {

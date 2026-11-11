@@ -80,7 +80,7 @@ window.TOUR_CATALOG = [
    "front_seat",
    "cancellation"
   ],
-  "pickup": "Brutalist group tour meeting point",
+  "pickup": "Paragraph Hotel",
   "pickup_url": "https://maps.app.goo.gl/1TyjAoFy2sCPUnqz8",
   "note": "Minimum age 12",
   "url": "https://friendly.ge/en/activity/332826/brutalist-tbilisi-soviet-architecture-skybridges-real-life-small-group"

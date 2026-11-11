@@ -1072,3 +1072,8 @@ html[data-accent="amber"]{--accent:#f0901e;--accent-ink:#20251f;--accent-soft:#f
 .phstk{display:flex;gap:8px;overflow-x:auto;padding:4px 0 8px;scrollbar-width:none}.phstk::-webkit-scrollbar{display:none}
 .phstk-b{flex:none;width:56px;padding:2px;border:2px solid transparent;border-radius:14px;background:none}.phstk-b svg{display:block;width:100%;height:auto}
 .phstk-b[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+
+/* 3.39 Guide's own tour rows: the time and the guest count never break in the middle; the long name wraps instead */
+.acard .ttl .st,.acard .ttl .cnt,.acard .ttl .num{white-space:nowrap}
+.acard.mycard .ttl{display:block}
+.acard.mycard .ttl .tname{overflow-wrap:anywhere}
