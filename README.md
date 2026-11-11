@@ -459,3 +459,7 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 - **Tour card:** Edit, Move, Copy, Cancel and Delete are smaller and sit in one row.
 - **Guest card:** "‹ Back" returns to the card it was opened from, and ✕ closes everything. Each mark (Good, Fine, Bad, Trouble maker) is one small button. Every booking ref of the guest is listed, with the tour date, as text that selects with one click. Fields and section titles start at the same left edge.
 - **Why a guest is VIP**, in facts about that person: how many tours and since which year, which tours, which extras and how often, good marks from the team, and whether they ever missed a tour.
+
+## 3.49
+- Guest card: the phone and a country flag are on one line (the country name shows on hover); the phone selects with one click.
+- Guest card, office only: **Income** from this guest, after the booking site fee, per currency, with what the guest paid. It counts only bookings that have a price saved, and says how many. Guide pay and costs are not taken off, so it is income, not profit.

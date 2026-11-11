@@ -1183,3 +1183,6 @@ code.ref{font:inherit;font-variant-numeric:tabular-nums;letter-spacing:.02em;use
 /* month view: one frame on the chosen day; day-off mark in the top right corner, on the line of the date */
 .mgrid button.sel,.mgrid button.sel:focus,.mgrid button.sel:focus-visible{outline:0}
 @media (min-width:761px){.mgrid button{position:relative}.mgrid button>.offm{position:absolute;top:6px;right:6px;margin:0;width:auto}.mrow[data-drag]{cursor:grab}}
+
+/* 3.49 guest card: the phone and a flag on one line */
+.pflag{font-size:1.15em;margin-left:6px;vertical-align:-1px}
