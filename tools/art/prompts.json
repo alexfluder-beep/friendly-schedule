@@ -1,7 +1,7 @@
 {
  "style": {
-  "avatar": "Round avatar icon, flat vector illustration, warm paper background colour #f7f5ef, limited palette of deep green #314b3c, rust orange #b8441c, plum #5b4bb0, ink #20251f, soft sand #e9e8dc. Simple bold shapes, gentle grain, centred subject that still reads at 40 px, no text, no letters, no logo, no border, no gradient glow, square 1:1 image.",
-  "badge": "Collectible badge emblem, round medal shape, flat vector illustration in a warm Georgian travel style, palette deep green #314b3c, rust orange #b8441c, plum #5b4bb0, mustard #f0b03f, ink #20251f on warm paper #f7f5ef. One clear symbol in the middle that reads at 64 px, a little playful, no text, no letters, no numbers, no logo, no glow, square 1:1 image."
+  "avatar": "Round avatar icon, flat vector illustration, warm paper background colour #f7f5ef, limited palette of deep green #314b3c, rust orange #b8441c, plum #5b4bb0, ink #20251f, soft sand #e9e8dc. Simple bold shapes, gentle grain, centred subject that still reads at 40 px, no churches, no crosses, no religious buildings, no text, no letters, no logo, no border, no gradient glow, square 1:1 image.",
+  "badge": "Collectible badge emblem, round medal shape, flat vector illustration in a warm Georgian travel style, palette deep green #314b3c, rust orange #b8441c, plum #5b4bb0, mustard #f0b03f, ink #20251f on warm paper #f7f5ef. One clear symbol in the middle that reads at 64 px, a little playful, no churches, no crosses, no religious buildings, no text, no letters, no numbers, no logo, no glow, square 1:1 image."
  },
  "avatars": [
   {
@@ -10,7 +10,7 @@
   },
   {
    "id": "gergeti",
-   "subject": "Gergeti Trinity church on a green hill under Mount Kazbek"
+   "subject": "snowy Mount Kazbek above green hills and a winding road"
   },
   {
    "id": "wine",
@@ -34,7 +34,7 @@
   },
   {
    "id": "mtskheta",
-   "subject": "Jvari monastery above the meeting of two rivers"
+   "subject": "two rivers of different colours meeting below green hills at Mtskheta"
   },
   {
    "id": "gareji",
@@ -58,7 +58,7 @@
   },
   {
    "id": "ararat",
-   "subject": "Mount Ararat with a small Armenian monastery"
+   "subject": "Mount Ararat with its two peaks above a valley of apricot trees"
   },
   {
    "id": "sighnaghi",
