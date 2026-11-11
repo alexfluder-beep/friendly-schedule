@@ -830,3 +830,29 @@ button,a,summary,label,select{touch-action:manipulation}
 .tabn{position:absolute;top:-6px;left:calc(50% + 6px);min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:var(--accent);color:var(--ink);font:700 11px/18px inherit;font-style:normal;text-align:center}
 html[data-os="ios"] input,html[data-os="ios"] select,html[data-os="ios"] textarea{font-size:max(16px,1em)}
 .xrow .tag{flex:none}
+
+/* 3.19 Tasks in two sections, labelled add button, special dates with suggestions and a date picker */
+.thead{margin-bottom:0}
+.tsec{display:flex;width:100%}
+.tsec button{flex:1;justify-content:center;display:inline-flex;align-items:center;gap:8px;min-height:44px}
+.segn{min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--surface2);color:var(--ink);font:700 12px/20px inherit;text-align:center}
+.seg button[aria-pressed="true"] .segn{background:rgba(255,255,255,.55)}
+.tfilt{gap:8px;flex-wrap:wrap}
+.fab.xfab{width:auto;height:56px;border-radius:28px;padding:0 20px 0 16px;gap:8px;font-size:var(--t-body);font-weight:700}
+.fab.xfab .msi{width:24px;height:24px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip2{min-height:40px;padding:0 16px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:var(--t-sm);font-weight:600;cursor:pointer}
+.chip2:active{transform:scale(.97)}
+.pdform{gap:12px;border-top:1px solid var(--line);padding-top:12px;margin-top:4px}
+.pdform input[type=date]{min-height:48px;width:100%;-webkit-appearance:none;appearance:none;text-align:left}
+
+/* 3.20 open-tour rows: icon beside the text, language tag; tour card: people and guests line up */
+.xrow .arow{flex-wrap:nowrap;flex:1;min-width:0;align-items:flex-start}
+.xrow .arow > span:last-child{min-width:0;line-height:1.35}
+.xrow .arow .emb{margin-top:2px}
+.ltag{display:inline-flex;align-items:center;gap:4px;vertical-align:middle;white-space:nowrap}
+.ltag .msi{width:14px;height:14px}
+.sheet .glist .avatar{width:40px;height:40px;flex:none}
+.sheet .glist .gbtn{gap:12px}
+.sheet .glist.crew .grow .row{gap:12px}
+.sheet .glist.crew .grow .muted{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}

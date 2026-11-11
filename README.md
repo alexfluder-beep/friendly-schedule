@@ -299,3 +299,10 @@ Art (tools/art): `make_art.py` makes avatar and badge pictures with Gemini once,
 - Tasks: adding a task is the same round + as on the calendar.
 - iPhone: the screen no longer zooms in and stays zoomed when a field is tapped.
 - Special dates: the dots are typed for you (24111990 becomes 24.11.1990).
+
+## 3.19 – 3.20
+- Tasks has two sections: **Tasks** and **Tours to staff** (for guides and drivers: **Tours to take**). The number on the Tasks tab counts only your own open tasks. The help button sits on the title row; adding a task is a labelled **New task** button.
+- Special dates: one-tap suggestions (Birthday, Anniversary, Family day, Private, Doctor, Car service, Trip) and the phone's own date picker.
+- Open-tour lists show the language the guests asked for, and the icon sits beside the text.
+- Drivers with the Delica are offered only 4x4 rides (4x4 in the name, Kazbegi, Gareji, Tusheti, Truso, Juta, Khevsureti).
+- Tour card: a person shows the role and at most one title; people and guests line up.
