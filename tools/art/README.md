@@ -1,13 +1,15 @@
-# App art made with Gemini
+# App art: hand-drawn SVG
 
-`prompts.json` lists 30 avatar pictures (Georgian places, food and travel things) and one picture per badge (75), in the app's warm Paper colours, without text.
-`make_art.py` sends each prompt to Gemini once and saves `out/avatars/<id>.png` and `out/badges/<id>.png`. It skips pictures that already exist, so it can be stopped and restarted.
+The avatar pictures (30) and badge pictures (75) are drawn by hand as small SVG files. Gemini is not needed (it needs billing; owner chose "B" on 11 Nov 2026).
 
-Run it where the Gemini key already is (the bot server):
+- `draw.py` holds every drawing. Run `python3 tools/art/draw.py` after a change. It writes:
+  - `art/avatars/<id>.svg`: 96 x 96, round, on its own background.
+  - `art/badges/<id>.svg`: 48 x 48 symbol (preview only).
+  - `art.js`: the one file the app loads (about 56 KB, cached for offline by `sw.js`).
+- Rules: flat, few shapes, palette paper #f7f5ef, green #314b3c, rust #b8441c, plum #5b4bb0, mustard #f0b03f, ink #20251f, sand #e9e8dc; must read at 40 px (avatars) and 64 px (badges); no text, letters or numbers; no churches, crosses or religious buildings; no glow.
+- Keep badge colours to that palette: an unearned badge shows its picture in grey by swapping exactly those colours.
+- `prompts.json` is the list of ids and subjects; `draw.py` refuses to run if a picture is missing.
 
-    cd friendly-schedule
-    set -a; . /path/to/bot/.env; set +a        # loads GEMINI_API_KEY without printing it
-    python3 tools/art/make_art.py --limit 3     # test: three pictures, look at them
-    python3 tools/art/make_art.py               # the rest (about 105 pictures, a few US cents each)
+How the app uses them: a person's avatar can be `art:<id>` (new), `ms:<icon>:<colour>` (old icon avatars) or a photo; all three keep working. A badge with a picture shows it inside its medal (tiers, progress ring, shine and the secret "?" stay); a badge without one (tour mastery, region titles) keeps the old line icon.
 
-Then commit only `tools/art/out/` to a new branch `art-raw` and push it. Claude then checks the pictures, makes them small (WebP), and adds them to the avatar library and badges.
+`make_art.py` (Gemini) is kept for later, in case billing is ever turned on.

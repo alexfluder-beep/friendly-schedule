@@ -277,7 +277,7 @@ Fewer sign-outs and a cleaner problem log:
 - Back office > Problems: filter by person, hide connection gaps, and a line "Last 7 days: N problems from N people".
 - Login screen: a globe with EN / RU / KA at the top.
 
-Art (tools/art): `make_art.py` makes avatar and badge pictures with Gemini once, on the bot server; see tools/art/README.md.
+Art (tools/art): avatar and badge pictures are hand-drawn SVG in `tools/art/draw.py`, which writes `art/` and `art.js`; see tools/art/README.md.
 
 ## 3.15
 - Login page: brand on top, the form on one soft card, and under it the account links with the language buttons (globe, EN / RU / KA) right below them. Gentle entrance and a press effect on the button; off when the phone asks for less motion.

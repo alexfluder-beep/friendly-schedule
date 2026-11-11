@@ -585,6 +585,8 @@ details.sect summary{font-size:var(--t-h3)}
 .avopt{aspect-ratio:1;border-radius:50%;border:3px solid transparent;color:#fff;display:flex;align-items:center;justify-content:center;padding:0}
 .avopt .msi{width:60%;height:60%}
 .avopt[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 2px var(--surface)}
+.avpic{background:none;overflow:hidden}.avpic img{display:block;width:100%;height:100%;border-radius:50%}
+.avpics+p{margin:4px 0 0}
 /* the week strip covers what scrolls under it, also on iPhones where the top bar height is not a whole pixel */
 @media (max-width:760px){.strip::before{content:"";position:absolute;left:-16px;right:-16px;top:-14px;height:14px;background:var(--bg)}}
 /* Work balance */
