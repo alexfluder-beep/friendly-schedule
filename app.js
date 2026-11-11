@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.53';
+  const APP_VERSION = '3.54';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -642,7 +642,7 @@
     return `<span class="smk tr ${need ? 'need' : ''} ${ts.length ? '' : 'none'}" ${ts.length ? `aria-label="${esc(T('sm_tours', { n: ts.length }))}"` : 'aria-hidden="true"'}><i></i>${ts.length > 1 || (!id && ts.length) ? `<span class="num">${ts.length}</span>` : ''}</span><span class="smk off ${mine ? 'me' : ''} ${mine || n ? '' : id ? 'gone' : 'none'}" ${mine || n ? `aria-label="${esc(mine ? T('off_mine') : T('sm_off', { n }))}"` : 'aria-hidden="true"'}>${msi(mine && mine.type === 'sick' ? 'sick' : 'beach_access')}${!mine && n ? `<span class="num">${n}</span>` : ''}</span>`;
   }
   // On a computer everyone gets the same switches at the top: the view, and whole team or mine.
-  const viewBarHtml = () => `<div class="bar viewbar"><div class="seg vseg">${[['day', 'D'], ['week', 'W'], ['month', 'M'], ['agenda', 'A']].map(([m, k]) => `<button data-act="mode" data-m="${m}" aria-pressed="${state.mode === m}" title="${T('v_key', { k })}">${T('v_' + m)}</button>`).join('')}</div><div class="seg"><button data-act="mine" data-v="0" aria-pressed="${!state.mine}">${T('team')}</button><button data-act="mine" data-v="1" aria-pressed="${!!state.mine}">${T('mine')}</button></div><span class="spacer"></span><button class="btn" data-act="summary">${T('day_summary')}</button></div>`;
+  const viewBarHtml = () => `<div class="bar viewbar"><div class="seg vseg">${[['day', 'D'], ['week', 'W'], ['month', 'M'], ['agenda', 'A']].map(([m, k]) => `<button data-act="mode" data-m="${m}" aria-pressed="${state.mode === m}" title="${T('v_key', { k })}">${T('v_' + m)}</button>`).join('')}</div><span class="spacer"></span><button class="btn" data-act="summary">${T('day_summary')}</button></div>`;
   const stripLegend = own => `<div class="striplg muted small" aria-hidden="true"><span><i class="lgd"></i>${T(own ? 'sm_lg_my' : 'sm_lg_tours')}</span>${own || !isAdmin() ? '' : `<span><i class="lgd need"></i>${T('sm_lg_need')}</span>`}<span>${msi('beach_access')}${T(own ? 'sm_lg_myoff' : 'sm_lg_off')}</span></div>`;
   // Whose tours the calendar shows: mine, one chosen person (office, computer view), or everyone.
   const seenBy = () => (state.mine ? me().id : (isAdmin() && state.who) || '');
@@ -764,7 +764,7 @@
       <div class="list home"><div class="strip">${days.map(d => `<button data-act="day" data-date="${d}" aria-pressed="${d === sel}" class="${d === td ? 'tdy' : ''} ${offCls(offOn(id, d))} ${holidayOn(d) ? 'hol' : ''}"><span>${esc(fmt(d, { weekday: 'short' }))}</span><b class="num">${D(d).getDate()}</b>${dayMarks(d, id)}</button>`).join('')}</div>${stripLegend(true)}
       ${now ? nowCardHtml(now) : ''}${days.map(myDayHtml).join('')}</div>
       ${photoStripHtml()}
-      <div class="bar homelinks"><button class="lnk" data-act="mode" data-m="month">${T('month')}</button><button class="lnk" data-act="mine" data-v="0">${T('home_team')}</button><button class="lnk" data-act="summary">${T('day_summary')}</button></div></div>`;
+      <div class="bar homelinks"><button class="lnk" data-act="mode" data-m="month">${T('month')}</button><button class="lnk" data-act="summary">${T('day_summary')}</button></div></div>`;
   }
   // Exchange rates to the pay currency (Rules), so money in USD, EUR and GEL can be added up.
   // Exchange rates. Official rates of the National Bank of Georgia, one per working day, are loaded by the admin's app
@@ -827,6 +827,7 @@
   function calendarHtml() {
     const wk = monday(state.date), days = [...Array(7)].map((_, i) => addDays(wk, i)), td = today();
     const people = crew().filter(p => (!state.mine || p.id === me().id) && (state.mine || !isAdmin() || !state.who || p.id === state.who));
+    if (!isAdmin()) state.mine = true;   // guides and drivers: personal schedule only, in every view
     if (PHONE() && state.mode !== 'week' && state.mode !== 'month') state.mode = 'week';   // Day and Agenda are computer views; a phone already shows the week as a list
     const title0 = state.mode === 'week' ? (days[0].slice(0, 7) === days[6].slice(0, 7) ? `${D(days[0]).getDate()}–${fmt(days[6], { day: 'numeric', month: 'short', year: 'numeric' })}` : `${fmt(days[0], { day: 'numeric', month: 'short' })} – ${fmt(days[6], { day: 'numeric', month: 'short', year: 'numeric' })}`) : fmt(state.date, { month: 'long', year: 'numeric' });
     const title = state.mode === 'day' ? fmt(state.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : state.mode === 'agenda' ? `${fmtDay(state.date)} – ${fmtDay(addDays(state.date, 29))}` : title0;
@@ -834,10 +835,10 @@
     let h = `${setupCard(true)}${window.matchMedia('(max-width:760px)').matches ? installCardHtml(false) : ''}${greetHtml()}${nextHtml()}${fabHtml()}
       ${!PHONE() ? '' : `<div class="calhd"><button class="calttl" data-act="mode" data-m="${state.mode === 'month' ? 'week' : 'month'}" aria-expanded="${state.mode === 'month'}" aria-label="${T(state.mode === 'month' ? 'week' : 'month')}"><b>${esc(fmt(state.date, { month: 'long' }))}</b> <span class="yr num">${state.date.slice(0, 4)}</span>${msi(state.mode === 'month' ? 'keyboard_arrow_up' : 'keyboard_arrow_down')}</button><label class="jump" title="${T('pick_date')}">${ico('cal')}<input type="date" id="jump" data-ch="jump" value="${esc(state.date)}" aria-label="${T('pick_date')}"></label><span class="spacer"></span>
         ${monday(state.date) !== monday(td) ? `<button class="btn sm calnow" data-act="today">${T('today')}</button>` : ''}${state.mode === 'month' ? '' : `<button class="iconbtn" data-act="nav" data-d="-1" aria-label="${T('prev')}">‹</button><button class="iconbtn" data-act="nav" data-d="1" aria-label="${T('next')}">›</button>`}
-        <button class="whochip ${state.mine ? '' : 'txt'}" data-act="mine" data-v="${state.mine ? '0' : '1'}" aria-label="${T(state.mine ? 'mine' : 'team')}">${state.mine ? avatar(me().id) : `<span>${T('who_all')}</span>`}</button></div>`}
+        ${isAdmin() ? `<button class="whochip ${state.mine ? '' : 'txt'}" data-act="mine" data-v="${state.mine ? '0' : '1'}" aria-label="${T(state.mine ? 'mine' : 'team')}">${state.mine ? avatar(me().id) : `<span>${T('who_all')}</span>`}</button>` : ''}</div>`}
       ${PHONE() ? '' : `<div class="bar">
       <div class="seg vseg">${[['day', 'D'], ['week', 'W'], ['month', 'M'], ['agenda', 'A']].map(([m, k]) => `<button data-act="mode" data-m="${m}" aria-pressed="${state.mode === m}" title="${T('v_key', { k })}">${T('v_' + m)}</button>`).join('')}</div>
-      <div class="seg"><button data-act="mine" data-v="0" aria-pressed="${!state.mine}">${T('team')}</button><button data-act="mine" data-v="1" aria-pressed="${!!state.mine}">${T('mine')}</button></div>
+      ${isAdmin() ? `<div class="seg"><button data-act="mine" data-v="0" aria-pressed="${!state.mine}">${T('team')}</button><button data-act="mine" data-v="1" aria-pressed="${!!state.mine}">${T('mine')}</button></div>` : ''}
       ${isAdmin() && !state.mine ? `<select class="inp whosel" data-ch="who" aria-label="${T('v_who')}"><option value="">${T('v_allteam', { n: crew().length })}</option>${crew().map(p => opt(p.id, p.name, state.who || '')).join('')}</select>` : ''}<span class="spacer"></span><button class="btn only-wide" data-act="print">${T('v_print')}</button><button class="btn only-wide" data-act="summary">${T('day_summary')}</button>${isAdmin() ? `<button class="btn primary only-wide" data-act="newtour">+ ${T('tour')}</button><button class="btn only-wide" data-act="offnew">+ ${T('dayoff')}</button>` : ''}<span class="only-wide">${helpBtn()}</span></div>${helpBox('calendar')}
       <div class="bar"><h2>${esc(title)}</h2><label class="jump" title="${T('pick_date')}">${ico('cal')}<input type="date" id="jump" data-ch="jump" value="${esc(state.date)}" aria-label="${T('pick_date')}"></label><span class="spacer"></span><div class="seg"><button data-act="nav" data-d="-1" aria-label="${T('prev')}">‹</button><button data-act="today">${T('today')}</button><button data-act="nav" data-d="1" aria-label="${T('next')}">›</button></div></div>`}`;
     const pFrom_To = [state.mode === 'month' ? state.date.slice(0, 8) + '01' : days[0], state.mode === 'month' ? addDays(addDays(state.date.slice(0, 8) + '01', 32).slice(0, 8) + '01', -1) : days[6]];
@@ -2958,7 +2959,7 @@
     nav(el) { const n = Number(el.dataset.d); if (state.mode === 'week') state.date = addDays(state.date, 7 * n); else if (state.mode === 'day') state.date = addDays(state.date, n); else if (state.mode === 'agenda') state.date = addDays(state.date, 28 * n); else { const d = D(state.date); d.setDate(1); d.setMonth(d.getMonth() + n); state.date = iso(d); } render(); document.querySelectorAll('main .mgrid, main .gridwrap, main .list').forEach(e => { e.classList.remove('sl-n', 'sl-p'); void e.offsetWidth; e.classList.add(n > 0 ? 'sl-n' : 'sl-p'); }); },
     today() { state.date = today(); render(); toToday(); },
     mode(el) { state.mode = el.dataset.m; render(); },
-    mine(el) { state.mine = el.dataset.v === '1'; render(); },
+    mine(el) { state.mine = isAdmin() ? el.dataset.v === '1' : true; render(); },   // guides and drivers see their own schedule only
     day(el) { state.date = el.dataset.date; render(); const x = document.getElementById('day-' + state.date); if (x) x.scrollIntoView({ block: 'start', behavior: 'smooth' }); },
     pickday(el) { state.date = el.dataset.date; render(); const x = document.getElementById('day-' + state.date); if (x && window.matchMedia('(max-width:760px)').matches) x.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); },
     tour(el) { let at = null; try { if (el.getBoundingClientRect && !state.modal) { const r = el.getBoundingClientRect(); if (r.width) at = { left: r.left, right: r.right, top: r.top }; } } catch (e) { /* no place */ } openTour(el.dataset.id); if (at && state.modal && state.modal.type === 'tour') { state.modal.at = at; renderModal(); } },
@@ -3341,7 +3342,7 @@
   document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && state.modal) guardClose(closeModal); });
   // Calendar keys on a computer, as in Setmore: D day, W week, M month, A agenda, T whole team / mine. Never while typing or with a sheet open.
   document.addEventListener('keydown', ev => { if (ev.ctrlKey || ev.metaKey || ev.altKey || state.modal || state.view !== 'calendar' || PHONE() || !me() || /^(INPUT|TEXTAREA|SELECT)$/.test((ev.target && ev.target.tagName) || '') || (ev.target && ev.target.isContentEditable)) return;
-    const k = String(ev.key || '').toLowerCase(), m = { d: 'day', w: 'week', m: 'month', a: 'agenda' }[k]; if (m) { state.mode = m; render(); } else if (k === 't') { state.mine = !state.mine; render(); } });
+    const k = String(ev.key || '').toLowerCase(), m = { d: 'day', w: 'week', m: 'month', a: 'agenda' }[k]; if (m) { state.mode = m; render(); } else if (k === 't' && isAdmin()) { state.mine = !state.mine; render(); } });
   try { window.matchMedia('(max-width:760px)').addEventListener('change', () => render()); } catch (e) { /* old browsers keep the layout they opened with */ }
   window.addEventListener('hashchange', () => { const v = location.hash.slice(1); if (['calendar', 'timeoff', 'tasks', 'admin', 'me'].includes(v) && v !== state.view) { state.view = v; render(); } });
 

@@ -482,3 +482,6 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 - **One set of sizes.** All corners now use five names (small 8, medium 12, large 16, extra 28, pill), where there were 14 different values; two stray text sizes were moved to the scale. The rules are written down in `GUIDEBOOK.md`.
 - **Leftovers removed:** the styles and code of the removed greeting phrase, and 26 texts in each language that no screen used any more (old photo flow, old day-off lists and others).
 - Fixed: the pay-question tag showed "dp_accepted" / "dp_declined" instead of "Accepted" / "Declined".
+
+## 3.54
+- **Guides and drivers see only their own schedule.** The Team / Mine switch, the "Whole team's calendar" link and the T key are for the office only; every view (day, week, month, agenda) shows a guide or driver their own tours. They still see tours that need someone, the team-ready percentages without names, and their partner on their own tours.
