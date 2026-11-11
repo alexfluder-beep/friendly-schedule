@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.45';
+  const APP_VERSION = '3.46';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -15,6 +15,9 @@
 2027-04-30..2027-05-05 Orthodox Easter and May holidays
 2027-05-15..2027-05-20 Eid al-Adha (date depends on the moon)
 2027-10-01..2027-10-07 Golden Week (China)`;
+  // Well-known holiday and busy-period names are shown in the person's language; a name the office made up stays as typed.
+  const NAMES = { 'new year': ['Новый год', 'ახალი წელი'], 'christmas': ['Рождество', 'შობა'], 'orthodox christmas': ['Православное Рождество', 'მართლმადიდებლური შობა'], 'christmas and new year': ['Рождество и Новый год', 'შობა და ახალი წელი'], 'easter': ['Пасха', 'აღდგომა'], 'orthodox easter': ['Православная Пасха', 'მართლმადიდებლური აღდგომა'], 'orthodox easter and may holidays': ['Православная Пасха и майские праздники', 'მართლმადიდებლური აღდგომა და მაისის დღესასწაულები'], 'tbilisoba': ['Тбилисоба', 'თბილისობა'], 'chinese new year': ['Китайский Новый год', 'ჩინური ახალი წელი'], 'eid al-fitr': ['Ураза-байрам', 'ურაზა-ბაირამი'], 'eid al-adha': ['Курбан-байрам', 'ყურბან-ბაირამი'], 'nowruz': ['Навруз', 'ნოვრუზი'], 'golden week': ['Золотая неделя (Китай)', 'ოქროს კვირა (ჩინეთი)'], 'independence day': ['День независимости', 'დამოუკიდებლობის დღე'], "st. george's day": ['Гиоргоба', 'გიორგობა'], 'giorgoba': ['Гиоргоба', 'გიორგობა'], "mother's day": ['День матери', 'დედის დღე'], "women's day": ['Женский день', 'ქალთა დღე'], 'epiphany': ['Крещение', 'ნათლისღება'], 'mariamoba': ['Мариамоба', 'მარიამობა'], 'svetitskhovloba': ['Светицховлоба', 'სვეტიცხოვლობა'], 'team dinner': ['Ужин команды', 'გუნდის ვახშამი'] };
+  const trName = name => { const raw = String(name || ''), l = (typeof lang === 'function' ? lang() : 'en'); if (l === 'en') return raw; const base = raw.replace(/\s*\(.*$/, '').trim().toLowerCase(), hit = NAMES[base]; return hit ? hit[l === 'ru' ? 0 : 1] : raw; };
   const peaks = () => String(rules().peaks ?? DEFAULT_PEAKS).split('\n').map(l => l.trim().match(/^(\d{4}-\d\d-\d\d)\s*\.\.\s*(\d{4}-\d\d-\d\d)\s*(.*)$/)).filter(Boolean).map(x => ({ from: x[1], to: x[2], name: x[3] || '' }));
   const peakOn = d => peaks().find(p => p.from <= d && p.to >= d);
   const DEFAULT_RULES = { maxStreak: 6, carSeats: 6, seasonFrom: 6, seasonTo: 10, maxSeasonBlock: 5, minNoticeDays: 14 };
@@ -644,7 +647,7 @@
     const dts = toursOnDay(d).filter(t => (!state.mine || involves(t, me().id))).sort((x, y) => (x.start_time || '').localeCompare(y.start_time || ''));
     const offs = db.time_off.filter(o => o.status !== 'declined' && o.date_from <= d && o.date_to >= d && (!state.mine || o.user_id === me().id));
     const cxs = cancelledOnDay(d).filter(t => !state.mine || involves(t, me().id));
-    return `<div class="dayhd" id="day-${d}" data-drop="${d}"><b class="${d === td ? 'tdy' : ''}">${esc(fmt(d, { weekday: 'long', day: 'numeric', month: 'long' }))}</b>${ho ? `<span class="tag t-hol">${msi('celebration')}${esc(ho.name)}</span>` : ''}${pubHolOn(d) && !ho ? `<span class="tag t-pub" title="${esc(T('ph_info'))}">${msi('flag')}${esc(T(pubHolOn(d)))}</span>` : ''}${ev ? `<span class="tag t-group">${esc(ev.name)}</span>` : ''}<span class="spacer"></span>${dts.length ? `<button class="lnk" data-act="summary" data-date="${d}">${T('day_summary')}</button>` : ''}${!isAdmin() && d > td && !offOn(me().id, d) ? `<button class="lnk" data-act="offnew" data-date="${d}">${T('ask_dayoff')}</button>` : ''}</div>
+    return `<div class="dayhd" id="day-${d}" data-drop="${d}"><b class="${d === td ? 'tdy' : ''}">${esc(fmt(d, { weekday: 'long', day: 'numeric', month: 'long' }))}</b>${ho ? `<span class="tag t-hol">${msi('celebration')}${esc(trName(ho.name))}</span>` : ''}${pubHolOn(d) && !ho ? `<span class="tag t-pub" title="${esc(T('ph_info'))}">${msi('flag')}${esc(T(pubHolOn(d)))}</span>` : ''}${ev ? `<span class="tag t-group">${esc(trName(ev.name))}</span>` : ''}<span class="spacer"></span>${dts.length ? `<button class="lnk" data-act="summary" data-date="${d}">${T('day_summary')}</button>` : ''}${!isAdmin() && d > td && !offOn(me().id, d) ? `<button class="lnk" data-act="offnew" data-date="${d}">${T('ask_dayoff')}</button>` : ''}</div>
       ${dts.map(agendaCard).join('')}${cxs.map(agendaCard).join('')}${offs.map(o => `<div class="acard off ${o.type === 'sick' ? 'sick' : o.type === 'half' ? 'half' : ''}"><span class="ttl">${msi(o.type === 'sick' ? 'sick' : 'beach_access')}${T(o.type === 'sick' ? 'sick' : o.type === 'half' ? 'halfday' : 'dayoff')}${o.status === 'pending' ? ' · ' + T('pending') : ''}</span><span class="row">${avatar(o.user_id)}<span>${esc(pname(o.user_id))}</span></span></div>`).join('')}
       ${!dts.length && !offs.length && !cxs.length ? `<div class="muted small nothing" data-drop="${d}">${T('no_tours')}</div>` : ''}`;
   }
@@ -719,7 +722,7 @@
     const ts = toursOnDay(d).filter(t => involves(t, id)).sort((x, y) => (x.start_time || '').localeCompare(y.start_time || '')), cxs = cancelledOnDay(d).filter(t => involves(t, id));
     const card = t => { const off = !live(t), other = t.guide_id === id ? t.driver_id : t.guide_id, fr = tourBookings(t.id).filter(isFree).reduce((n, b) => n + (Number(b.pax) || 1), 0), vip = tourBookings(t.id).some(b => isVip(b.client_id));
       return `<button class="acard mycard ${off ? 'cancelled' : ''}" data-key="t${t.id}" style="--k:${esc(tourStyle(t.title).color)}" data-act="tour" data-id="${t.id}"><span class="ttl">${t.start_time ? `<span class="num st">${esc(t.start_time)}</span> ` : ''}<span class="tname">${esc(t.title)}</span> <span class="num cnt">(${paxText(t)})</span>${off ? ` <span class="tag t-danger">${T('cancelled')}</span>` : ''}${vip ? ` <span class="tag t-vip">${T('vip')}</span>` : ''}${!off && staysN(tourBookings(t.id)) ? ` <span class="tag t-stay num">${T('stay_n', { n: staysN(tourBookings(t.id)) })}</span>` : ''}${fr ? ` <span class="tag t-free num">${T('free_n', { n: fr })}</span>` : ''}</span>${endOf(t) !== t.date || other ? `<span class="num tm muted">${esc([endOf(t) !== t.date ? fmtRange(t.date, endOf(t)) : '', other ? pname(other) : ''].filter(Boolean).join(' · '))}</span>` : ''}${off ? '' : wxLine(t)}</button>`; };
-    return `<div class="dayhd my ${d === td ? 'tdy' : ''}" id="day-${d}"><b>${d === td ? T('today') + ' · ' : ''}${esc(fmt(d, { weekday: 'long', day: 'numeric', month: 'long' }))}</b>${ho ? `<span class="tag t-hol">${esc(ho.name)}</span>` : ''}${ev ? `<span class="tag t-group">${esc(ev.name)}</span>` : ''}</div>
+    return `<div class="dayhd my ${d === td ? 'tdy' : ''}" id="day-${d}"><b>${d === td ? T('today') + ' · ' : ''}${esc(fmt(d, { weekday: 'long', day: 'numeric', month: 'long' }))}</b>${ho ? `<span class="tag t-hol">${esc(trName(ho.name))}</span>` : ''}${ev ? `<span class="tag t-group">${esc(trName(ev.name))}</span>` : ''}</div>
       ${ts.map(card).join('')}${cxs.map(card).join('')}${o ? `<div class="acard mycard off ${o.type === 'sick' ? 'sick' : ''}" style="--k:var(--private)"><span class="ttl">${msi(o.type === 'sick' ? 'sick' : 'beach_access')}${T(o.type === 'sick' ? 'sick' : o.type === 'half' ? 'halfday' : 'dayoff')}${o.status === 'pending' ? ` <span class="tag t-warn">${T('pending')}</span>` : ''}</span></div>` : ''}
       ${!ts.length && !cxs.length && !o ? `<div class="nothing2"><span class="muted">${T('nothing_planned')}</span>${d > td ? `<button class="lnk" data-act="offnew" data-date="${d}">${T('ask_dayoff')}</button>` : ''}</div>` : ''}`;
   }
@@ -810,7 +813,7 @@
     if (!isAdmin() && state.mine && state.mode === 'week') return guideHomeHtml(days, title) + fabHtml();
     let h = `${setupCard(true)}${window.matchMedia('(max-width:760px)').matches ? installCardHtml(false) : ''}${greetHtml()}${nextHtml()}${fabHtml()}
       ${!PHONE() ? '' : `<div class="calhd"><button class="calttl" data-act="mode" data-m="${state.mode === 'month' ? 'week' : 'month'}" aria-expanded="${state.mode === 'month'}" aria-label="${T(state.mode === 'month' ? 'week' : 'month')}"><b>${esc(fmt(state.date, { month: 'long' }))}</b> <span class="yr num">${state.date.slice(0, 4)}</span>${msi(state.mode === 'month' ? 'keyboard_arrow_up' : 'keyboard_arrow_down')}</button><label class="jump" title="${T('pick_date')}">${ico('cal')}<input type="date" id="jump" data-ch="jump" value="${esc(state.date)}" aria-label="${T('pick_date')}"></label><span class="spacer"></span>
-        ${monday(state.date) !== monday(td) ? `<button class="btn sm calnow" data-act="today">${T('today')}</button>` : ''}<button class="iconbtn" data-act="nav" data-d="-1" aria-label="${T('prev')}">‹</button><button class="iconbtn" data-act="nav" data-d="1" aria-label="${T('next')}">›</button>
+        ${monday(state.date) !== monday(td) ? `<button class="btn sm calnow" data-act="today">${T('today')}</button>` : ''}${state.mode === 'month' ? '' : `<button class="iconbtn" data-act="nav" data-d="-1" aria-label="${T('prev')}">‹</button><button class="iconbtn" data-act="nav" data-d="1" aria-label="${T('next')}">›</button>`}
         <button class="whochip ${state.mine ? '' : 'txt'}" data-act="mine" data-v="${state.mine ? '0' : '1'}" aria-label="${T(state.mine ? 'mine' : 'team')}">${state.mine ? avatar(me().id) : `<span>${T('who_all')}</span>`}</button></div>`}
       ${PHONE() ? '' : `<div class="bar">
       <div class="seg"><button data-act="mode" data-m="week" aria-pressed="${state.mode === 'week'}">${T('week')}</button><button data-act="mode" data-m="month" aria-pressed="${state.mode === 'month'}">${T('month')}</button></div>
@@ -821,7 +824,7 @@
     const pstats = !(isAdmin() && !state.mine) ? '' : `<div class="only-wide">${periodStatsHtml(pFrom_To[0], pFrom_To[1])}</div>${incBarHtml(pFrom_To[0], pFrom_To[1])}`;
     if (state.mode === 'month') return h + monthHtml() + photoStripHtml() + pstats;
     // wide: team grid
-    const hd = days.map(d => { const ho = holidayOn(d), ev = eventOn(d); return `<div class="hd ${d === td ? 'today' : ''}">${esc(fmtDay(d))}${ho ? `<span class="hol">${esc(ho.name)}</span>` : ''}${ev ? `<span class="hol ev">${esc(ev.name)}</span>` : ''}</div>`; }).join('');
+    const hd = days.map(d => { const ho = holidayOn(d), ev = eventOn(d); return `<div class="hd ${d === td ? 'today' : ''}">${esc(fmtDay(d))}${ho ? `<span class="hol">${esc(trName(ho.name))}</span>` : ''}${ev ? `<span class="hol ev">${esc(trName(ev.name))}</span>` : ''}</div>`; }).join('');
     const rowFor = (label, sub, id, filter) => `<div class="who">${id ? avatar(id) : ''}<div>${esc(label)}<span class="r">${esc(sub)}</span></div></div>` + days.map(d => {
       const ts = toursOnDay(d).filter(filter).sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
       const o = id ? offOn(id, d) : null;
@@ -851,8 +854,8 @@
     }
     const legend = `<div class="row small muted lgrow"><span class="lg"><i class="dotk"></i>${T('lg_tour')}</span><span class="lg"><i class="sq myoff"></i>${T('lg_myoff')}</span><span class="lg"><i class="sq myoff mysick"></i>${T('sick')}</span><span class="lg"><i class="sq hol"></i>${T('holidays')}</span><span class="lg"><i class="sq pub"></i>${T('ph_legend')}</span></div>`;
     const mAt = n => { const d = D(first); d.setMonth(d.getMonth() + n); return fmt(iso(d), { month: 'short' }); };
-    const mnav = `<div class="mnav"><button data-act="nav" data-d="-1" aria-label="${T('prev')}: ${esc(mAt(-1))}"><span aria-hidden="true">‹</span></button><b>${esc(fmt(first, { month: 'long', year: 'numeric' }))}</b><button data-act="nav" data-d="1" aria-label="${T('next')}: ${esc(mAt(1))}"><span aria-hidden="true">›</span></button></div>`;
-    return `${mnav}<div class="mgrid">${wd}${cells}</div>${legend}<div class="list">${dayBlock(sel)}</div>`;
+    const mnav = `<div class="mnav"><button data-act="nav" data-d="-1" aria-label="${T('prev')}: ${esc(mAt(-1))}"><span aria-hidden="true">‹</span></button><button class="mtoday" data-act="today">${T('today')}</button><button data-act="nav" data-d="1" aria-label="${T('next')}: ${esc(mAt(1))}"><span aria-hidden="true">›</span></button></div>`;
+    return `${PHONE() ? mnav : ''}<div class="mgrid">${wd}${cells}</div>${legend}<div class="list">${dayBlock(sel)}</div>`;
   }
 
   // ---------- tour modal ----------
@@ -1644,8 +1647,8 @@
     if (!isAdmin() && sug.length) h += `<div class="card"><b>${T('sug_title')}</b><span class="muted small">${T('sug_text')}</span><div class="bar">${sug.map(d => `<button class="btn sm" data-act="offnew" data-date="${d}">${esc(fmtDay(d))}</button>`).join('')}</div></div>`;
     if (isAdmin()) h += `<h3>${T('to_approve')} (${pending.length})</h3><div class="list">${pending.length ? pending.map(o => offRow(o, true)).join('') : `<div class="empty">${T('nothing_pending')}</div>`}</div>`;
     h += `<div class="cols"><div class="list"><h3>${T('my_requests')}</h3>${mine.length ? mine.map(o => offRow(o, isAdmin())).join('') : `<div class="empty">${T('no_requests')}</div>`}</div>
-      <div class="list"><h3>${T('team_off')}</h3>${!upcoming.length ? `<div class="empty">${T('nobody_off')}</div>` : isAdmin() ? upcoming.map(o => `<div class="card lrow">${avatar(o.user_id)}<span class="lmain"><b>${esc(pname(o.user_id))}</b>${offTag(o)}</span><span class="num ldate">${esc(fmtRange(o.date_from, o.date_to))}</span></div>`).join('') : teamOffCounts(upcoming)}
-      <h3>${T('holidays')}</h3>${hol.length ? hol.map(x => `<div class="card lrow nohead"><span class="lmain"><span class="tag ${x.kind === 'event' ? 't-group' : 't-hol'}">${esc(x.name)}</span></span><span class="num ldate">${esc(fmtRange(x.date_from, x.date_to))}</span>${x.notes ? `<div class="muted small">${esc(x.notes)}</div>` : ''}</div>`).join('') : `<div class="empty">${T('no_holidays')}</div>`}</div></div>`;
+      <div class="list"><h3>${T(isAdmin() ? 'team_off' : 'tc_title')}</h3>${!isAdmin() ? teamOffCounts(upcoming) : !upcoming.length ? `<div class="empty">${T('nobody_off')}</div>` : isAdmin() ? upcoming.map(o => `<div class="card lrow">${avatar(o.user_id)}<span class="lmain"><b>${esc(pname(o.user_id))}</b>${offTag(o)}</span><span class="num ldate">${esc(fmtRange(o.date_from, o.date_to))}</span></div>`).join('') : teamOffCounts(upcoming)}
+      <h3>${T('holidays')}</h3>${hol.length ? hol.map(x => `<div class="card lrow nohead"><span class="lmain"><b class="nw num">${esc(fmtRange(x.date_from, x.date_to))}</b></span><span class="ldate"><span class="tag ${x.kind === 'event' ? 't-group' : 't-hol'}">${esc(trName(x.name))}</span></span>${x.notes ? `<div class="muted small">${esc(x.notes)}</div>` : ''}</div>`).join('') : `<div class="empty">${T('no_holidays')}</div>`}</div></div>`;
     return h;
   }
   function offModalHtml(m) {
@@ -1712,11 +1715,15 @@
   const RIDE_4X4 = /4\s*[x×х]\s*4|4\s*wd|delica/i;   // by the tour name only: not every Kazbegi tour is a 4x4 ride (owner, 11 Nov)
   // For guides and drivers the team's days off are numbers per day, never names: "2 guides, 1 driver off" and the share of the team.
   function teamOffCounts(list) {
-    const td = today(), team = staff().filter(p => p.role !== 'admin'), rows = [];
-    for (let i = 0; i < 21 && rows.length < 10; i++) { const d = addDays(td, i), ids = new Set(list.filter(o => o.date_from <= d && o.date_to >= d).map(o => twin(o.user_id))); if (!ids.size) continue;
-      const g = team.filter(p => ids.has(p.id) && p.role !== 'driver').length, dr = team.filter(p => ids.has(p.id) && p.role === 'driver').length, n = g + dr; if (!n) continue;
-      rows.push(`<div class="card lrow nohead"><span class="lmain"><b class="nw">${esc(fmtDay(d))}</b></span><span class="ldate">${esc([g ? T('to_guides', { n: g }) : '', dr ? T('to_drivers', { n: dr }) : ''].filter(Boolean).join(', '))} <span class="muted small num">${Math.round(n / (team.length || 1) * 100)}%</span></span></div>`); }
-    return rows.join('') || `<div class="empty">${T('nobody_off')}</div>`;
+    const td = today(), m = me(), team = staff().filter(p => p.role !== 'admin'), n = team.length || 1, start = monday(td), r = rules(), pk = peaks();
+    const wd = [...Array(7)].map((_, i) => `<div class="hd">${esc(fmt(addDays(start, i), { weekday: 'short' }))}</div>`).join('');
+    const cells = [...Array(28)].map((_, i) => {
+      const d = addDays(start, i), past = d < td, off = new Set(list.filter(o => o.date_from <= d && o.date_to >= d).map(o => twin(o.user_id))), others = [...off].filter(id => id !== m.id).length, ready = Math.round((n - off.size) / n * 100);
+      const why = []; if (!past) { if (db.tours.some(t => live(t) && involves(t, m.id) && t.date <= d && endOf(t) >= d)) why.push(T('tc_mytour')); if (pk.some(p => p.from <= d && p.to >= d)) why.push(T('tc_peak')); if (others >= Math.max(2, Math.ceil(n * 0.2))) why.push(T('tc_many', { n: others })); }
+      const mine = off.has(m.id), ho = holidayOn(d);
+      return `<button class="tcd ${past ? 'past' : ''} ${d === td ? 'tdy' : ''} ${mine ? 'mine' : ''} ${why.length ? 'no' : ''}" ${past ? 'disabled' : `data-act="tcday" data-date="${d}" data-why="${esc(why.join(' · '))}"`} aria-label="${esc(fmtDay(d))}: ${T('tc_ready', { p: ready })}${why.length ? '. ' + esc(T('tc_no')) + ': ' + esc(why.join(', ')) : ''}"><b class="num">${D(d).getDate()}</b><span class="num pc">${past ? '' : ready + '%'}</span>${mine ? msi('beach_access') : why.length && !past ? `<i class="nomk" aria-hidden="true">!</i>` : ''}${ho ? `<i class="hold" title="${esc(trName(ho.name))}"></i>` : ''}</button>`;
+    }).join('');
+    return `<div class="card tcal"><div class="tcgrid">${wd}${cells}</div><div class="striplg muted small"><span><b class="num">90%</b> ${T('tc_lg_ready')}</span><span><i class="nomk">!</i> ${T('tc_lg_no')}</span><span>${msi('beach_access')} ${T('sm_lg_myoff')}</span></div>${state.tcWhy ? `<div class="banner small"><span>${esc(state.tcWhy)}</span></div>` : ''}</div>`;
   }
   // Work and rest (Time off page, guides and drivers). Personal: the person's own answers (tours a week that feel right, rest days,
   // more work or more rest) plus what the schedule shows about them. Counted again on every open; no guest names.
@@ -1752,10 +1759,11 @@
     const mN = Number(td.slice(5, 7)), hi = mN >= r.seasonFrom && mN <= r.seasonTo, mon = n => fmt(`2026-${String(n).padStart(2, '0')}-01`, { month: 'long' });
     add('star', T('wr_team', { n: tNext, p: tPrev }) + (ly ? ' ' + T('wr_lastyear', { n: ly }) : '') + ' ' + (hi ? T('wr_season_hi', { m: mon(r.seasonTo), n: r.maxSeasonBlock }) : T('wr_season_lo', { m: mon(r.seasonFrom) })));
     const pk = peaks().filter(p => p.to >= td).sort((x, y) => x.from.localeCompare(y.from))[0];
-    if (pk) add('cake', T('wr_peak', { name: pk.name || T('wr_busy'), from: fmtDay(pk.from), to: fmtDay(pk.to) }));
+    if (pk) add('cake', T('wr_peak', { name: trName(pk.name) || T('wr_busy'), from: fmtDay(pk.from).replace(/\.$/, ''), to: fmtDay(pk.to).replace(/\.$/, '') }));
     // 7. room to grow: the most booked tours, and one this person has not done yet
     const cnt = {}, name = {}; between(team, addDays(td, -30), addDays(td, 30)).forEach(t => { const k = statKey(t.title); cnt[k] = (cnt[k] || 0) + 1; name[k] = name[k] || aliasOf(t.title); });
-    const top = Object.keys(cnt).filter(k => cnt[k] >= 2).sort((x, y) => cnt[y] - cnt[x]).slice(0, 3), known = new Set(mine.map(t => statKey(t.title))), fresh = top.find(k => !known.has(k));
+    const car = {}; team.forEach(t => { if (t.driver_id || kmOf(t.title) > 0) car[statKey(t.title)] = true; });   // a driver is only told about tours that use a car
+    const top = Object.keys(cnt).filter(k => cnt[k] >= 2).sort((x, y) => cnt[y] - cnt[x]).slice(0, 3), known = new Set(mine.map(t => statKey(t.title))), fresh = top.find(k => !known.has(k) && (!driver || car[k]));
     if (top.length) add('add_task', T('wr_trend', { list: top.map(k => `${name[k]} (${cnt[k]})`).join(', ') }) + (fresh ? ' ' + T(driver ? 'wr_learn_d' : 'wr_learn', { name: name[fresh] }) : ''));
     const open = openTours().filter(x => !x.mine).length, chip = (k, v, label, on) => `<button type="button" class="btn sm wrchip" data-act="wrset" data-k="${k}" data-v="${v}" aria-pressed="${on}">${esc(label)}</button>`;
     const asked = target || rest.length || want;
@@ -1764,7 +1772,13 @@
       <span class="muted small">${T('wr_q_rest')}</span><div class="bar">${[0, 1, 2, 3, 4, 5, 6].map(i => chip('rest', i, wdName(i), rest.includes(i))).join('')}</div>
       <span class="muted small">${T('wr_q_want')}</span><div class="bar">${['more', 'same', 'rest'].map(v => chip('want', v, T('wr_want_' + v), want === v)).join('')}</div></details>`;
     const earn = open && want !== 'rest' ? `<button class="banner small wrearn" data-act="wrtours"><span>${esc(T('wr_earn', { n: open, role: T('role_' + (driver ? 'driver' : 'guide')).toLowerCase() }))}</span><b>${T('xc_see')} ›</b></button>` : want === 'rest' ? `<span class="banner small wrearn"><span>${esc(T('wr_rest_first'))}</span></span>` : '';
-    return `<div class="card wrcard"><b>${T('wr_title')}</b>${wishes}${L.map(([ic, tx]) => `<span class="wrline">${msi(ic)}<span>${esc(tx)}</span></span>`).join('')}${earn}<span class="muted small wrnote">${T('wr_note')}</span></div>`;
+    // The animal of the week: one picture and one line about last week (Monday to Sunday), so the card can be read at a glance.
+    const lw = between(mine, addDays(wk0, -8), addDays(wk0, -1)), lwDays = new Set(lw.map(t => t.date)).size, lwKinds = new Set(lw.map(t => statKey(t.title))).size, early = lw.filter(t => t.start_time && t.start_time < '09:00').length;
+    const an = !lw.length ? 'cat' : lwDays >= 6 ? 'bear' : lwKinds >= 3 ? 'fox' : early * 2 >= lw.length && lw.length >= 2 ? 'bird' : 'owl';
+    const totem = `<div class="wrtotem"><svg viewBox="0 0 48 48" aria-hidden="true">${(window.CUTE && window.CUTE.art[an]) || ''}</svg><span class="grow-l"><span class="muted small">${T('wa_last')}</span><b>${T('wa_' + an)}</b><span class="small">${esc(T('wa_' + an + '_t', { n: lw.length, d: lwDays, r: 7 - lwDays, k: lwKinds }))}</span></span></div>`;
+    const tiles = `<div class="stats wrstats"><div class="stat"><b class="num">${thisWk}</b>${T('wa_thisweek')}<span class="muted small num">${T('wa_usual', { n: nf(avg) })}</span></div><div class="stat"><b class="num">${days.length}</b>${T('wa_days30')}<span class="muted small num">${T('wa_run', { n: run })}</span></div><div class="stat"><b class="num">${free ? esc(fmt(free, { day: 'numeric', month: 'short' })) : '—'}</b>${T('wa_free')}<span class="muted small num">${T('wa_next14', { n: next.length })}</span></div></div>`;
+    const tip = run >= (r.maxStreak || 6) ? T('wr_adv_rest') : target && thisWk > target ? T('wr_over', { t: target }) : target && thisWk < target ? T('wr_under', { t: target }) : '';
+    return `<div class="card wrcard"><b>${T('wr_title')}</b>${totem}${tiles}${tip ? `<span class="wrline">${msi('info')}<span>${esc(tip)}</span></span>` : ''}${earn}${wishes}<details class="sect wrmore bpmore" data-keep="wr-more" ${(state.keep || {})['wr-more'] ? 'open' : ''}><summary data-s="${T('show')}" data-h="${T('hide')}">${T('wa_more')}</summary>${L.map(([ic, tx]) => `<span class="wrline">${msi(ic)}<span>${esc(tx)}</span></span>`).join('')}</details><span class="muted small wrnote">${T('wr_note')}</span></div>`;
   }
   function openTours() {
     const m = me(); if (!m || isAdmin()) return []; const role = m.role === 'driver' ? 'driver' : 'guide', td = today(), to = addDays(td, 30);
@@ -2585,7 +2599,7 @@
     const h = holidayOn(day); if (h) return { k: 'holiday', art: 'star', name: h.name };
     return o && o.status === 'approved' && o.type !== 'half' ? { k: 'off', art: 'sofa' } : null;
   }
-  const specialText = sp => [hiText('gr_' + sp.k, sp.k === 'holiday' ? sp.name : firstName(me())), T('gr_' + sp.k + '_t')];
+  const specialText = sp => [hiText('gr_' + sp.k, sp.k === 'holiday' ? trName(sp.name) : firstName(me())), T('gr_' + sp.k + '_t')];
   function greetHtml() {
     const m = me(); if (!m || !m.active || state.viewAs) return ''; const td = today(), sp = specialOn(td), art = k => (window.CUTE && window.CUTE.art[k]) || '';
     if (sp) { const [h, t] = specialText(sp); return `<div class="card greet"><svg viewBox="0 0 48 48" aria-hidden="true">${art(sp.art)}</svg><span class="grow-l"><b>${esc(h)}</b><span class="muted small">${esc(t)}</span></span></div>`; }
@@ -2688,9 +2702,9 @@
       ${teamGoalHtml()}${weeklyHtml(id)}
       ${roadHtml(id)}
       ${thanksHtml(id)}${id === me().id ? `<div class="bar"><button class="btn" data-act="recap">${msi('star')}${T('rc_btn', { y: today().slice(0, 4) })}</button></div>` : ''}
-      ${(() => { const todo = tracks.filter(([k]) => k !== 'master' && k !== 'titles').map(([k, label]) => { const bs = g.list.filter(b => b.track === k && !b.done); return bs.length ? `${label ? `<h3>${esc(label)}</h3>` : ''}<div class="medals">${bs.map(b => medal(b)).join('')}</div>` : ''; }).join(''), n = g.list.filter(b => !b.done && b.track !== 'master' && b.track !== 'titles').length; return todo ? `<details class="sect bpmore" data-keep="bp-todo" ${(state.keep || {})["bp-todo"] ? 'open' : ''}><summary>${T('bp_todo')} <span class="muted small num">${n}</span></summary>${todo}</details>` : ''; })()}
-      ${(() => { const ms = g.list.filter(b => b.track === 'master'); return ms.length ? `<details class="sect bpmore" data-keep="bp-master" ${(state.keep || {})["bp-master"] ? 'open' : ''}><summary>${T('tr_master')} <span class="muted small num">${ms.filter(b => b.done).length}/${ms.length}</span></summary><div class="medals">${ms.map(b => medal(b)).join('')}</div></details>` : ''; })()}
-      <details class="sect bpmore" data-keep="bp-month" ${(state.keep || {})["bp-month"] ? 'open' : ''}><summary>${T('g_month')}</summary><div class="stats"><div class="stat"><b>${g.weekNow}</b>${T('g_week')}</div><div class="stat"><b>${g.cur.tours}</b>${T('g_thismonth')}${delta(g.cur.tours, g.prev.tours)}</div><div class="stat"><b>${g.yearNow}</b>${T('g_year')}</div><div class="stat"><b>${nf(g.cur.guests)}</b>${T('guests')}${delta(g.cur.guests, g.prev.guests)}</div>${g.isD ? `<div class="stat"><b>${nf(g.cur.km)}</b>km${delta(g.cur.km, g.prev.km)}</div>` : ''}<div class="stat"><b>${Math.round(g.regs.size / REGIONS.length * 100)}%</b>${T('g_geo')}</div></div></details>
+      ${(() => { const todo = tracks.filter(([k]) => k !== 'master' && k !== 'titles').map(([k, label]) => { const bs = g.list.filter(b => b.track === k && !b.done); return bs.length ? `${label ? `<h3>${esc(label)}</h3>` : ''}<div class="medals">${bs.map(b => medal(b)).join('')}</div>` : ''; }).join(''), n = g.list.filter(b => !b.done && b.track !== 'master' && b.track !== 'titles').length; return todo ? `<details class="sect bpmore" data-keep="bp-todo" ${(state.keep || {})["bp-todo"] ? 'open' : ''}><summary data-s="${T('show')}" data-h="${T('hide')}"><span>${T('bp_todo')} <span class="tag t-muted num">${n}</span></span></summary>${todo}</details>` : ''; })()}
+      ${(() => { const ms = g.list.filter(b => b.track === 'master'); return ms.length ? `<details class="sect bpmore" data-keep="bp-master" ${(state.keep || {})["bp-master"] ? 'open' : ''}><summary data-s="${T('show')}" data-h="${T('hide')}"><span>${T('tr_master')} <span class="tag t-muted num">${ms.filter(b => b.done).length}/${ms.length}</span></span></summary><div class="medals">${ms.map(b => medal(b)).join('')}</div></details>` : ''; })()}
+      <details class="sect bpmore" data-keep="bp-month" ${(state.keep || {})["bp-month"] ? 'open' : ''}><summary data-s="${T('show')}" data-h="${T('hide')}"><span>${T('g_month')}</span></summary><div class="stats"><div class="stat"><b>${g.weekNow}</b>${T('g_week')}</div><div class="stat"><b>${g.cur.tours}</b>${T('g_thismonth')}${delta(g.cur.tours, g.prev.tours)}</div><div class="stat"><b>${g.yearNow}</b>${T('g_year')}</div><div class="stat"><b>${nf(g.cur.guests)}</b>${T('guests')}${delta(g.cur.guests, g.prev.guests)}</div>${g.isD ? `<div class="stat"><b>${nf(g.cur.km)}</b>km${delta(g.cur.km, g.prev.km)}</div>` : ''}<div class="stat"><b>${Math.round(g.regs.size / REGIONS.length * 100)}%</b>${T('g_geo')}</div></div></details>
       <div class="card f"><b>${T('g_together')}</b>${pals.map(([pid, n]) => `<div class="row">${avatar(pid)}<span style="flex:1;min-width:0">${esc(T('g_with', { name: pname(pid), n }))}</span>${n >= 50 ? `<span class="tag t-ok">50+</span>` : ''}</div>`).join('') || `<span class="muted small">${T('no_tours')}</span>`}
         ${g.isG ? `<div class="row">${ico('heart')}<span>${T('g_repeat', { n: g.rep })}</span></div>` : ''}${g.isD ? `<div class="row">${ico('moon')}<span>${T('g_moon', { km: nf(g.km), p: (g.km / 384400 * 100).toFixed(g.km / 384400 < 0.1 ? 2 : 1) })}</span></div>` : ''}${g.isG && g.walk ? `<div class="row">${ico('boot')}<span>${T('g_walked', { km: nf(g.walk) })}</span></div>` : ''}</div>
       <p class="muted small">${T('badges_text')} ${T('g_note')}</p>`;
@@ -2806,7 +2820,7 @@
     const body = state.view === 'calendar' ? calendarHtml() : state.view === 'timeoff' ? timeoffHtml() : state.view === 'tasks' ? tasksHtml() : state.view === 'admin' ? adminHtml() : meHtml();
     const demo = S.mode === 'demo' ? `<div class="banner slim"><b>${T('demo_title')}</b><span class="small only-wide">${T('demo_text')}</span><label class="small" for="demo-as">${T('demo_as')}</label><select id="demo-as" data-ch="demoas">${db.profiles.filter(p => p.active !== false).map(p => opt(p.id, `${p.name} · ${T('role_' + p.role)}`, me().id)).join('')}</select></div>` : '';
     const upd = S.syncedAt ? T('updated_at', { time: new Intl.DateTimeFormat(LOCALES[lang()], { hour: '2-digit', minute: '2-digit' }).format(new Date(S.syncedAt)) }) : T('refresh');
-    const shell = `<header class="top"><div class="brand"><i class="sdot s-${syncState()}" title="${esc(upd)}"></i>Friendly Schedule</div><nav class="nav" aria-label="Main">${nav}</nav><span class="spacer only-phone"></span>
+    const shell = `<header class="top"><div class="brand"><i class="sdot s-${syncState()}" title="${esc(upd)}"></i>${T('brand')}</div><nav class="nav" aria-label="Main">${nav}</nav><span class="spacer only-phone"></span>
       
       <button class="iconbtn ${state.refreshing ? 'spin' : ''}" data-act="refresh" aria-label="${T('refresh')}" title="${esc(upd)}">${ico('refresh')}</button>
       <button class="iconbtn" data-act="bell" aria-label="${T('notifications')}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>${unread ? `<span class="badge">${unread}</span>` : ''}</button>${syncRow()}</header>
@@ -2827,7 +2841,11 @@
   }
   // Delivery notices: saved on the phone while offline, and sent when the internet is back.
   let lastPending = 0;
-  function syncNotice() { const n = S.pending || 0; if (n > lastPending && S.offline) toast(T('st_saved')); else if (lastPending > 0 && n === 0 && !S.offline) toast(T('st_sent')); lastPending = n; }
+  let badgeN = -1;
+  function appBadge(n) { if (n === badgeN) return; badgeN = n; try { if (n && navigator.setAppBadge) navigator.setAppBadge(n).catch(() => {}); else if (!n && navigator.clearAppBadge) navigator.clearAppBadge().catch(() => {}); } catch (e) { /* not supported */ } }
+  window.addEventListener('beforeunload', ev => { if ((S.pending || 0) > 0 && !PHONE()) { ev.preventDefault(); ev.returnValue = ''; } });
+  try { if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', ev => { if (ev.data && ev.data.type === 'fs-sync' && S.offline && navigator.onLine) S.sync(); }); } catch (e) { /* no helper here */ }
+  function syncNotice() { const n = S.pending || 0; appBadge(n); if (n > lastPending && S.offline) toast(T('st_saved')); else if (lastPending > 0 && n === 0 && !S.offline) toast(T('st_sent')); lastPending = n; }
   // ---------- test period: ask people to report anything odd ----------
   // Maintenance: the admin switches it on in Rules (or in config.js when the database itself is down).
   const maint = () => { const s = (db.settings.find(x => x.id === 'maintenance') || {}).value || {}; return CFG.maintenance ? { on: true, text: String(CFG.maintenance) } : s; };
@@ -3007,6 +3025,7 @@
     invdel(el) { run(() => S.remove('invites', el.dataset.id)); },
     wsame(el) { const box = el.closest('.wweek'), rows = [...box.querySelectorAll('.wrow')], src = rows.find(r => r.querySelector('[type=checkbox]').checked && r.querySelector('[name^=wf]').value) || rows[0], f = src.querySelector('[name^=wf]').value, t = src.querySelector('[name^=wt]').value; rows.forEach(r => { r.querySelector('[name^=wf]').value = f; r.querySelector('[name^=wt]').value = t; r.querySelectorAll("input").forEach(x => dirty.add(x)); }); qsaveOn(); },
     showpw() { state.showPw = !state.showPw; render(); },
+    tcday(el) { const d = el.dataset.date, why = el.dataset.why; if (why) { state.tcWhy = `${fmtDay(d)}: ${T('tc_no')} (${why})`; render(); } else { state.tcWhy = ''; acts.offnew({ dataset: { date: d } }); } },
     usf(el) { state.usageF = { ...(state.usageF || {}), [el.dataset.k]: el.dataset.v }; render(); },
     refresh() { if (state.refreshing) return; state.refreshing = true; render(); (async () => { try { if (S.offline) await S.sync(); else await S.pulse(); } catch (e) { console.error(e); } state.refreshing = false; render(); if (!S.warming) toast(T(S.offline ? 'rf_off' : 'up_to_date')); })(); },
     pvcount() { run(async () => { state.staleN = await S.staleGuests(pv().keepMonths); }); },
@@ -3390,6 +3409,7 @@
     const v = location.hash.slice(1); if (['calendar', 'timeoff', 'tasks', 'admin', 'me'].includes(v)) state.view = v;
     try { await S.init(); } catch (e) { console.error(e); logErr('offline', `${errCode(e)} App could not start: ${(e && e.message) || e}`, navigator.onLine ? 'phone was online' : 'phone had no internet'); $('#app').innerHTML = `<main><div class="banner f"><b>${esc(T('err_connect'))}</b><span class="small">${esc(errCode(e) + ': ' + T('ec_' + errCode(e)))}</span><span class="small">${esc(T('err_retry'))}</span><button class="btn primary" onclick="location.reload()">${esc(T('refresh'))}</button></div></main>`; setTimeout(() => { if (navigator.onLine) location.reload(); }, 20000); return; }
     saveHello(); document.addEventListener('visibilitychange', () => { if (document.hidden) saveHello(); });
+    if (S.remember) S.remember('lang', lang()); if ((S.pending || 0) > 0) setTimeout(() => toast(T('st_waiting_open', { n: S.pending || 0 })), 600);
     if (S.warming) { let warm = true; S.onChange((t, r, type) => { if (warm && type === 'STATE' && !S.warming) { warm = false; PH.asked.clear(); displayFromAccount(); saveHello(); weekCheck(); } }); }
     if (S.mode === 'demo') window.__test = { pageFor: (title, kind) => { const u = pageFor({ title, kind }), m = /\/activity\/(\d+)/.exec(u); return m ? { id: Number(m[1]) } : null; } };          // for the automatic tests only
     if (me() && !isAdmin()) state.mine = true;

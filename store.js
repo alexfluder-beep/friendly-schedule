@@ -44,7 +44,10 @@
     const q = o.op === 'remove' ? sb.from(o.table).delete().eq('id', o.id) : o.insert ? sb.from(o.table).insert(o.row) : sb.from(o.table).update(o.row).eq('id', o.row.id);
     const { error } = await q; if (error) throw error;
   }
-  function queue(o) { outbox.push(o); store.pending = outbox.length; saveCache(); }
+  // A waiting change is written to the phone straight away (not a moment later), so closing the app right after a tap cannot lose it.
+  function queue(o) { outbox.push(o); store.pending = outbox.length; idb.set('outbox', outbox); saveCache(); askBackgroundSync(); }
+  // Where the browser allows it (Android, Chrome and Edge on a computer), it wakes the app's helper when the internet is back, even with the app closed.
+  function askBackgroundSync() { try { if ('serviceWorker' in navigator) navigator.serviceWorker.ready.then(r => { if (r.sync) r.sync.register('fs-outbox').catch(() => {}); }).catch(() => {}); } catch (e) { /* not supported */ } }
 
   // ---------- demo seed (sample team and tours, not real people) ----------
   const p2 = n => String(n).padStart(2, '0');
@@ -226,6 +229,8 @@
       outbox = (await idb.get('outbox')) || []; store.pending = outbox.length;
       const useCache = async () => { const c = await idb.get('cache'); if (!c || !c.me) return false; me = c.me; TABLES.forEach(t => db[t] = (c.db && c.db[t]) || []); store.offline = true; store.cachedAt = c.at; return true; };
       window.addEventListener('online', () => store.sync());
+      window.addEventListener('pagehide', () => { if (outbox.length) idb.set('outbox', outbox); });
+      try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) { /* older browser */ }   // ask the browser not to clear what is saved on this device
       window.addEventListener('offline', () => { store.offline = true; emit(null, null, 'STATE', true); });
       if (!navigator.onLine && await useCache()) return;
       // Quick start: someone who used the app on this phone before sees the saved copy at once, and fresh data is fetched behind it.
@@ -251,6 +256,7 @@
       } catch (e) { store.offline = true; emit(null, null, 'STATE', true); }
       finally { store.syncing = false; if (!store.offline && me && outbox.length) setTimeout(() => store.sync(), 50); }   // a change queued while the fresh data was loading goes out now
     },
+    remember(k, v) { if (mode === 'supabase') idb.set(k, v); },   // small notes the app's helper reads when the app is closed (the language)
     demoViewAs(id) { me = db.profiles.find(p => p.id === id) || me; ls.set('fs-demo-as', me.id); emit('profiles', me, 'UPDATE'); },
     demoReset() { ls.del(DEMO_KEY); ls.del('fs-demo-as'); TABLES.forEach(t => db[t] = []); seedDemo(); me = db.profiles[0]; emit('profiles', me, 'UPDATE'); },
     async signIn(email, password) { if (mode === 'demo') { ls.del('fs-demo-out'); me = db.profiles.find(p => p.role === 'admin' && p.active !== false) || db.profiles[0]; return; } const { data, error } = await sb.auth.signInWithPassword({ email, password }); if (error) throw error; await afterLogin(data.user); },

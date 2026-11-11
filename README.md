@@ -435,3 +435,14 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 
 ## 3.45
 - Month arrows are round buttons with the arrow only (the month names did not fit on phones). Screen readers still hear which month each arrow opens.
+
+## 3.46
+- **Header:** the app name is one word, "Schedule" (Расписание / განრიგი).
+- **Month view:** the month name shows once. On phones the row above the grid is "‹ Today ›"; on a computer the existing header arrows are used.
+- **Time off, for guides and drivers: "Team ready, next 4 weeks".** A plain calendar with every date. Each day shows what percent of the team is working. A day marked "!" is not a good day to ask off (you have a tour, a busy period, or several people are already off); tap it to see why. Tap any other day to ask for it. The office still sees the list with names.
+- **Company holidays** rows: date on the left, name on the right, like the list above.
+- **Work and rest is shorter.** First the animal of the week (from last week: resting cat, wise owl, quick fox, early bird, strong bear), then three numbers (tours this week, working days in 30 days, next free day), one tip, and the wishes. The long text is folded under "More about my schedule".
+- **Drivers** are no longer told to learn a tour that has no car (walking tours).
+- **Names in the person's language:** well-known holidays and busy periods (New Year, Christmas, Easter, Tbilisoba, Nowruz and others) are shown in Russian and Georgian. A name the office made up stays as typed. The double dot after a Russian date is gone.
+- **Badges:** long names break with a hyphen ("Первопрохо-дец"), not in the middle. Folded sections are card rows with the count next to the title and "Show" / "Hide" on the right.
+- **Changes made without internet are safer.** A change is written to the device at the moment it is made (before, up to a second later). The browser is asked not to clear the app's saved data. The installed app's icon shows the number of waiting changes. On a computer, closing the tab with unsent changes asks first. On Android and in Chrome or Edge, when the internet returns and the app is closed, one notice says "Changes are waiting" (only if notifications are on); opening the app sends them. The app itself does the sending, because it holds the sign-in.
