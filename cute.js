@@ -33,6 +33,7 @@
     cup: `<path d="M17 6q-2.5 3 0 5.5M24 5q-2.5 3 0 5.5" fill="none" stroke="${O}" stroke-width="1.8" stroke-linecap="round"/><path d="M34 21h3.5a5.5 5.5 0 0 1 0 11H34" fill="none" ${S}/><path d="M9 16h26v15a8 8 0 0 1-8 8H17a8 8 0 0 1-8-8z" fill="${W}" ${S}/><path d="M9 16h26v5H9z" fill="${OR}" ${S}/>${face(22, 28, 4)}`,
     flag: `<path d="M13 6v36" ${S} fill="none"/><path d="M13 8h26l-6 8 6 8H13z" fill="${R}" ${S}/><path d="M5 43c3-5 13-5 16 0z" fill="${M}" ${S}/>${face(23, 15, 3.2, false)}`,
     bear: animal(BR, false),
+    camera: `<path d="M17 13l2.500-5h9l2.500 5" fill="${G}" ${S}/><rect x="5" y="13" width="38" height="26" rx="7" fill="${B}" ${S}/><circle cx="24" cy="26" r="9" fill="${W}" ${S}/><circle cx="24" cy="26" r="4.500" fill="${G}"/><circle cx="22.300" cy="24.300" r="1.400" fill="${W}"/><rect x="33" y="17" width="6" height="4" rx="1.500" fill="${Y}" ${S}/>`,
     fox: `${animal('#ff9d5c', true)}<path d="M11 20 12 7l4.5 3zM37 20 36 7l-4.5 3z" fill="${G}"/>`,
     cave: `<path d="M4 41C4 20 13 8 24 8s20 12 20 33z" fill="#d9b08c" ${S}/><path d="M15 41c0-10 4-15 9-15s9 5 9 15z" fill="${G}" ${S}/><circle cx="20.5" cy="36" r="1.4" fill="${Y}"/><circle cx="27.5" cy="36" r="1.4" fill="${Y}"/>${face(24, 17, 3.6, false)}`,
     compass: `<circle cx="24" cy="24" r="18" fill="${W}" ${S}/><circle cx="24" cy="24" r="13.5" fill="none" stroke="${B}" stroke-width="2"/><path d="M24 9l5 15h-10z" fill="${R}" ${S}/><path d="M24 39l5-15h-10z" fill="${B}" ${S}/><circle cx="24" cy="24" r="2.2" fill="${O}"/>`,
@@ -59,7 +60,7 @@
     moon: 'moon', mountain: 'tent', newdest: 'road', night: 'owl', nights30: 'tent', nights5: 'tent', noshow5: 'clock', offroad: 'van', pioneer: 'star', pioneer5: 'star', planner: 'calendar',
     polyglot: 'speech', rest10: 'sofa', rested: 'sofa', reviewer: 'star', ritual: 'phone', routes10: 'map', season80: 'trophy', seasons: 'sun', seller: 'heart', sharpeye: 'lens', smart: 'gift',
     solo10: 'wheel', solo50: 'wheel', steel: 'shield', t100: 'trophy', t250: 'trophy', t50: 'trophy', team: 'heart', walk100: 'boot', walk42: 'boot', week5: 'calendar', weekend: 'sun',
-    welcome: 'gift', wine: 'wine', year150: 'trophy', newyear: 'snow', snow: 'cat', comeback: 'heart', hattrick: 'stars3', fri13: 'clover', sunrise: 'sunrise',
+    welcome: 'gift', wine: 'wine', year150: 'trophy', photo: 'camera', liked: 'heart', thanks: 'heart', newyear: 'snow', snow: 'cat', comeback: 'heart', hattrick: 'stars3', fri13: 'clover', sunrise: 'sunrise',
   };
   // Region titles (by their theme) and tour mastery (by words in the tour name) get their own pictures.
   const TITLE = { sun: 'sun', mountain: 'mountain', glass: 'wine', pin: 'fox', globe: 'flag' };

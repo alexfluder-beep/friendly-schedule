@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.35';
+  const APP_VERSION = '3.36';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -726,10 +726,11 @@
   function guideHomeHtml(days, title) {
     const td = today(), sel = state.date, id = me().id, now = days.includes(td) ? tourNow() : null;
     const asks = db.change_requests.filter(q => q.swap_with === id && q.status === 'pending' && !q.agreed);
-    return `${setupCard(true)}${weekCardHtml()}${asks.length ? nextHtml() : ''}
+    return `${setupCard(true)}${greetHtml()}${weekCardHtml()}${asks.length ? nextHtml() : ''}
       <div class="bar homebar"><h2>${esc(fmt(days[3], { month: 'long', year: 'numeric' }))}</h2><label class="jump" title="${T('pick_date')}">${ico('cal')}<input type="date" id="jump" data-ch="jump" value="${esc(state.date)}" aria-label="${T('pick_date')}"></label><span class="spacer"></span><div class="seg"><button data-act="nav" data-d="-1" aria-label="${T('prev')}">‹</button><button data-act="today">${T('today')}</button><button data-act="nav" data-d="1" aria-label="${T('next')}">›</button></div></div>
       <div class="list home"><div class="strip">${days.map(d => `<button data-act="day" data-date="${d}" aria-pressed="${d === sel}" class="${d === td ? 'tdy' : ''} ${offCls(offOn(id, d))} ${holidayOn(d) ? 'hol' : ''}"><span>${esc(fmt(d, { weekday: 'short' }))}</span><b class="num">${D(d).getDate()}</b><span class="dot ${toursOnDay(d).some(t => involves(t, id)) ? '' : 'none'}"></span></button>`).join('')}</div>
       ${now ? nowCardHtml(now) : ''}${days.map(myDayHtml).join('')}</div>
+      ${photoStripHtml()}
       <div class="bar homelinks"><button class="lnk" data-act="mode" data-m="month">${T('month')}</button><button class="lnk" data-act="mine" data-v="0">${T('home_team')}</button><button class="lnk" data-act="summary">${T('day_summary')}</button></div>`;
   }
   // Exchange rates to the pay currency (Rules), so money in USD, EUR and GEL can be added up.
@@ -795,7 +796,7 @@
     const people = crew().filter(p => !state.mine || p.id === me().id);
     const title = state.mode === 'week' ? (days[0].slice(0, 7) === days[6].slice(0, 7) ? `${D(days[0]).getDate()}–${fmt(days[6], { day: 'numeric', month: 'short', year: 'numeric' })}` : `${fmt(days[0], { day: 'numeric', month: 'short' })} – ${fmt(days[6], { day: 'numeric', month: 'short', year: 'numeric' })}`) : fmt(state.date, { month: 'long', year: 'numeric' });
     if (!isAdmin() && state.mine && state.mode === 'week') return guideHomeHtml(days, title) + fabHtml();
-    let h = `${setupCard(true)}${window.matchMedia('(max-width:760px)').matches ? installCardHtml(false) : ''}${nextHtml()}${fabHtml()}
+    let h = `${setupCard(true)}${window.matchMedia('(max-width:760px)').matches ? installCardHtml(false) : ''}${greetHtml()}${nextHtml()}${photoStripHtml()}${fabHtml()}
       ${!PHONE() ? '' : `<div class="calhd"><button class="calttl" data-act="mode" data-m="${state.mode === 'month' ? 'week' : 'month'}" aria-expanded="${state.mode === 'month'}" aria-label="${T(state.mode === 'month' ? 'week' : 'month')}"><b>${esc(fmt(state.date, { month: 'long' }))}</b> <span class="yr num">${state.date.slice(0, 4)}</span>${msi(state.mode === 'month' ? 'keyboard_arrow_up' : 'keyboard_arrow_down')}</button><label class="jump" title="${T('pick_date')}">${ico('cal')}<input type="date" id="jump" data-ch="jump" value="${esc(state.date)}" aria-label="${T('pick_date')}"></label><span class="spacer"></span>
         ${monday(state.date) !== monday(td) ? `<button class="btn sm calnow" data-act="today">${T('today')}</button>` : ''}<button class="iconbtn" data-act="nav" data-d="-1" aria-label="${T('prev')}">‹</button><button class="iconbtn" data-act="nav" data-d="1" aria-label="${T('next')}">›</button>
         <button class="whochip" data-act="mine" data-v="${state.mine ? '0' : '1'}" aria-label="${T(state.mine ? 'mine' : 'team')}">${state.mine ? avatar(me().id) : `<span>${T('who_all')}</span>`}</button></div>`}
@@ -1318,6 +1319,7 @@
     if (delica) list.push(B('delica1', 'delica', 'car', km, 1000, 'km'), B('delica10', 'delica', 'car', km, 10000, 'km'), B('offroad', 'delica', 'mountain', mountain, 20));
     list.push(B('geo3', 'geo', 'map', regs.size, 3), B('geo6', 'geo', 'map', regs.size, 6), B('geoall', 'geo', 'map', regs.size, REGIONS.length));
     list.push(B('early', 'fun', 'clock', early, 10), B('late', 'fun', 'bed', late, 10), B('night', 'fun', 'moon', night, 5), B('weekend', 'fun', 'sun', weekend, 20), B('lazy', 'fun', 'bed', gap, 11), B('gold', 'fun', 'coin', earned, 10000, rules().currency || 'GEL'), B('double', 'fun', 'bolt', Object.values(starts).filter(x => x > 1).length, 5), B('iron', 'fun', 'bolt', streak, 6), B('seasons', 'fun', 'cal', months.size, 12), B('full', 'fun', 'users', full, 10), B('wine', 'fun', 'glass', wine, 20), B('bears', 'fun', 'paw', s.bears, 10), B('mountain', 'fun', 'mountain', s.multi, 1), B('rested', 'fun', 'sun', s.rested, 3), B('team', 'fun', 'check', s.tasks, 10));
+    { const mp = db.photos.filter(x => twin(x.user_id) === id), pl = mp.reduce((a, x) => a + likesN(x), 0), tk = db.thanks.filter(x => twin(x.to_id) === id).length; list.push(B('photo1', 'fun', 'camera', mp.length, 1), B('photo10', 'fun', 'camera', mp.length, 10), B('photo50', 'fun', 'camera', mp.length, 50), B('liked25', 'fun', 'heart', pl, 25), B('thanks10', 'fun', 'heart', tk, 10)); }
     const newToMe = Object.values(mineFirst).filter(d => d >= d90).length;
     list.push(B('pioneer', 'new', 'star', pioneer, 1), B('pioneer5', 'new', 'star', pioneer, 5), B('newdest', 'new', 'map', newToMe, 3), B('armenia1', 'new', 'globe', armenia, 1), B('armenia10', 'new', 'globe', armenia, 10));
     const offs = db.time_off.filter(o => o.user_id === id && o.type !== 'sick'), notice = rules().minNoticeDays || 14;
@@ -1383,6 +1385,7 @@
   const seenKey = () => 'fs-badges-' + me().id;
   let celeTimer = null;
   function checkBadges() {
+    setTimeout(() => { try { weeklySave(); } catch (e) { /* later */ } }, 2500);
     clearTimeout(celeTimer);
     celeTimer = setTimeout(() => {
       if (!me() || !me().active || state.modal || window.__noCelebrate) return;
@@ -2497,6 +2500,83 @@
       <div class="cols"><div class="card"><b>${T('st_kinds')}</b>${kinds.map(([k, n]) => `<div class="row"><span class="tag t-${k}">${T('kind_' + k)}</span><span class="meter"><i style="width:${inYear.length ? Math.round(n / inYear.length * 100) : 0}%"></i></span><b class="num">${n}</b></div>`).join('')}</div>
       <div class="card"><b>${T('st_top')}</b>${top.map(([t, n]) => `<div class="row"><span style="flex:1;min-width:0;overflow-wrap:anywhere">${esc(t)}</span><b class="num">${n}</b></div>`).join('') || `<span class="muted small">${T('no_tours')}</span>`}</div></div>`;
   }
+  // ---------- Photo of the day: one photo per person per day, likes from the team, the best one leads; older days are the archive ----------
+  // Only the team sees the photos (private storage, opened with short-lived links).
+  const PH = { url: {}, asked: new Set(), want: new Set(), timer: 0 };
+  const phPath = (p, k) => `${p.user_id}/${p.id}-${k}.jpg`, likesN = p => (Array.isArray(p.likes) ? p.likes.length : 0), iLike = p => (p.likes || []).includes(S.authId);
+  function phAsk(paths) {
+    paths.forEach(x => { if (!PH.asked.has(x)) { PH.asked.add(x); PH.want.add(x); } }); if (!PH.want.size || PH.timer) return;
+    PH.timer = setTimeout(async () => { PH.timer = 0; const list = [...PH.want]; PH.want = new Set(); try { Object.assign(PH.url, await S.photoUrls(list)); } catch (e) { list.forEach(x => PH.asked.delete(x)); return; } if (state.modal && state.modal.type === 'photos') renderModal(); else if (!state.modal) render(); }, 80);
+  }
+  function phSrc(p, k) { if (p.data) return p.data; const path = phPath(p, k), u = PH.url[path]; if (u) return u; phAsk([path]); return ''; }
+  const phImg = (p, k, cls) => { const src = phSrc(p, k); return src ? `<img class="${cls}" src="${esc(src)}" alt="${esc(p.caption || pname(p.user_id))}" loading="lazy" decoding="async">` : `<span class="${cls} wait" aria-hidden="true"></span>`; };
+  const photosOn = day => db.photos.filter(p => p.day === day).sort((x, y) => likesN(y) - likesN(x) || String(x.created_at || '').localeCompare(String(y.created_at || '')));
+  const myPhoto = day => db.photos.find(p => p.day === day && twin(p.user_id) === me().id);
+  // A kind word on the right day: the person's own birthday or anniversary (from their special dates), or a holiday from the team calendar.
+  function greetHtml() {
+    const m = me(); if (!m || !m.active || state.viewAs) return ''; const td = today(), md = td.slice(5), first = String(m.name || '').replace(/\(.*?\)/g, '').trim().split(/\s+/)[0] || '';
+    const mine = db.personal_dates.filter(d => twin(d.user_id) === m.id && (d.yearly ? String(d.date).slice(5) === md : d.date === td)).map(d => pdKind(d.title));
+    const k = mine.includes('birthday') ? 'birthday' : mine.includes('anniversary') ? 'anniversary' : '', h = holidayOn(td);
+    if (!k && !h) return ''; const art = (window.CUTE && window.CUTE.art[k ? 'gift' : 'star']) || '';
+    return `<div class="card greet"><svg viewBox="0 0 48 48" aria-hidden="true">${art}</svg><span class="grow-l"><b>${esc(k ? T('gr_' + k, { name: first }) : T('gr_holiday', { name: h.name }))}</b><span class="muted small">${esc(T(k ? 'gr_' + k + '_t' : 'gr_holiday_t'))}</span></span></div>`;
+  }
+  function photoStripHtml() {
+    if (!me() || !me().active || state.viewAs) return ''; const td = today(), ps = photosOn(td), show = ps.length ? ps : photosOn(addDays(td, -1));
+    return `<button class="phstrip" data-act="photos">${msi('photo_camera')}<span class="grow-l"><b>${T('ph_title')}</b><span class="muted small">${ps.length ? T('ph_n', { n: ps.length }) : T(myPhoto(td) ? 'ph_n' : 'ph_add_first', { n: 0 })}</span></span><span class="phs-th">${show.slice(0, 3).map(p => phImg(p, 't', 'phs-i')).join('')}</span><b>›</b></button>`;
+  }
+  function photosModalHtml(m) {
+    const td = today(), day = m.day || td, ps = photosOn(day), mine = myPhoto(day), big = m.full && db.photos.find(p => p.id === m.full);
+    const head = `<div class="hdr"><h2>${T('ph_title')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>`;
+    if (big) return `${head}<button class="lnk" data-act="phfull" data-id="">‹ ${T('back')}</button><div class="phbig">${phImg(big, 'f', 'phbig-i')}</div><div class="row nw">${avatar(big.user_id)}<span class="grow-l"><b>${esc(pname(big.user_id))}</b></span><button class="btn sm phlike" data-act="phlike" data-id="${big.id}" aria-pressed="${iLike(big)}">${msi('favorite')}<span class="num">${likesN(big)}</span></button></div>${big.caption ? `<p>${esc(big.caption)}</p>` : ''}<span class="muted small">${esc(fmtDay(big.day))}</span>`;
+    const card = (p, i) => `<div class="phcard" data-key="ph${p.id}"><button class="phpic" data-act="phfull" data-id="${p.id}" aria-label="${T('ph_open')}">${phImg(p, 't', 'phpic-i')}${i === 0 && likesN(p) > 0 ? `<span class="tag t-ok phbest">${T('ph_best')}</span>` : ''}</button><div class="row nw">${avatar(p.user_id)}<span class="grow-l"><b>${esc(pname(p.user_id))}</b></span><button class="btn sm phlike" data-act="phlike" data-id="${p.id}" aria-pressed="${iLike(p)}" aria-label="${T('ph_like')}">${msi('favorite')}<span class="num">${likesN(p)}</span></button></div>${p.caption ? `<span class="small">${esc(p.caption)}</span>` : ''}${twin(p.user_id) === me().id || isAdmin() ? `<button class="lnk small" data-act="phdel" data-id="${p.id}">${T('ph_del')}</button>` : ''}</div>`;
+    const from = addDays(td, -60), days = [...new Set(db.photos.filter(p => p.day >= from && p.day !== day).map(p => p.day))].sort().reverse();
+    const month = td.slice(0, 7), score = {}; db.photos.filter(p => p.day.slice(0, 7) === month).forEach(p => { const id = twin(p.user_id), x = score[id] = score[id] || { n: 0, l: 0 }; x.n++; x.l += likesN(p); });
+    const top = Object.entries(score).sort((x, y) => y[1].l - x[1].l || y[1].n - x[1].n).slice(0, 3);
+    return `${head}<div class="bar"><button class="iconbtn" data-act="phnav" data-d="-1" aria-label="${T('prev')}">‹</button><b class="grow-l" style="justify-content:center">${esc(day === td ? T('today') : fmtDay(day))}</b><button class="iconbtn" data-act="phnav" data-d="1" aria-label="${T('next')}" ${day >= td ? 'disabled' : ''}>›</button></div>
+      ${ps.length ? `<div class="phgrid">${ps.map(card).join('')}</div>` : `<p class="muted">${T(day === td ? 'ph_none_today' : 'ph_none')}</p>`}
+      ${day === td ? `<div class="card f phadd"><b>${T(mine ? 'ph_replace' : 'ph_add')}</b><input class="inp" id="ph-cap" maxlength="140" placeholder="${T('ph_cap')}" value="${esc(mine ? mine.caption || '' : '')}"><label class="btn primary filebtn">${msi('photo_camera')}${T(mine ? 'ph_choose2' : 'ph_choose')}<input type="file" class="vh" accept="image/*" data-ch="phfile"></label><span class="muted small">${T('ph_rules')}</span></div>` : ''}
+      ${top.length ? `<h3>${T('ph_top')}</h3><div class="card f">${top.map(([id, x]) => `<div class="row nw">${avatar(id)}<span class="grow-l">${esc(pname(id))}</span><span class="muted small num">${T('ph_score', { n: x.n, l: x.l })}</span></div>`).join('')}</div>` : ''}
+      ${days.length ? `<details class="sect" ${m.arch ? 'open' : ''}><summary>${T('ph_archive')} (${days.length})</summary><div class="pharch">${days.map(d => { const w = photosOn(d)[0]; return `<button class="pharch-b" data-act="phday" data-day="${d}">${phImg(w, 't', 'pharch-i')}<span class="small num">${esc(fmt(d, { day: 'numeric', month: 'short' }))}</span></button>`; }).join('')}</div></details>` : ''}`;
+  }
+  const shrink = (img, max, q) => new Promise(res => { const k = Math.min(1, max / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k)); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); c.toBlob(b => res({ blob: b, url: c.toDataURL('image/jpeg', q) }), 'image/jpeg', q); });
+  // ---------- Thank-you notes between teammates ----------
+  const thanksTo = id => db.thanks.filter(x => twin(x.to_id) === id).sort((x, y) => String(y.created_at || '').localeCompare(String(x.created_at || '')));
+  function thanksHtml(id) {
+    const got = thanksTo(id), own = id === me().id;
+    return `<h3>${T('th_title')}${got.length ? ` <span class="muted small num">${got.length}</span>` : ''}</h3><div class="card f">${got.slice(0, 4).map(x => `<div class="row nw">${avatar(x.from_id)}<span class="grow-l" style="flex-direction:column;align-items:flex-start;gap:0"><b>${esc(pname(x.from_id))}</b><span class="small">${esc(x.text || T('th_plain'))}</span></span></div>`).join('') || `<span class="muted small">${T('th_none')}</span>`}${own && !state.viewAs ? `<button class="btn" data-act="thnew">${msi('favorite')}${T('th_say')}</button>` : ''}</div>`;
+  }
+  function thanksModalHtml() {
+    const ppl = staff().filter(p => p.id !== me().id && p.id !== S.authId);
+    return `<div class="hdr"><h2>${T('th_say')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div><form class="f" data-form="thanks"><label>${T('th_who')}<select name="to" required>${ppl.map(p => `<option value="${p.id}">${esc(p.name)} · ${T('role_' + p.role)}</option>`).join('')}</select></label><label>${T('th_text')}<input name="text" maxlength="200" placeholder="${T('th_ph')}"></label><div class="actions"><button type="button" class="btn" data-act="close">${T('cancel')}</button><button class="btn primary">${T('th_send')}</button></div></form>`;
+  }
+  // ---------- Team goal of the month (Back office sets the number of guests) and the personal challenge of the week ----------
+  function teamGoalHtml() {
+    const g = rules().goal || {}, mo = today().slice(0, 7), on = g.month === mo && Number(g.guests) > 0, done = db.tours.filter(t => live(t) && t.date.slice(0, 7) === mo && t.date <= today()).reduce((a, t) => a + (Number(t.pax) || 0), 0);
+    if (!on && !isAdmin()) return ''; const pct = on ? Math.min(100, Math.round(done / g.guests * 100)) : 0, mname = fmt(mo + '-01', { month: 'long' });
+    return `<div class="card f goalc"><b>${T('tg_title', { m: mname })}</b>${on ? `<span class="num"><b>${nf(done)}</b> / ${nf(g.guests)} ${T('guests').toLowerCase()}${pct >= 100 ? ` <span class="tag t-ok">${T('tg_done')}</span>` : ''}</span><span class="meter"><i style="width:${pct}%"></i></span><span class="muted small">${T('tg_text')}</span>` : `<span class="muted small">${T('tg_none')}</span>`}${isAdmin() && !state.viewAs ? `<form class="bar" data-form="teamgoal"><input class="inp" name="guests" type="number" inputmode="numeric" min="0" max="99999" value="${on ? g.guests : ''}" placeholder="${T('tg_ph')}" style="flex:1;min-width:120px"><button class="btn qsave">${T('save')}</button></form>` : ''}</div>`;
+  }
+  const WEEKLY = [['photo', 1], ['thanks', 1], ['tours3', 3], ['weekend', 1], ['early', 1]];
+  function weekly(id) {
+    const wk = monday(today()), end = addDays(wk, 6), n = Math.floor(D(wk).getTime() / 6048e5), [k, goal] = WEEKLY[((n % WEEKLY.length) + WEEKLY.length) % WEEKLY.length];
+    const ts = db.tours.filter(t => live(t) && involves(t, id) && t.date >= wk && t.date <= end);
+    const have = k === 'photo' ? db.photos.filter(p => twin(p.user_id) === id && p.day >= wk && p.day <= end).length : k === 'thanks' ? db.thanks.filter(x => twin(x.from_id) === id && String(x.created_at || '').slice(0, 10) >= wk).length
+      : k === 'tours3' ? ts.length : k === 'weekend' ? ts.filter(t => D(t.date).getDay() % 6 === 0).length : ts.filter(t => t.start_time && t.start_time < '09:00').length;
+    return { k, goal, have: Math.min(have, goal), done: have >= goal, wk };
+  }
+  function weeklyHtml(id) {
+    const w = weekly(id), wonN = (((person(id) || {}).display || {}).weeks || []).length;
+    return `<div class="card f weekc ${w.done ? 'done' : ''}"><span class="row nw"><b class="grow-l">${T('wc_title')}</b>${wonN ? `<span class="muted small num">${T('wc_won', { n: wonN })}</span>` : ''}</span><span>${T('wc_' + w.k)}</span><span class="meter"><i style="width:${Math.round(w.have / w.goal * 100)}%"></i></span><span class="muted small num">${w.done ? T('wc_done') : `${w.have} / ${w.goal}`}</span></div>`;
+  }
+  function weeklySave() { const m = me(); if (!m || !m.active || state.viewAs) return; const w = weekly(m.id); if (!w.done) return; const d = (m.display && typeof m.display === 'object') ? m.display : {}, ws = Array.isArray(d.weeks) ? d.weeks : []; if (ws.includes(w.wk)) return; S.save('profiles', { ...stripEmail(m), display: { ...d, weeks: [...ws, w.wk].slice(-200) } }).then(() => { toast(T('wc_toast')); fx.badge(); }).catch(() => { /* next time */ }); }
+  // ---------- My year so far: a short recap to read or share ----------
+  function recapModalHtml() {
+    const id = me().id, y = today().slice(0, 4), ts = db.tours.filter(t => live(t) && involves(t, id) && t.date.slice(0, 4) === y && t.date <= today()), guests = ts.reduce((a, t) => a + (Number(t.pax) || 0), 0), km = ts.reduce((a, t) => a + kmOf(t.title), 0);
+    const byM = {}; ts.forEach(t => { const k = t.date.slice(0, 7); byM[k] = (byM[k] || 0) + 1; }); const bm = Object.keys(byM).sort((a, b) => byM[b] - byM[a])[0];
+    const place = ROAD.map(([k, re, mul]) => [k, ts.filter(t => re.test(t.title)).length * mul]).sort((a, b) => b[1] - a[1])[0], pals = {}; ts.forEach(t => [t.guide_id, t.driver_id].forEach(x => { const o = x && twin(x); if (o && o !== id) pals[o] = (pals[o] || 0) + 1; })); const pal = Object.keys(pals).sort((a, b) => pals[b] - pals[a])[0];
+    const rows = [[T('rc_tours'), nf(ts.length)], [T('guests'), nf(guests)], ...(km ? [['km', nf(km)]] : []), ...(bm ? [[T('rc_month'), `${fmt(bm + '-01', { month: 'long' })} (${byM[bm]})`]] : []), ...(place && place[1] ? [[T('rd_' + place[0]), '×' + nf(place[1])]] : []), ...(pal ? [[T('rc_pal'), `${pname(pal)} (${pals[pal]})`]] : []), [T('rc_photos'), nf(db.photos.filter(p => twin(p.user_id) === id && p.day.slice(0, 4) === y).length)], [T('th_title'), nf(thanksTo(id).filter(x => String(x.created_at || '').slice(0, 4) === y).length)], [T('badges'), nf(game(id).list.filter(b => b.done).length)]];
+    const text = `${T('rc_title', { y })} · ${me().name}\n` + rows.map(r => `${r[0]}: ${r[1]}`).join('\n') + '\nFriendly.ge';
+    return `<div class="hdr"><h2>${T('rc_title', { y })}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div><div class="card roadc">${rows.map(r => `<span class="roadrow"><span>${esc(r[0])}</span><b class="num">${esc(r[1])}</b></span>`).join('')}</div><div class="actions"><button class="btn" data-act="close">${T('close')}</button><button class="btn primary" data-act="sharetext" data-v="${esc(text)}">${ico('share')}${T('share')}</button></div>`;
+  }
   // "My road": how many times this person has been to the well-known places. Counted from the tour names in their history.
   const ROAD = [['jvari', /kazbegi|truso|juta|stepantsminda|khevsureti|shatili/i, 2], ['tusheti', /tusheti|omalo/i, 1], ['gareji', /gareji|rainbow/i, 1], ['kakheti', /kakheti|sighnaghi|signagi|telavi|wine/i, 1],
     ['mtskheta', /mtskheta|jvari\b/i, 1], ['sabaduri', /sabaduri/i, 1], ['border', /armenia|yerevan|sevan|dilijan|haghpat/i, 2], ['gudauri', /gudauri/i, 1], ['vardzia', /vardzia|borjomi|rabati/i, 1], ['oldtown', /walking|old tbilisi/i, 1], ['brutal', /brutal|soviet/i, 1]];
@@ -2511,8 +2591,10 @@
     const pals = Object.entries(g.partners).sort((x, y) => y[1] - x[1]).slice(0, 3);
     return `<div class="card lvl"><div class="row nw">${avatar(id, true)}<div class="grow-l" style="flex-direction:column;align-items:stretch;gap:4px;min-width:0"><b class="lvn">${T('level')} ${g.level}</b><details class="lvhelp"><summary class="lnk small">${T('lv_how')}</summary><p class="small">${T('lv_text')}</p><ul class="small"><li>${T('lv_tour')}</li><li>${T('lv_guest')}</li><li>${T('lv_km')}</li><li>${T('lv_badge')}</li></ul><p class="small muted">${T('lv_steps')}</p></details><span class="meter"><i style="width:${Math.round((g.xp - g.base) / (g.next - g.base) * 100)}%"></i></span><span class="muted small num">${T('g_xp', { xp: nf(g.xp), next: nf(g.next) })} · ${g.done}/${g.list.length} ${T('badges').toLowerCase()}</span></div></div></div>
       <h3>${T('g_month')}</h3><div class="stats"><div class="stat"><b>${g.weekNow}</b>${T('g_week')}</div><div class="stat"><b>${g.cur.tours}</b>${T('g_thismonth')}${delta(g.cur.tours, g.prev.tours)}</div><div class="stat"><b>${g.yearNow}</b>${T('g_year')}</div><div class="stat"><b>${nf(g.cur.guests)}</b>${T('guests')}${delta(g.cur.guests, g.prev.guests)}</div>${g.isD ? `<div class="stat"><b>${nf(g.cur.km)}</b>km${delta(g.cur.km, g.prev.km)}</div>` : ''}<div class="stat"><b>${Math.round(g.regs.size / REGIONS.length * 100)}%</b>${T('g_geo')}</div></div>
+      ${teamGoalHtml()}${weeklyHtml(id)}
       ${next.length ? `<h3>${T('g_next')}</h3><div class="medals">${next.map(b => medal(b)).join('')}</div>` : ''}
       ${roadHtml(id)}
+      ${thanksHtml(id)}${id === me().id ? `<div class="bar"><button class="btn" data-act="recap">${msi('star')}${T('rc_btn', { y: today().slice(0, 4) })}</button></div>` : ''}
       ${tracks.map(([k, label]) => { const bs = g.list.filter(b => b.track === k).sort((x, y) => (k === 'secret' ? y.done - x.done : 0)); return bs.length ? `${label ? `<h3>${esc(label)}</h3>` : ''}<div class="medals">${bs.map(b => medal(b)).join('')}</div>` : ''; }).join('')}
       <div class="card f"><b>${T('g_together')}</b>${pals.map(([pid, n]) => `<div class="row">${avatar(pid)}<span style="flex:1;min-width:0">${esc(T('g_with', { name: pname(pid), n }))}</span>${n >= 50 ? `<span class="tag t-ok">50+</span>` : ''}</div>`).join('') || `<span class="muted small">${T('no_tours')}</span>`}
         ${g.isG ? `<div class="row">${ico('heart')}<span>${T('g_repeat', { n: g.rep })}</span></div>` : ''}${g.isD ? `<div class="row">${ico('moon')}<span>${T('g_moon', { km: nf(g.km), p: (g.km / 384400 * 100).toFixed(g.km / 384400 < 0.1 ? 2 : 1) })}</span></div>` : ''}${g.isG && g.walk ? `<div class="row">${ico('boot')}<span>${T('g_walked', { km: nf(g.walk) })}</span></div>` : ''}</div>
@@ -2686,7 +2768,7 @@
     const el = $('#modal'); if (!el) return; const m = state.modal;
     if (m && !modalHist) { modalHist = true; navPush(); } else if (!m && modalHist) { modalHist = false; navPop(); }
     if (!m) { el.innerHTML = ''; modalKey = ''; return; }
-    const inner = m.type === 'exp' ? expModalHtml(m) : m.type === 'tnames' ? tnamesHtml(m) : m.type === 'tour' ? tourModalHtml(m) : m.type === 'off' ? offModalHtml(m) : m.type === 'task' ? taskModalHtml(m) : m.type === 'client' ? clientModalHtml(m) : m.type === 'offer' ? offerModalHtml(m) : m.type === 'guest' ? guestSheetHtml(m) : m.type === 'creq' ? creqModalHtml(m) : m.type === 'cancel' ? cancelModalHtml(m) : m.type === 'person' ? personModalHtml(m) : m.type === 'invite' ? inviteModalHtml(m) : m.type === 'tip' ? tipModalHtml(m) : m.type === 'share' ? shareModalHtml(m) : m.type === 'test' ? testModalHtml() : m.type === 'display' ? `<div class="hdr"><h2>${T('ds_title')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div><div class="f">${displayHtml()}</div>` : m.type === 'move' ? moveModalHtml(m) : m.type === 'celebrate' ? celebrateHtml(m) : m.type === 'cat' ? catModalHtml(m) : m.type === 'dispute' ? disputeModalHtml(m) : m.type === 'prange' ? payRangeHtml(m.id, payRange().from, payRange().to, true) : m.type === 'badge' ? badgeModalHtml(m) : m.type === 'summary' ? summaryHtml(m) : m.type === 'statement' ? statementHtml(m.id, m.month, true) : m.type === 'pstats' ? `<div class="hdr"><h2>${T(state.mode === 'month' ? 'inc_month' : 'inc_week')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>${periodStatsHtml(m.from, m.to).replace('<details class="wstats">', '<details class="wstats" open>')}` : m.type === 'addmenu' ? addMenuHtml() : m.type === 'pdate' ? pdModalHtml(m) : m.type === 'confirm' ? `<div class="hdr"><h2>${esc(m.text)}</h2></div><div class="actions"><button class="btn" data-act="close">${T('close')}</button><button class="btn danger" data-act="confirmyes">${esc(m.yes)}</button></div>` : bellHtml();
+    const inner = m.type === 'exp' ? expModalHtml(m) : m.type === 'tnames' ? tnamesHtml(m) : m.type === 'tour' ? tourModalHtml(m) : m.type === 'off' ? offModalHtml(m) : m.type === 'task' ? taskModalHtml(m) : m.type === 'client' ? clientModalHtml(m) : m.type === 'offer' ? offerModalHtml(m) : m.type === 'guest' ? guestSheetHtml(m) : m.type === 'creq' ? creqModalHtml(m) : m.type === 'cancel' ? cancelModalHtml(m) : m.type === 'person' ? personModalHtml(m) : m.type === 'invite' ? inviteModalHtml(m) : m.type === 'tip' ? tipModalHtml(m) : m.type === 'share' ? shareModalHtml(m) : m.type === 'test' ? testModalHtml() : m.type === 'display' ? `<div class="hdr"><h2>${T('ds_title')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div><div class="f">${displayHtml()}</div>` : m.type === 'move' ? moveModalHtml(m) : m.type === 'photos' ? photosModalHtml(m) : m.type === 'thanks' ? thanksModalHtml() : m.type === 'recap' ? recapModalHtml() : m.type === 'celebrate' ? celebrateHtml(m) : m.type === 'cat' ? catModalHtml(m) : m.type === 'dispute' ? disputeModalHtml(m) : m.type === 'prange' ? payRangeHtml(m.id, payRange().from, payRange().to, true) : m.type === 'badge' ? badgeModalHtml(m) : m.type === 'summary' ? summaryHtml(m) : m.type === 'statement' ? statementHtml(m.id, m.month, true) : m.type === 'pstats' ? `<div class="hdr"><h2>${T(state.mode === 'month' ? 'inc_month' : 'inc_week')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>${periodStatsHtml(m.from, m.to).replace('<details class="wstats">', '<details class="wstats" open>')}` : m.type === 'addmenu' ? addMenuHtml() : m.type === 'pdate' ? pdModalHtml(m) : m.type === 'confirm' ? `<div class="hdr"><h2>${esc(m.text)}</h2></div><div class="actions"><button class="btn" data-act="close">${T('close')}</button><button class="btn danger" data-act="confirmyes">${esc(m.yes)}</button></div>` : bellHtml();
     const key = m.type + ':' + (m.id || (m.draft && m.draft.id) || '') + ':' + (m.edit ? 'e' : '');
     morph(el, `<div class="overlay" data-act="backdrop"><div class="sheet" role="dialog" aria-modal="true">${inner}</div></div>`);
     if (key !== modalKey) { const sh = el.querySelector('.sheet'); if (sh) sh.scrollTop = 0; modalKey = key; }
@@ -2758,6 +2840,15 @@
     celeok() { state.modal = null; renderModal(); checkBadges(); },
     celereplay(el) { state.modal = { type: 'celebrate', k: el.dataset.k, more: 0 }; renderModal(); fx.sheet(); },
     badge(el) { state.modal = { type: 'badge', k: el.dataset.k }; renderModal(); },
+    photos(el) { state.modal = { type: 'photos', day: (el && el.dataset.day) || today() }; renderModal(); track('photos'); },
+    phday(el) { state.modal = { type: 'photos', day: el.dataset.day, arch: true }; renderModal(); },
+    phnav(el) { const m = state.modal; if (!m) return; const d = addDays(m.day || today(), Number(el.dataset.d)); if (d > today()) return; m.day = d; m.full = ''; renderModal(); },
+    phfull(el) { const m = state.modal; if (!m) return; m.full = el.dataset.id || ''; renderModal(); },
+    phlike(el) { S.likePhoto(el.dataset.id).then(() => { if (state.modal && state.modal.type === 'photos') renderModal(); }).catch(e => { console.error(e); toast(T('err_save')); }); fx.tap(); },
+    phdel(el) { const p = db.photos.find(x => x.id === el.dataset.id); if (!p) return; const back = state.modal; confirmDo(T('ph_del_q'), T('ph_del'), async () => { await S.removePhoto(p); state.modal = { ...back, full: '' }; renderModal(); }); },
+    thnew() { state.modal = { type: 'thanks' }; renderModal(); },
+    recap() { state.modal = { type: 'recap' }; renderModal(); track('recap'); },
+    sharetext(el) { const t = el.dataset.v || ''; if (navigator.share) navigator.share({ text: t }).catch(() => { /* closed */ }); else if (navigator.clipboard) navigator.clipboard.writeText(t).then(() => toast(T('copied'))).catch(() => { /* no access */ }); },
     catedit(el) { const i = Number(el.dataset.i), c = i >= 0 ? catalog()[i] : { title: '', kind: 'private', days: 1 }; state.modal = { type: 'cat', i, draft: { ...c, dur: c.start && c.end ? durOf({ start_time: c.start, end_time: c.end }) : '', regions: [...regionsOf(c.title || '')] } }; renderModal(); },
     catdel() { const m = state.modal, items = catalog().slice(); confirmDo(T('cat_del_q', { name: m.draft.title }), T('cat_del'), async () => { items.splice(m.i, 1); await S.save('settings', { id: 'catalog', value: { items } }); toast(T('saved')); }); },
     statmonth(el) { state.statMonth = state.statMonth === el.dataset.m ? null : el.dataset.m; render(); },
@@ -2961,6 +3052,14 @@
     impmap(el) { state.imp.map[el.dataset.name] = el.value; },
     listmonth(el) { if (el.value) { state.listMonth = el.value; render(); } },
     q(el) { state.q = el.value; render(); },
+    phfile(el) {
+      const f = el.files && el.files[0]; if (!f) return; const cap = (($('#ph-cap') || {}).value || '').trim().slice(0, 140), td = today(), old = db.photos.find(p => p.day === td && p.user_id === S.authId);
+      const img = new Image(), url = URL.createObjectURL(f);
+      img.onload = async () => { try { const full = await shrink(img, 1280, 0.78), th = await shrink(img, 420, 0.72); URL.revokeObjectURL(url); const row = { id: old ? old.id : S.uid(), user_id: S.authId, day: td, caption: cap || null, likes: old ? old.likes || [] : [], created_at: old ? old.created_at : new Date().toISOString() };
+        toast(T('ph_sending')); await S.addPhoto(row, th.blob, full.blob, th.url); delete PH.url[phPath(row, 't')]; delete PH.url[phPath(row, 'f')]; PH.asked.delete(phPath(row, 't')); PH.asked.delete(phPath(row, 'f')); toast(T('ph_sent')); fx.ok(); if (state.modal && state.modal.type === 'photos') renderModal(); render(); checkBadges(); weeklySave(); }
+        catch (e) { console.error(e); toast(T(String(e && e.message) === 'offline' ? 'ph_offline' : 'err_save')); fx.err(); } };
+      img.onerror = () => toast(T('err_save')); img.src = url;
+    },
     avatar(el) {
       const f = el.files && el.files[0]; if (!f) return;
       const img = new Image(), url = URL.createObjectURL(f);
@@ -3017,6 +3116,8 @@
       logAct(`Added ${ok} people from a list`); toast(T('bulk_done', { n: ok, bad }));
     },
     async person(fd) { await savePerson(fd.has('wf0') ? weekFields(weekFrom(fd)) : {}); renderModal(); },
+    async thanks(fd) { const to = fd.get('to'); if (!to || to === S.authId) return; await S.save('thanks', { id: S.uid(), from_id: S.authId, to_id: to, text: String(fd.get('text') || '').trim().slice(0, 200) || null, created_at: new Date().toISOString() }); state.modal = null; renderModal(); toast(T('th_sent')); weeklySave(); },
+    async teamgoal(fd) { const n = Math.max(0, Math.min(99999, Number(fd.get('guests')) || 0)); await S.save('settings', { id: 'rules', value: { ...rules(), goal: { month: today().slice(0, 7), guests: n } } }); },
     async privacy(fd) { const v = { ...rules() }; v.privacy = { guideDays: Math.min(365, Math.max(1, Number(fd.get('guideDays')) || 14)), keepMonths: Math.min(120, Math.max(3, Number(fd.get('keepMonths')) || 24)), auto: !!fd.get('auto') }; await S.save('settings', { id: 'rules', value: v }); state.staleN = null; toast(T('saved')); },
     async rules(fd) { const v = { ...rules() }; for (const k of Object.keys(DEFAULT_RULES)) v[k] = Number(fd.get(k)) || 0; v.customMarks = fd.get('customMarks') || ''; v.pubHol = !!fd.get('pubHol'); v.rates = String(fd.get('rates') || '').trim(); v.commission = String(fd.get('commission') || '').trim(); v.peaks = String(fd.get('peaks') || '').trim(); await S.save('settings', { id: 'maintenance', value: { on: !!fd.get('mtOn'), text: String(fd.get('mtText') || '').trim() } }); v.guestCurrency = (fd.get('guestCurrency') || 'USD').trim().toUpperCase(); for (const k of ['reviewGoogle', 'reviewTripadvisor', 'reviewTrustindex', 'reviewGyg', 'reviewViator', 'offerPromo', 'tipUrl', 'botUrl']) v[k] = (fd.get(k) || '').trim(); await S.save('settings', { id: 'rules', value: v }); toast(T('saved')); },
     async pay(fd) { const v = { ...rules() }, p = {}; for (const k of ['guide_private', 'guide_group', 'guide_custom', 'driver_private', 'driver_group', 'driver_custom']) p[k] = Number(fd.get(k)) || 0; v.pay = p; v.currency = (fd.get('currency') || 'GEL').trim(); v.payNote = (fd.get('payNote') || '').trim(); await S.save('settings', { id: 'rules', value: v }); toast(T('saved')); }
@@ -3061,7 +3162,7 @@
 
   const toToday = () => { const x = document.getElementById('day-' + today()); if (x && window.matchMedia('(max-width:760px)').matches) x.scrollIntoView({ block: 'start' }); };
   // ---------- usage: counts of what people tap, sent in small batches ----------
-  const TRACKED = { tour: 'Open tour card', guest: 'Open guest', client: 'Open client card', attend: 'Guest check-in', summary: 'Day summary', creq: 'Suggest a change', score: 'Tour score', offer: 'Offer a tour', offersend: 'Send tour offer', copy: 'Copy', mode: 'Week / month switch', mine: 'Team / mine switch', offnew: 'Day-off request', taskdone: 'Task ticked', statmonth: 'Statistics', metab: 'Me tabs', swapagree: 'Handover answer', rate: 'Guest mark', help: 'Help', csv: 'Export CSV', statement: 'Pay statement', swipe: 'Swipe', wa: 'WhatsApp tap', call: 'Call tap', map: 'Map tap', view_calendar: 'Calendar screen', view_timeoff: 'Time off screen', view_tasks: 'Tasks screen', view_me: 'Me screen', view_admin: 'Back office screen', view_clients: 'Clients screen' };
+  const TRACKED = { photos: 'Open photo of the day', recap: 'Open my year', tour: 'Open tour card', guest: 'Open guest', client: 'Open client card', attend: 'Guest check-in', summary: 'Day summary', creq: 'Suggest a change', score: 'Tour score', offer: 'Offer a tour', offersend: 'Send tour offer', copy: 'Copy', mode: 'Week / month switch', mine: 'Team / mine switch', offnew: 'Day-off request', taskdone: 'Task ticked', statmonth: 'Statistics', metab: 'Me tabs', swapagree: 'Handover answer', rate: 'Guest mark', help: 'Help', csv: 'Export CSV', statement: 'Pay statement', swipe: 'Swipe', wa: 'WhatsApp tap', call: 'Call tap', map: 'Map tap', view_calendar: 'Calendar screen', view_timeoff: 'Time off screen', view_tasks: 'Tasks screen', view_me: 'Me screen', view_admin: 'Back office screen', view_clients: 'Clients screen' };
   let usageBuf = {};
   function track(name) { if (!TRACKED[name] || !me()) return; usageBuf[name] = (usageBuf[name] || 0) + 1; }
   function flushUsage() {

@@ -376,3 +376,13 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 - A turned or resized screen during a page change is no longer reported as an error.
 - Two logins of one person: `rules.sameAs { second account: main account }`. The second login works as the main one (same tours, badges, statistics, pay, settings); the person shows once in lists; the team list marks the second login. The two Boss accounts are joined this way (27 tours moved to the main one; the ids are kept in the settings row `merge_log`).
 - Badge page: how many teammates have the same badge. Badges page: "My road", how many times the person crossed the Jvari Pass or the Armenian border, went to Tusheti, Gareji, Kakheti and so on (a pass or border counts twice).
+
+## 3.36
+- **Photo of the day.** One photo per person per day, with a few words. The team likes photos with a heart; the most liked one is marked "Photo of the day". Tap a photo to see it large. Older days are in the archive (the best of each day), and "Photographers this month" lists who posted and how many likes they got. Only the team sees the photos: they live in a private storage folder (`photos`), made small on the phone before sending (1280 px and a 420 px preview). Needs internet.
+- New badges: First shot, Photographer (10), Team photographer (50), Crowd favourite (25 likes), Good teammate (10 thank-you notes).
+- **Thank-you notes** between teammates on the Badges page.
+- **Team goal of the month**: the office types a number of guests; everyone sees one shared bar.
+- **Challenge of the week**: one small personal goal that changes every Monday (a photo, a thank-you, three tours, a weekend tour, an early start).
+- **My year so far**: a short recap to read or share.
+- A greeting on the person's own birthday or anniversary (from their special dates) and on holidays from the team calendar.
+- Database: tables `photos` and `thanks`, function `photo_like`, storage folder `photos` (in `supabase/update.sql`, already applied).

@@ -305,3 +305,78 @@ revoke all on public.backup_config from anon, authenticated;
 insert into public.backup_config (id) values (1) on conflict (id) do nothing;
 select cron.unschedule(jobid) from cron.job where jobname = 'friendly-backup-daily';
 select cron.schedule('friendly-backup-daily', '0 23 * * *', $$ select net.http_post(url := 'https://scqqmnwzglbgnvgzqifu.supabase.co/functions/v1/backup', headers := '{"Content-Type":"application/json"}'::jsonb, body := '{}'::jsonb, timeout_milliseconds := 120000); $$);
+
+-- 3.36 Photo of the day (team only), likes, and thank-you notes between teammates. Safe to run again.
+create table if not exists public.photos (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  day date not null,
+  caption text check (caption is null or char_length(caption) <= 140),
+  tour_id uuid references public.tours(id) on delete set null,
+  likes uuid[] not null default '{}',
+  created_at timestamptz not null default now(),
+  unique (user_id, day)
+);
+create index if not exists photos_day_idx on public.photos(day desc);
+create index if not exists photos_tour_id_idx on public.photos(tour_id);
+alter table public.photos enable row level security;
+drop policy if exists photos_read on public.photos;
+drop policy if exists photos_insert on public.photos;
+drop policy if exists photos_update on public.photos;
+drop policy if exists photos_delete on public.photos;
+create policy photos_read on public.photos for select to authenticated using ((select public.app_role()) is not null);
+create policy photos_insert on public.photos for insert to authenticated with check ((select public.app_role()) is not null and user_id = (select auth.uid()));
+create policy photos_update on public.photos for update to authenticated using (user_id = (select auth.uid()) or (select public.is_admin())) with check (user_id = (select auth.uid()) or (select public.is_admin()));
+create policy photos_delete on public.photos for delete to authenticated using (user_id = (select auth.uid()) or (select public.is_admin()));
+revoke all on public.photos from anon;
+
+-- A like is a tap by anyone in the team: it adds or removes the person's own id, nothing else.
+create or replace function public.photo_like(p uuid) returns uuid[]
+language plpgsql security definer set search_path = public as $$
+declare me uuid := auth.uid(); out_likes uuid[];
+begin
+  if public.app_role() is null then raise exception 'No access'; end if;
+  update public.photos set likes = case when me = any(likes) then array_remove(likes, me) else array_append(likes, me) end
+   where id = p returning likes into out_likes;
+  return out_likes;
+end $$;
+revoke execute on function public.photo_like(uuid) from public, anon;
+grant execute on function public.photo_like(uuid) to authenticated;
+
+create table if not exists public.thanks (
+  id uuid primary key default gen_random_uuid(),
+  from_id uuid not null references public.profiles(id) on delete cascade,
+  to_id uuid not null references public.profiles(id) on delete cascade,
+  tour_id uuid references public.tours(id) on delete set null,
+  text text check (text is null or char_length(text) <= 200),
+  created_at timestamptz not null default now(),
+  check (from_id <> to_id)
+);
+create index if not exists thanks_to_idx on public.thanks(to_id, created_at desc);
+create index if not exists thanks_from_idx on public.thanks(from_id);
+create index if not exists thanks_tour_id_idx on public.thanks(tour_id);
+alter table public.thanks enable row level security;
+drop policy if exists thanks_read on public.thanks;
+drop policy if exists thanks_insert on public.thanks;
+drop policy if exists thanks_delete on public.thanks;
+create policy thanks_read on public.thanks for select to authenticated using ((select public.app_role()) is not null);
+create policy thanks_insert on public.thanks for insert to authenticated with check ((select public.app_role()) is not null and from_id = (select auth.uid()));
+create policy thanks_delete on public.thanks for delete to authenticated using (from_id = (select auth.uid()) or (select public.is_admin()));
+revoke all on public.thanks from anon;
+
+do $$ begin alter publication supabase_realtime add table public.photos; exception when duplicate_object then null; when undefined_object then null; end $$;
+do $$ begin alter publication supabase_realtime add table public.thanks; exception when duplicate_object then null; when undefined_object then null; end $$;
+
+-- The pictures themselves live in a private storage folder: only signed-in team members can open them,
+-- and each person can add or replace files only in their own folder (<their id>/...).
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('photos', 'photos', false, 1048576, array['image/jpeg'])
+on conflict (id) do update set public = false, file_size_limit = 1048576, allowed_mime_types = array['image/jpeg'];
+drop policy if exists team_photos_read on storage.objects;
+drop policy if exists team_photos_insert on storage.objects;
+drop policy if exists team_photos_update on storage.objects;
+drop policy if exists team_photos_delete on storage.objects;
+create policy team_photos_read on storage.objects for select to authenticated using (bucket_id = 'photos' and (select public.app_role()) is not null);
+create policy team_photos_insert on storage.objects for insert to authenticated with check (bucket_id = 'photos' and (select public.app_role()) is not null and (storage.foldername(name))[1] = (select auth.uid())::text);
+create policy team_photos_update on storage.objects for update to authenticated using (bucket_id = 'photos' and (storage.foldername(name))[1] = (select auth.uid())::text) with check (bucket_id = 'photos' and (storage.foldername(name))[1] = (select auth.uid())::text);
+create policy team_photos_delete on storage.objects for delete to authenticated using (bucket_id = 'photos' and ((storage.foldername(name))[1] = (select auth.uid())::text or (select public.is_admin())));

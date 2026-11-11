@@ -1037,3 +1037,25 @@ html[data-accent="amber"]{--accent:#f0901e;--accent-ink:#20251f;--accent-soft:#f
 
 /* 3.35 My road counters */
 .roadc{gap:0}.roadrow{display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--line)}.roadrow b{font-size:var(--t-h3);white-space:nowrap}.roadc>.muted{padding-top:8px}
+
+/* 3.36 Photo of the day, thanks, team goal, challenge of the week */
+.phstrip{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:8px 14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);color:var(--ink);text-align:left}
+.phstrip>.msi{width:24px;height:24px;flex:none;color:var(--muted)}.phstrip .grow-l{flex-direction:column;align-items:flex-start;gap:0;min-width:0}
+.phs-th{display:flex;gap:4px;flex:none}.phs-i{width:40px;height:40px;border-radius:10px;object-fit:cover;background:var(--surface2);display:block}
+.wait{background:var(--surface2)}
+.phgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px}
+.phcard{display:flex;flex-direction:column;gap:6px;min-width:0}
+.phpic{position:relative;padding:0;border:0;background:none;border-radius:16px;overflow:hidden;display:block;width:100%}
+.phpic-i{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:16px;display:block}
+.phbest{position:absolute;left:8px;top:8px}
+.phlike{gap:6px;min-width:64px}.phlike .msi{width:18px;height:18px}
+.phlike[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent)}.phlike[aria-pressed="true"] .msi{color:var(--sick)}
+.phbig{margin:8px 0}.phbig-i{width:100%;max-height:70vh;object-fit:contain;border-radius:16px;display:block;min-height:200px}
+.phadd .filebtn{align-self:flex-start}
+.pharch{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:8px;margin-top:8px}
+.pharch-b{display:flex;flex-direction:column;align-items:center;gap:2px;padding:0;border:0;background:none;color:var(--muted)}
+.pharch-i{width:100%;aspect-ratio:1;object-fit:cover;border-radius:12px;display:block}
+.goalc .meter,.weekc .meter{width:100%}.weekc.done{border-color:var(--ok)}
+
+/* 3.36 greeting on a birthday or holiday */
+.greet{flex-direction:row;align-items:center;gap:12px;background:var(--accent-soft)}.greet svg{width:48px;height:48px;flex:none}.greet .grow-l{flex-direction:column;align-items:flex-start;gap:2px}

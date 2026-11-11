@@ -2,7 +2,7 @@
 (() => {
   'use strict';
   const CFG = window.APP_CONFIG || {};
-  const TABLES = ['profiles', 'expenses', 'tours', 'bookings', 'clients', 'client_ratings', 'tour_ratings', 'payout_details', 'log', 'change_requests', 'pay_adjustments', 'personal_dates', 'usage', 'offers', 'time_off', 'holidays', 'tasks', 'notifications', 'settings', 'invites', 'pay_disputes', 'tour_costs'];
+  const TABLES = ['profiles', 'expenses', 'tours', 'bookings', 'clients', 'client_ratings', 'tour_ratings', 'payout_details', 'log', 'change_requests', 'pay_adjustments', 'personal_dates', 'usage', 'offers', 'time_off', 'holidays', 'tasks', 'notifications', 'settings', 'invites', 'pay_disputes', 'tour_costs', 'photos', 'thanks'];
   const DEMO_KEY = 'fs-demo-v18';
   const db = {}; TABLES.forEach(t => db[t] = []);
   const listeners = [];
@@ -145,7 +145,7 @@
   }
   // Safety net for live updates: every few minutes, and when the app comes back to the screen, the near-term
   // schedule is re-read, so a missed live message is repaired within minutes.
-  const HOT = ['profiles', 'time_off', 'holidays', 'tasks', 'change_requests', 'settings', 'notifications', 'invites', 'pay_disputes', 'pay_adjustments'];
+  const HOT = ['profiles', 'time_off', 'holidays', 'tasks', 'change_requests', 'settings', 'notifications', 'invites', 'pay_disputes', 'pay_adjustments', 'photos', 'thanks'];
   const sig = rows => rows.map(r => JSON.stringify(r)).sort().join('|');
   let pulsing = false;
   async function pulse() {
@@ -340,6 +340,34 @@
       const op = { op: 'remove', table, id };
       if (store.offline || !navigator.onLine) { queue(op); return; }
       try { await sendOp(op); saveCache(); } catch (error) { if (isNetErr(error)) { store.offline = true; queue(op); emit(null, null, 'STATE', true); return; } await store.refresh(table); throw error; }
+    },
+    // ---- team photos: the pictures live in a private storage folder, the table row holds who, when and the likes ----
+    get authId() { return me ? me.id : null; },
+    async addPhoto(row, thumb, full, thumbUrl) {
+      if (mode === 'demo') { applyLocal('photos', { ...row, data: thumbUrl }, 'UPSERT'); emit('photos', row, 'UPSERT'); persistDemo(); return; }
+      if (store.offline || !navigator.onLine) throw new Error('offline');
+      const base = `${row.user_id}/${row.id}`, opt = { upsert: true, contentType: 'image/jpeg', cacheControl: '31536000' };
+      let r = await sb.storage.from('photos').upload(base + '-f.jpg', full, opt); if (r.error) throw r.error;
+      r = await sb.storage.from('photos').upload(base + '-t.jpg', thumb, opt); if (r.error) throw r.error;
+      const { error } = await sb.from('photos').upsert(row); if (error) throw error;
+      applyLocal('photos', row, 'UPSERT'); emit('photos', row, 'UPSERT'); saveCache();
+    },
+    async photoUrls(paths) {
+      if (mode === 'demo' || !paths.length) return {};
+      const { data, error } = await sb.storage.from('photos').createSignedUrls(paths, 6 * 3600); if (error) throw error;
+      const out = {}; (data || []).forEach(x => { if (x.signedUrl && !x.error) out[x.path] = x.signedUrl; }); return out;
+    },
+    async likePhoto(id) {
+      const row = db.photos.find(x => x.id === id); if (!row || !me) return;
+      const toggle = () => { const l = Array.isArray(row.likes) ? row.likes : []; return l.includes(me.id) ? l.filter(x => x !== me.id) : [...l, me.id]; };
+      if (mode === 'demo') { applyLocal('photos', { id, likes: toggle() }, 'UPSERT'); emit('photos', row, 'UPSERT'); persistDemo(); return; }
+      applyLocal('photos', { id, likes: toggle() }, 'UPSERT'); emit('photos', row, 'UPSERT');            // shown at once, the server answer follows
+      const { data, error } = await sb.rpc('photo_like', { p: id }); if (error) { await store.refresh('photos'); throw error; }
+      if (Array.isArray(data)) { applyLocal('photos', { id, likes: data }, 'UPSERT'); emit('photos', row, 'UPSERT'); }
+    },
+    async removePhoto(row) {
+      if (mode !== 'demo') { const base = `${row.user_id}/${row.id}`; await sb.storage.from('photos').remove([base + '-f.jpg', base + '-t.jpg']); }
+      await store.remove('photos', row.id);
     },
     async refresh(table) {
       if (mode !== 'supabase') return;
