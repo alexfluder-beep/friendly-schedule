@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.26';
+  const APP_VERSION = '3.27';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -137,6 +137,9 @@
   // Pictures people can choose instead of a photo (Me > Choose a picture).
   const AV_ICONS = ['hiking', 'directions_car', 'landscape', 'forest', 'wine_bar', 'coffee', 'pets', 'sailing', 'photo_camera', 'music_note', 'sports_soccer', 'sunny', 'star', 'favorite', 'eco', 'local_florist', 'cottage', 'cake', 'rocket_launch', 'sentiment_satisfied'];
   const AV_COLORS = ['#2f6b48', '#1d3b66', '#22618c', '#5b4bb0', '#a8325f', '#b8441c', '#8a5a00', '#4a3526'];
+  // Painted avatar pictures (Gemini, made once): saved on the profile as "art:<name>".
+  const AV_ART = ['delica', 'gergeti', 'svaneti', 'tusheti', 'gareji', 'vardzia', 'ararat', 'sabaduri', 'mtskheta', 'sighnaghi', 'tbilisi', 'narikala', 'sulfur', 'cable', 'horse', 'eagle', 'dog', 'wine', 'grapes', 'khinkali', 'churchkhela', 'pomegranate', 'coffee', 'backpack', 'map', 'compass', 'camera', 'sun', 'snowflake', 'star'];
+  const avArt = v => { const m = /^art:([a-z0-9]+)$/.exec(v || ''); return m && AV_ART.includes(m[1]) ? `art/avatars/${m[1]}.webp` : ''; };
   const avLib = v => { const m = /^ms:([a-z_]+):(#[0-9a-f]{6})$/i.exec(v || ''); return m && AV_ICONS.includes(m[1]) ? { icon: m[1], color: m[2] } : null; };
   // Country of a phone number from its dialling code. It shows where the number is registered, not the guest's nationality.
   const DIAL = { 1: 'US', 20: 'EG', 27: 'ZA', 30: 'GR', 31: 'NL', 32: 'BE', 33: 'FR', 34: 'ES', 36: 'HU', 39: 'IT', 40: 'RO', 41: 'CH', 43: 'AT', 44: 'GB', 45: 'DK', 46: 'SE', 47: 'NO', 48: 'PL', 49: 'DE', 52: 'MX', 54: 'AR', 55: 'BR', 60: 'MY', 61: 'AU', 62: 'ID', 63: 'PH', 64: 'NZ', 65: 'SG', 66: 'TH', 7: 'RU', 76: 'KZ', 77: 'KZ', 81: 'JP', 82: 'KR', 84: 'VN', 86: 'CN', 90: 'TR', 91: 'IN', 92: 'PK', 94: 'LK', 98: 'IR', 351: 'PT', 352: 'LU', 353: 'IE', 354: 'IS', 356: 'MT', 357: 'CY', 358: 'FI', 359: 'BG', 370: 'LT', 371: 'LV', 372: 'EE', 373: 'MD', 374: 'AM', 375: 'BY', 380: 'UA', 381: 'RS', 385: 'HR', 386: 'SI', 420: 'CZ', 421: 'SK', 852: 'HK', 886: 'TW', 961: 'LB', 962: 'JO', 964: 'IQ', 965: 'KW', 966: 'SA', 968: 'OM', 971: 'AE', 972: 'IL', 973: 'BH', 974: 'QA', 992: 'TJ', 993: 'TM', 994: 'AZ', 995: 'GE', 996: 'KG', 998: 'UZ' };
@@ -543,7 +546,7 @@
     $('#toasts').appendChild(el); setTimeout(() => el.remove(), 3500);
   }
   const initials = n => ((n || '').replace(/\(.*?\)/g, ' ').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(x => [...x][0]).join('') || '?').toUpperCase();
-  const avatar = (id, big) => { const p = person(id); if (!p) return ''; const c = big ? 'avatar big' : 'avatar', lib = avLib(p.avatar); if (lib) return `<span class="${c} avlib" style="background:${esc(lib.color)}" title="${esc(p.name)}">${msi(lib.icon)}</span>`; return p.avatar ? `<img class="${c}" src="${esc(p.avatar)}" alt="${esc(p.name)}" title="${esc(p.name)}">` : `<span class="${c} ${!big && IC[p.role] ? 'role' : ''}" style="background:${esc(p.color || '#66737f')}" title="${esc(p.name + ' · ' + T('role_' + p.role))}">${!big && IC[p.role] ? ico(p.role) : esc(initials(p.name))}</span>`; };
+  const avatar = (id, big) => { const p = person(id); if (!p) return ''; const c = big ? 'avatar big' : 'avatar', lib = avLib(p.avatar); const art = avArt(p.avatar); if (art) return `<img class="${c}" src="${art}" alt="${esc(p.name)}" title="${esc(p.name)}" loading="lazy" decoding="async">`; if (lib) return `<span class="${c} avlib" style="background:${esc(lib.color)}" title="${esc(p.name)}">${msi(lib.icon)}</span>`; return p.avatar ? `<img class="${c}" src="${esc(p.avatar)}" alt="${esc(p.name)}" title="${esc(p.name)}">` : `<span class="${c} ${!big && IC[p.role] ? 'role' : ''}" style="background:${esc(p.color || '#66737f')}" title="${esc(p.name + ' · ' + T('role_' + p.role))}">${!big && IC[p.role] ? ico(p.role) : esc(initials(p.name))}</span>`; };
   const acText = t => (t.children > 0 ? T('ad_ch', { a: t.adults || 0, c: t.children }) : (t.adults || t.pax || 0) === 1 ? T('ad_one') : T('ad_only', { a: t.adults || t.pax || 0 }));
   const dateText = t => (endOf(t) !== t.date ? fmtRange(t.date, endOf(t)) : fmtDay(t.date));
   const payFor = (t, role) => { const o = t[role + '_pay']; if (o !== null && o !== undefined && o !== '') return Number(o) || 0; const pt = (rules().payTable || {})[t.title]; if (pt && (Number(pt[role + '_base']) || Number(pt[role + '_guest']))) return ((Number(pt[role + '_base']) || 0) + (Number(pt[role + '_guest']) || 0) * (t.pax || 0)) * tourDays(t).length; return (Number((rules().pay || {})[role + '_' + t.kind]) || 0) * tourDays(t).length; };
@@ -865,22 +868,32 @@
   }
   // The website page for a tour: exact name, then the name it was joined to, then the most similar catalogue name (same private/group kind).
   const catFor = title => { const c = catFind(title) || catFind(aliasOf(title)); if (c) return c; let best = null, bs = 0; catalog().forEach(x => { const sc = tnScore(x.title, aliasOf(title)); if (sc > bs) { bs = sc; best = x; } }); return bs >= 0.5 ? best : null; };
+  // The page of a tour when the calendar uses a short name ("Tbilisi walking tour", "Gareji 4x4 ENG"): same kind (group or not),
+  // most of the short name's words found in the catalogue name. The Telegram bot uses the same rule (schedule.py page_for).
+  const PG_STOP = /^(tour|tours|the|a|an|of|from|in|to|and|day|days|one|trip|small|group|private|guided|by|with|eng|en|ru|rus|ka|geo)$/;
+  const pgWords = t => tourKey(t).replace(/[а-яё]/g, c => CYR[c] ?? c).split(' ').filter(w => w && !PG_STOP.test(w));
+  const pgSame = (x, y) => x === y || (Math.min(x.length, y.length) >= 5 && (x.startsWith(y) || y.startsWith(x))) || sameWord(x, y);
+  function pageGuess(title, kind) {
+    const q = pgWords(aliasOf(title)); if (!q.length) return null; let best = null, bs = 0, bc = 0;
+    catalog().forEach(c => { if (!c.url || (kind === 'group') !== (c.kind === 'group')) return; const w = pgWords(c.title), n = q.filter(x => w.some(y => pgSame(x, y))).length, sc = n / q.length, cov = n / (w.length || 1); if (sc > bs || (sc === bs && cov > bc)) { bs = sc; bc = cov; best = c; } });
+    return bs >= 0.6 ? best : null;
+  }
+  // The tour's own page on friendly.ge (owner 11 Nov: always the tour page, never the home page).
+  // 1. Back office list rules.tourPages { name key: url } (short Setmore names), 2. the catalogue, 3. the closest catalogue name of the same kind, 4. the group or private tours list.
+  function pageFor(t) {
+    const pages = rules().tourPages || {}, title = t.title || '', ks = [tourKey(title), tourKey(aliasOf(title))];
+    const own = ks.map(k => pages[k + '|' + t.kind] || pages[k]).find(Boolean);
+    if (own) return own;
+    const same = x => x && x.url && (x.kind === 'group') === (t.kind === 'group') ? x : null, c = catFind(title) || catFind(aliasOf(title)) || pageGuess(title, t.kind) || same(catFor(title));
+    if (c && c.url) return c.url;
+    return t.kind === 'group' ? 'https://friendly.ge/en/group-tours-from-tbilisi' : 'https://friendly.ge/en/private-tours-from-tbilisi';
+  }
+  const promoPct = () => Number(rules().promoPct) || 15;
   const myPromo = () => (rules().promos || {})[me().id] || rules().offerPromo || '';
   // Our own website links get campaign tags (no names: the promo code or "team"), so GA4 on friendly.ge shows visits and bookings that came from the app.
   function gaUrl(url, medium, content) {
     try { const u = new URL(url); if (!/(^|\.)friendly\.ge$/i.test(u.hostname) || u.searchParams.has('utm_source')) return url; u.searchParams.set('utm_source', 'friendly_schedule'); u.searchParams.set('utm_medium', medium); u.searchParams.set('utm_campaign', (myPromo() || 'team').toLowerCase().replace(/[^a-z0-9_-]/g, '')); if (content) u.searchParams.set('utm_content', String(content).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)); return u.toString(); } catch (e) { return url; }
   }
-  // The tour's own page on friendly.ge (owner 11 Nov: always the tour page, never the home page).
-  // 1. Back office list rules.tourPages { name key: url } (short Setmore names), 2. the catalogue, 3. the group or private tours list.
-  function pageFor(t) {
-    const pages = rules().tourPages || {}, title = t.title || '', ks = [tourKey(title), tourKey(aliasOf(title))];
-    const own = ks.map(k => pages[k + '|' + t.kind] || pages[k]).find(Boolean);
-    if (own) return own;
-    const c = catFor(title);
-    if (c && c.url) return c.url;
-    return t.kind === 'group' ? 'https://friendly.ge/en/group-tours-from-tbilisi' : 'https://friendly.ge/en/private-tours-from-tbilisi';
-  }
-  const promoPct = () => Number(rules().promoPct) || 15;
   function offerText(t, free) {
     const page = pageFor(t), id = (page.match(/\/activity\/(\d+)/) || [])[1], url = gaUrl(page, 'guide_offer', id || aliasOf(t.title)), promo = myPromo();
     const when = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }).format(D(t.date));
@@ -2440,7 +2453,7 @@
     return h + `<div class="cols"><div class="list"><div class="card f">
       <div class="row">${avatar(m.id, true)}<div><b>${esc(m.name)}</b> <span class="tag t-muted">${T('role_' + m.role)}</span>${m.email ? `<div class="muted small">${esc(m.email)}</div>` : ''}</div></div>
       <div class="bar"><label class="btn filebtn">${msi('photo_camera')}${T('photo_upload')}<input type="file" id="me-photo" class="vh" accept="image/*" data-ch="avatar"></label></div>
-      <details class="sect avpick" ${state.avOpen ? 'open' : ''}><summary>${T('av_choose')}</summary>${(() => { const cur = avLib(m.avatar) || { icon: '', color: state.avColor || m.color || AV_COLORS[0] }, col = state.avColor || cur.color; return `<div class="avcols">${AV_COLORS.map(c => `<button type="button" class="avcol" data-act="avcolor" data-v="${c}" style="background:${c}" aria-pressed="${c === col}" aria-label="${c}"></button>`).join('')}</div><div class="avgrid">${AV_ICONS.map(k => `<button type="button" class="avopt" data-act="avpick" data-v="ms:${k}:${col}" aria-pressed="${cur.icon === k}" style="background:${col}">${msi(k)}</button>`).join('')}</div>${m.avatar ? `<button type="button" class="lnk" data-act="avpick" data-v="">${T('av_none')}</button>` : ''}`; })()}</details>
+      <details class="sect avpick" ${state.avOpen ? 'open' : ''}><summary>${T('av_choose')}</summary>${(() => { const cur = avLib(m.avatar) || { icon: '', color: state.avColor || m.color || AV_COLORS[0] }, col = state.avColor || cur.color; return `<b class="small">${T('av_pics')}</b><div class="avgrid art">${AV_ART.map(k => `<button type="button" class="avopt pic" data-act="avpick" data-v="art:${k}" aria-pressed="${m.avatar === 'art:' + k}" aria-label="${k}"><img src="art/avatars/${k}.webp" alt="" loading="lazy" decoding="async"></button>`).join('')}</div><b class="small">${T('av_icons')}</b><div class="avcols">${AV_COLORS.map(c => `<button type="button" class="avcol" data-act="avcolor" data-v="${c}" style="background:${c}" aria-pressed="${c === col}" aria-label="${c}"></button>`).join('')}</div><div class="avgrid">${AV_ICONS.map(k => `<button type="button" class="avopt" data-act="avpick" data-v="ms:${k}:${col}" aria-pressed="${cur.icon === k}" style="background:${col}">${msi(k)}</button>`).join('')}</div>${m.avatar ? `<button type="button" class="lnk" data-act="avpick" data-v="">${T('av_none')}</button>` : ''}`; })()}</details>
       <form class="f" data-form="mydetails" id="me-details"><b>${T('md_title')}</b><div class="two"><label>${T('phone')}<input name="phone" type="tel" value="${esc(m.phone || '')}" placeholder="+995…" autocomplete="tel"></label><label>${T('md_langs')}<input name="languages" value="${esc(m.languages || '')}" placeholder="EN, RU, KA"></label></div>${(rules().promos || {})[m.id] ? `<div class="tsum">${T('promo_mine', { code: rules().promos[m.id] })}</div>` : ''}<div class="actions"><button class="btn qsave">${T('save')}</button></div></form>
       <form class="f" data-form="mytg"><b>Telegram</b><span class="muted small">${T('tg_mine_text')}</span><div class="bar"><input class="inp" id="me-tg" name="telegram" value="${esc(m.telegram ? '@' + m.telegram : '')}" placeholder="@username" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1;min-width:150px"><button class="btn qsave">${T('save')}</button></div></form>
       ${/^https:\/\/t\.me\//.test(rules().botUrl || '') || m.telegram_id ? `<div class="f" id="me-tgbot"><b>${T('tg_title')}</b>${m.telegram_id ? `<span class="row"><span class="tag t-ok">${T('tg_on')}</span><span class="muted small">${T('tg_on_text')}</span></span>` : `<span class="muted small">${T('tg_text')}</span>${m.link_code ? `<div class="row"><b class="num tgcode">/link ${esc(m.link_code)}</b><button class="btn sm" data-act="copy" data-v="/link ${esc(m.link_code)}">${ico('copy')}${T('copy')}</button></div>` : ''}<div class="bar"><button class="btn sm" data-act="tgcode">${T(m.link_code ? 'tg_new' : 'tg_get')}</button>${/^https:\/\/t\.me\//.test(rules().botUrl || '') ? `<a class="btn sm" href="${esc(rules().botUrl)}" target="_blank" rel="noopener">${T('tg_open')}</a>` : ''}</div>`}</div>` : ''}
@@ -3074,6 +3087,7 @@
   (async () => {
     const v = location.hash.slice(1); if (['calendar', 'timeoff', 'tasks', 'admin', 'me'].includes(v)) state.view = v;
     try { await S.init(); } catch (e) { console.error(e); logErr('offline', `${errCode(e)} App could not start: ${(e && e.message) || e}`, navigator.onLine ? 'phone was online' : 'phone had no internet'); $('#app').innerHTML = `<main><div class="banner f"><b>${esc(T('err_connect'))}</b><span class="small">${esc(errCode(e) + ': ' + T('ec_' + errCode(e)))}</span><span class="small">${esc(T('err_retry'))}</span><button class="btn primary" onclick="location.reload()">${esc(T('refresh'))}</button></div></main>`; setTimeout(() => { if (navigator.onLine) location.reload(); }, 20000); return; }
+    if (S.mode === 'demo') window.__test = { pageFor: (title, kind) => { const u = pageFor({ title, kind }), m = /\/activity\/(\d+)/.exec(u); return m ? { id: Number(m[1]) } : null; } };          // for the automatic tests only
     if (me() && !isAdmin()) state.mine = true;
     displayFromAccount();
     render(); if (state.view === 'calendar') toToday();

@@ -329,3 +329,11 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 - A new big badge arrives as a gift box: tap to open, the medal comes out with a shine.
 - Each badge keeps the day it was earned ("Earned on 11 November 2026") on its page. Badges earned before 3.25 show no date.
 - Links to friendly.ge in the offer text carry Google Analytics tags (source friendly_schedule, medium guide_offer, campaign = the promo code or "team", content = the tour), so visits and bookings from guide messages show in GA4 under Traffic acquisition. Tip QR codes and review links go to other sites and are not tagged.
+
+## 3.26
+- Messages for guests link to the tour's own page, never the home page: first the Back office list `rules.tourPages`, then the catalogue, then the group or private tours list. The message ends with "Use my code X at checkout for 15% off" (`rules.promoPct`). Google Analytics tags: campaign = the guide's code, content = the activity id.
+
+## 3.27
+- Avatars: 30 painted pictures (Georgia, food, travel things) in Me > Choose a picture instead of a photo. Painted once with Gemini; no churches. The files are in `art/avatars/` (192 px, about 5 KB each).
+- Tour pages are also found for short calendar names with nothing set by hand ("Tbilisi walking tour" opens the Old Tbilisi walking tour page; "Gareji 4x4 ENG" the group Gareji page). Same kind only: a group name never opens a private page.
+- The Telegram bot has the same messages: /guests.
