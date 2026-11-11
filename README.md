@@ -400,3 +400,10 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 - Time off, for guides and drivers: "Team off soon" shows numbers per day ("guides off: 2, drivers off: 1" and the share of the team), not names. The office still sees names.
 - Me: one Save for phone, languages and Telegram username.
 - The meeting place of the Brutalist group tour is shown as "Paragraph Hotel" (app, catalogue and bot); the map link is the same.
+
+## 3.40
+- **Photo of the day is simpler to add.** One big dashed box "Add my photo of the day", then a preview of the chosen photo with the words, the sticker row and one Post button. Nothing is sent before Post. If sending fails the sheet says why in plain words, and the problem goes to the office's problem log (kind `photo`). Under your own photo: "Words and sticker" and "Another photo".
+- The Photo of the day line is near the top of the guide's home page, and it also shows in "Look as" (to look only: no adding, no likes).
+- **Badges page, what matters first:** level, Almost there, My badges (earned ones, titles first), team goal and challenge, My road, thanks. Folded away: Badges still to earn, Tour mastery, This month. A section you open stays open.
+- **Stars mean a level.** One to three stars only on badges that come in steps and on tour mastery, on a small white label under the sticker. One-off badges and titles have none.
+- **Abano Pass:** My road counts crossings ("Crossed the Abano Pass (Tusheti) ×N", twice per trip), and three badges: Over the Abano (2), Abano regular (10), Master of the Abano (30).

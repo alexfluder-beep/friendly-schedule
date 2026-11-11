@@ -1077,3 +1077,13 @@ html[data-accent="amber"]{--accent:#f0901e;--accent-ink:#20251f;--accent-soft:#f
 .acard .ttl .st,.acard .ttl .cnt,.acard .ttl .num{white-space:nowrap}
 .acard.mycard .ttl{display:block}
 .acard.mycard .ttl .tname{overflow-wrap:anywhere}
+
+/* 3.40 Photo of the day: one big place to tap, then a preview with one Post button */
+.phdrop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:150px;padding:20px;border:2px dashed var(--line);border-radius:var(--r);background:var(--surface);color:var(--ink);text-align:center;cursor:pointer}
+.phdrop .msi{width:36px;height:36px;color:var(--action)}.phdrop b{font-size:var(--t-h3)}
+.phdrop:active{background:var(--surface2)}
+.phprev{margin:8px 0}.phprev-i{display:block;width:100%;max-height:46vh;object-fit:cover;border-radius:16px;background:var(--surface2);min-height:160px}
+.phsteps{margin-top:2px}
+.bpmore{margin-top:8px}.bpmore>summary{font-weight:700;font-size:var(--t-h3)}.bpmore .medals,.bpmore .stats{margin-top:10px}
+
+.banner.warn{background:color-mix(in srgb,var(--warn) 14%,var(--surface));border-color:var(--warn)}

@@ -60,7 +60,7 @@
     moon: 'moon', mountain: 'tent', newdest: 'road', night: 'owl', nights30: 'tent', nights5: 'tent', noshow5: 'clock', offroad: 'van', pioneer: 'star', pioneer5: 'star', planner: 'calendar',
     polyglot: 'speech', rest10: 'sofa', rested: 'sofa', reviewer: 'star', ritual: 'phone', routes10: 'map', season80: 'trophy', seasons: 'sun', seller: 'heart', sharpeye: 'lens', smart: 'gift',
     solo10: 'wheel', solo50: 'wheel', steel: 'shield', t100: 'trophy', t250: 'trophy', t50: 'trophy', team: 'heart', walk100: 'boot', walk42: 'boot', week5: 'calendar', weekend: 'sun',
-    welcome: 'gift', wine: 'wine', year150: 'trophy', photo: 'camera', liked: 'heart', thanks: 'heart', newyear: 'snow', snow: 'cat', comeback: 'heart', hattrick: 'stars3', fri13: 'clover', sunrise: 'sunrise',
+    welcome: 'gift', wine: 'wine', year150: 'trophy', abano: 'mountain', photo: 'camera', liked: 'heart', thanks: 'heart', newyear: 'snow', snow: 'cat', comeback: 'heart', hattrick: 'stars3', fri13: 'clover', sunrise: 'sunrise',
   };
   // Region titles (by their theme) and tour mastery (by words in the tour name) get their own pictures.
   const TITLE = { sun: 'sun', mountain: 'mountain', glass: 'wine', pin: 'fox', globe: 'flag' };
