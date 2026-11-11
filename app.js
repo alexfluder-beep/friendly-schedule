@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.52';
+  const APP_VERSION = '3.53';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -2624,8 +2624,6 @@
   const myPhoto = day => db.photos.find(p => p.day === day && twin(p.user_id) === me().id);
   // The greeting line. Ordinary day: "Good morning, <name>" and one short phrase (phrases.js). A special day gets a card:
   // own birthday or anniversary (special dates), a holiday from the team calendar, a sick day (get well) or an approved day off.
-  const hashN = x => { let h = 7; for (const c of String(x)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; };
-  const dayPart = () => { const h = new Date().getHours(); return h >= 5 && h < 12 ? 0 : h < 18 ? 1 : h < 23 ? 2 : 3; };
   const firstName = m => String((m && m.name) || '').replace(/\(.*?\)/g, '').trim().split(/\s+/)[0] || '';
   const hiText = (k, name) => T(k, { name }).replace(/[,،]\s*$/, '').replace(/,\s*!/, '!');
   function specialOn(day) {

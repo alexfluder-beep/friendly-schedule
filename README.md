@@ -477,3 +477,8 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 - **Guest card reviewed:** the marks come first under "Mark this guest" (the title is no longer repeated), then the note and earlier marks with a readable date, then Like and Dislike as two small buttons on one line. The Income row is hidden when no prices are saved.
 - Tour card buttons on a phone: one compact row, icon above a short label.
 - **Updates arrive whole.** The app's files now open from the saved copy of one version (instant start, also on weak internet). A new version is downloaded completely in the background and then replaces the old one; if the app was just opened it reloads by itself, otherwise the "new version" banner shows. Before, on a weak connection a phone could run new styles with an old program file, or stay on an old version for a long time.
+
+## 3.53
+- **One set of sizes.** All corners now use five names (small 8, medium 12, large 16, extra 28, pill), where there were 14 different values; two stray text sizes were moved to the scale. The rules are written down in `GUIDEBOOK.md`.
+- **Leftovers removed:** the styles and code of the removed greeting phrase, and 26 texts in each language that no screen used any more (old photo flow, old day-off lists and others).
+- Fixed: the pay-question tag showed "dp_accepted" / "dp_declined" instead of "Accepted" / "Declined".
