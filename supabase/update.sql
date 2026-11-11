@@ -380,3 +380,6 @@ create policy team_photos_read on storage.objects for select to authenticated us
 create policy team_photos_insert on storage.objects for insert to authenticated with check (bucket_id = 'photos' and (select public.app_role()) is not null and (storage.foldername(name))[1] = (select auth.uid())::text);
 create policy team_photos_update on storage.objects for update to authenticated using (bucket_id = 'photos' and (storage.foldername(name))[1] = (select auth.uid())::text) with check (bucket_id = 'photos' and (storage.foldername(name))[1] = (select auth.uid())::text);
 create policy team_photos_delete on storage.objects for delete to authenticated using (bucket_id = 'photos' and ((storage.foldername(name))[1] = (select auth.uid())::text or (select public.is_admin())));
+
+-- 3.37 a badge as a sticker on the photo of the day
+alter table public.photos add column if not exists sticker text check (sticker is null or char_length(sticker) <= 80);

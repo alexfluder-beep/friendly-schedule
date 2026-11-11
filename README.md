@@ -386,3 +386,8 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 - **My year so far**: a short recap to read or share.
 - A greeting on the person's own birthday or anniversary (from their special dates) and on holidays from the team calendar.
 - Database: tables `photos` and `thanks`, function `photo_like`, storage folder `photos` (in `supabase/update.sql`, already applied).
+
+## 3.37
+- Photo of the day looks like a card: taller pictures, the words sit on the photo as a paper label, and the person can put one of their earned badges on it as a sticker (when adding the photo, later with "Save text and sticker", or from a badge page with "Put on my photo of the day").
+- Share: the large view makes one picture to send (photo, label, sticker, name and date, Friendly.ge).
+- Database: `photos.sticker` (in `supabase/update.sql`, already applied).
