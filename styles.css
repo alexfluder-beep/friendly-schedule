@@ -779,3 +779,26 @@ button,a,summary,label,select{touch-action:manipulation}
 .authlang{display:flex;align-items:center;justify-content:flex-end;gap:8px;color:var(--muted)}
 .authlang .msi{width:24px;height:24px}
 .authlang .seg button{min-width:48px;padding:8px 12px}
+
+/* 3.15 login page: brand on top, form on one tonal card, account links and language together under it.
+   Patterns rebuilt in our own CSS (ideas: Uiverse pill button press, React Bits fade-up entrance; MIT). */
+.auth{margin-top:6vh;gap:16px}
+.authhead{display:flex;flex-direction:column;gap:4px;padding:0 4px}
+.auth .authhead .brand.big{font-size:var(--t-h1);letter-spacing:-.01em}
+.auth .authhead .brand i{width:14px;height:14px}
+.auth .authhead p{margin:0}
+.authcard{background:var(--surface2);border:1px solid var(--line);border-radius:28px;padding:20px;gap:12px}
+.authcard h2{margin:0 0 4px}
+.authcard .btn.big{margin-top:4px;transition:transform .15s cubic-bezier(.2,0,0,1),background-color .15s}
+.authcard .btn.big:active{transform:scale(.97)}
+.authcard input:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
+.authfoot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;padding:0 4px}
+.authfoot .bar{margin:0;gap:16px}
+.authlang{justify-content:flex-start}
+.authlang .msi{width:20px;height:20px}
+.authlang .seg button{min-width:44px;min-height:40px;padding:4px 12px;font-size:var(--t-cap)}
+@media (prefers-reduced-motion:no-preference){
+  .authhead,.authcard,.authfoot{animation:auth-up .32s cubic-bezier(.2,0,0,1) both}
+  .authcard{animation-delay:.05s}.authfoot{animation-delay:.1s}
+}
+@keyframes auth-up{from{opacity:0;transform:translateY(12px)}}

@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.14';
+  const APP_VERSION = '3.15';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -506,18 +506,18 @@
   // ---------- auth screens ----------
   function authHtml() {
     const a = state.auth, msg = state.authMsg ? `<div class="banner">${esc(state.authMsg)}</div>` : '', pw = state.showPw;
-    // Language first, at the top: a globe and three short buttons, so a guide who reads only Russian or Georgian finds it at once.
+    // Language sits right under the form, next to the account links: a globe and three short buttons.
     const langSel = `<div class="authlang" role="group" aria-label="${T('language')}">${msi('language')}<div class="seg">${[['en', 'EN', 'English'], ['ru', 'RU', 'Русский'], ['ka', 'KA', 'ქართული']].map(([k, l, n]) => `<button type="button" data-act="prelangb" data-v="${k}" aria-pressed="${lang() === k}" lang="${k}" title="${n}" aria-label="${n}">${l}</button>`).join('')}</div></div>`;
-    const brand = langSel + `<div class="brand big"><i></i>Friendly Schedule</div><p class="muted small">${T('login_sub')}</p>`;
+    const brand = `<div class="authhead"><div class="brand big"><i></i>Friendly Schedule</div><p class="muted">${T('login_sub')}</p></div>`;
     const privacy = `<details class="sect"><summary>${T('privacy_link')}</summary><p class="muted small">${T('privacy_text', { n: pv().guideDays })}</p></details>`;
-    if (me() && !me().active) return `<main><div class="auth f">${brand}<div class="card"><h2>${T(me().left_at ? 'closed_title' : 'pending_title')}</h2><p class="muted">${T(me().left_at ? 'closed_text' : 'pending_text')}</p>${S.loginNote ? `<p class="muted small">${esc(me().email || '')} · ${esc(S.loginNote)}</p>` : ''}</div><button class="btn primary" data-act="reload">${T('refresh')}</button><button class="btn" data-act="signout">${T('signout')}</button></div></main>`;
-    if (a === 'newpass') return `<main><form class="auth f" data-form="newpass">${brand}<h2>${T('new_password')}</h2>${msg}<label>${T('password')}<input id="np-pass" name="password" type="password" minlength="8" required autocomplete="new-password"></label><button class="btn primary">${T('save')}</button></form></main>`;
-    return `<main><form class="auth f" data-form="${a}">${brand}<h2>${T(a === 'signup' ? 'create_account' : a === 'reset' ? 'reset_password' : 'sign_in')}</h2>${msg}
+    if (me() && !me().active) return `<main><div class="auth f">${brand}<div class="card"><h2>${T(me().left_at ? 'closed_title' : 'pending_title')}</h2><p class="muted">${T(me().left_at ? 'closed_text' : 'pending_text')}</p>${S.loginNote ? `<p class="muted small">${esc(me().email || '')} · ${esc(S.loginNote)}</p>` : ''}</div><button class="btn primary" data-act="reload">${T('refresh')}</button><button class="btn" data-act="signout">${T('signout')}</button>${langSel}</div></main>`;
+    if (a === 'newpass') return `<main><form class="auth f" data-form="newpass">${brand}<h2>${T('new_password')}</h2>${msg}<label>${T('password')}<input id="np-pass" name="password" type="password" minlength="8" required autocomplete="new-password"></label><button class="btn primary">${T('save')}</button>${langSel}</form></main>`;
+    return `<main><form class="auth f" data-form="${a}">${brand}<div class="authcard f"><h2>${T(a === 'signup' ? 'create_account' : a === 'reset' ? 'reset_password' : 'sign_in')}</h2>${msg}
       ${a === 'signup' ? `<p class="muted small">${T('signup_steps')}</p><label>${T('your_name')}<input id="au-name" name="name" required autocomplete="name"></label>` : ''}
       <label>${T('email')}<input id="au-email" name="email" type="email" required autocomplete="email" inputmode="email"></label>
       ${a !== 'reset' ? `<label>${T('password')}<span class="pwrow"><input id="au-pass" name="password" type="${pw ? 'text' : 'password'}" minlength="8" required autocomplete="${a === 'signup' ? 'new-password' : 'current-password'}"><button type="button" class="btn sm" data-act="showpw" aria-pressed="${!!pw}">${T(pw ? 'hide_pw' : 'show_pw')}</button></span></label>` : ''}
       <button class="btn primary big">${T(a === 'signup' ? 'create_account' : a === 'reset' ? 'send_reset' : 'sign_in')}</button>
-      <div class="bar">${a !== 'signin' ? `<button type="button" class="lnk" data-act="auth" data-to="signin">${T('sign_in')}</button>` : ''}${a !== 'signup' ? `<button type="button" class="lnk" data-act="auth" data-to="signup">${T('create_account')}</button>` : ''}${a !== 'reset' ? `<button type="button" class="lnk" data-act="auth" data-to="reset">${T('forgot')}</button>` : ''}</div>
+      </div><div class="authfoot"><div class="bar">${a !== 'signin' ? `<button type="button" class="lnk" data-act="auth" data-to="signin">${T('sign_in')}</button>` : ''}${a !== 'signup' ? `<button type="button" class="lnk" data-act="auth" data-to="signup">${T('create_account')}</button>` : ''}${a !== 'reset' ? `<button type="button" class="lnk" data-act="auth" data-to="reset">${T('forgot')}</button>` : ''}</div>${langSel}</div>
       ${S.mode === 'demo' ? `<div class="banner small">${T('demo_login')}</div>` : ''}${privacy}</form></main>`;
   }
 
