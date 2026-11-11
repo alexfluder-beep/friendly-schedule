@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.25';
+  const APP_VERSION = '3.26';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -870,10 +870,21 @@
   function gaUrl(url, medium, content) {
     try { const u = new URL(url); if (!/(^|\.)friendly\.ge$/i.test(u.hostname) || u.searchParams.has('utm_source')) return url; u.searchParams.set('utm_source', 'friendly_schedule'); u.searchParams.set('utm_medium', medium); u.searchParams.set('utm_campaign', (myPromo() || 'team').toLowerCase().replace(/[^a-z0-9_-]/g, '')); if (content) u.searchParams.set('utm_content', String(content).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)); return u.toString(); } catch (e) { return url; }
   }
+  // The tour's own page on friendly.ge (owner 11 Nov: always the tour page, never the home page).
+  // 1. Back office list rules.tourPages { name key: url } (short Setmore names), 2. the catalogue, 3. the group or private tours list.
+  function pageFor(t) {
+    const pages = rules().tourPages || {}, title = t.title || '', ks = [tourKey(title), tourKey(aliasOf(title))];
+    const own = ks.map(k => pages[k + '|' + t.kind] || pages[k]).find(Boolean);
+    if (own) return own;
+    const c = catFor(title);
+    if (c && c.url) return c.url;
+    return t.kind === 'group' ? 'https://friendly.ge/en/group-tours-from-tbilisi' : 'https://friendly.ge/en/private-tours-from-tbilisi';
+  }
+  const promoPct = () => Number(rules().promoPct) || 15;
   function offerText(t, free) {
-    const c = catFor(t.title) || {}, r = rules(), url = gaUrl(c.url || r.siteUrl || 'https://friendly.ge/en/', 'guide_offer', aliasOf(t.title)), promo = myPromo();
+    const page = pageFor(t), id = (page.match(/\/activity\/(\d+)/) || [])[1], url = gaUrl(page, 'guide_offer', id || aliasOf(t.title)), promo = myPromo();
     const when = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }).format(D(t.date));
-    return `If you would like to see more of Georgia with us: ${t.title}, ${when}${t.start_time ? ' at ' + t.start_time : ''}${free ? ` (${free} ${free === 1 ? 'place' : 'places'} left)` : ''}. You can book here: ${url}${promo ? ` Promo code ${promo}.` : ''}`;
+    return `If you would like to see more of Georgia with us: ${t.title}, ${when}${t.start_time ? ' at ' + t.start_time : ''}${free ? ` (${free} ${free === 1 ? 'place' : 'places'} left)` : ''}. You can book here: ${url}${promo ? `\nUse my code ${promo} at checkout for ${promoPct()}% off.` : ''}`;
   }
   function offerModalHtml(m) {
     const b = m.bid ? db.bookings.find(x => x.id === m.bid) : null, list = offerList();
