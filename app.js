@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.16';
+  const APP_VERSION = '3.17';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -1960,9 +1960,12 @@
       if (type === 'Event') { if (/OFF/i.test(svc)) (offDays[mem] = offDays[mem] || {})[date] = /HALF/i.test(svc) ? 'half' : 'dayoff'; else out.skipped++; continue; }
       const [a, b] = String(r[cTime] || '').split(' - '), start = to24(a), end = to24(b);
       const isClass = type === 'Class', key = isClass ? `${mem}|${date}|${start}|${svc}` : String(r[cBid] || S.uid());
-      const name = String(r[cName] || '').trim(), xn = name.match(/x\s*(\d+)/i);
-      const praw = String(r[cPax] || ''), pm = praw.match(/(\d+)\s*adults?\s*\+\s*(\d+)\s*child/i), xc = name.match(/x\s*(\d+)\s*\+\s*(\d+)/i);
-      const adults = pm ? Number(pm[1]) : xc ? Number(xc[1]) : (parseInt(praw, 10) || (xn ? Number(xn[1]) : 1)), children = pm ? Number(pm[2]) : xc ? Number(xc[2]) : 0, pax = adults + children;
+      const name = String(r[cName] || '').trim(), xn = name.match(/x\s*(\d{1,2})(?!\d)/i);
+      // "No of participants" is typed by hand in Setmore: "3", "2+2", "3 (2 adults + 1 child)", and sometimes a booking code by mistake.
+      // A head count is 1-99; anything else (a long number, letters) is kept as the booking code, never as people.
+      const praw = String(r[cPax] || '').trim(), pm = praw.match(/(\d{1,2})\s*adults?\s*\+\s*(\d{1,2})\s*child/i) || praw.match(/^(\d{1,2})\s*\+\s*(\d{1,2})$/), xc = name.match(/x\s*(\d{1,2})\s*\+\s*(\d{1,2})(?!\d)/i);
+      const pn = praw.match(/^x?\s*(\d{1,2})(\D|$)/i), pnum = pn ? Number(pn[1]) : 0, pcode = !pm && !pnum && /^#?[A-Za-z0-9-]{6,}$/.test(praw) ? praw.replace(/^#/, '') : '';
+      const adults = pm ? Number(pm[1]) : xc ? Number(xc[1]) : (pnum || (xn ? Number(xn[1]) : 1)), children = pm ? Number(pm[2]) : xc ? Number(xc[2]) : 0, pax = adults + children;
       const txt = [name, svc, ...cComments.map(i => r[i])].map(x => String(x || '')).join(' '), marks = MK.filter(([re]) => re.test(txt)).map(x => x[1]);
       const addr = String((cPick >= 0 && r[cPick]) || (cHotel >= 0 && r[cHotel]) || (cAddr >= 0 && r[cAddr]) || '').trim() || null, label = String((cLabel >= 0 && r[cLabel]) || '').trim().toLowerCase();
       const cid = /^[0-9a-f-]{36}$/i.test(String(r[cCust] || '').trim()) ? String(r[cCust]).trim() : null, phone = r[cPhone] ? `+${r[cCC] || ''}${r[cPhone]}` : null;
@@ -1970,7 +1973,7 @@
       let t = groups[key];
       if (!t) { t = groups[key] = { id: S.uid(), member: mem, date, start_time: start, end_time: end, title: svc, kind: isClass ? 'group' : 'private', capacity: 0, pax: 0, adults: 0, children: 0, date_to: null, guide_pay: null, driver_pay: null, language: null, pickup: String(r[cHotel] || r[cAddr] || '').trim() || null, notes: String(r[cComments[0]] || '').trim() || null, status: 'confirmed', guide_id: null, driver_id: null, external_id: 'setmore:' + key }; out.tours.push(t); }
       t.pax += pax; t.adults += adults; t.children += children;
-      if (name) out.bookings.push({ id: S.uid(), tour_id: t.id, client_id: cid, guest: name, adults, children, pax, phone, ref: String(r[cComments[1]] || r[cBid] || '').trim() || null, notes: null, marks, price: cCost >= 0 && Number(r[cCost]) > 0 ? Number(r[cCost]) : null, currency: 'USD', // Setmore prices are in US dollars (owner, 10 Nov)
+      if (name) out.bookings.push({ id: S.uid(), tour_id: t.id, client_id: cid, guest: name, adults, children, pax, phone, ref: String(r[cComments[1]] || pcode || r[cBid] || '').trim() || null, notes: null, marks, price: cCost >= 0 && Number(r[cCost]) > 0 ? Number(r[cCost]) : null, currency: 'USD', // Setmore prices are in US dollars (owner, 10 Nov)
         email: cid && out.clients[cid] ? out.clients[cid].email : null, history: [{ at: new Date().toISOString(), w: 'created', from: 'Setmore' }], pickup_addr: addr, payment: /online|paid|prepaid/.test(label) ? 'prepaid' : /cash/.test(label) ? 'cash' : null, source: srcFromCodes(txt) || null });
     }
     for (const mem of Object.keys(offDays)) {

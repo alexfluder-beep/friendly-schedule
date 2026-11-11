@@ -287,3 +287,6 @@ Art (tools/art): `make_art.py` makes avatar and badge pictures with Gemini once,
 - "X asks to change their tours" notice: the admin answers on the notice with **Apply** (the person's tour list is updated), **Correct** (opens the person to edit the list by hand) or **Decline**. The person gets "Your request was approved / declined: your tour list". Works for notices sent before this version too.
 - Tour card (admin): **Delete tour**. It asks first, says how many guest bookings go with it, and cannot be undone; Cancel tour is still the way to keep a tour in the history.
 - Closing a window with typed but unsaved data asks "Keep editing / Close without saving" (close button, tap outside, Esc and the phone Back button).
+
+## 3.17
+- Setmore import: the hand-typed "No of participants" column no longer stops the import. Only 1–99 counts as people ("3", "x2", "2+2", "3 (2 adults + 1 child)"); a booking code or long number typed there by mistake is kept as the booking code instead.
