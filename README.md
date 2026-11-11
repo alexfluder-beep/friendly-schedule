@@ -314,3 +314,6 @@ Phone calendar in the layout the team knows from Setmore:
 - A slim bar above the menu: "This week · 12 tours · 55 guests · profit"; tap it for the full breakdown (admins).
 - The round + opens a sheet: Tour, Day off, Sick, Task, Add person.
 Special dates (Me): an open list with an icon per kind, edit and delete icon buttons, and "+ Add a date" that opens a sheet with one-tap kinds and rolling day / month / year wheels.
+
+## 3.23
+- Delica drivers are offered a tour only when its name says 4x4 or 4WD (or Delica). Place names such as Kazbegi no longer count, because not every Kazbegi tour is a 4x4 ride.
