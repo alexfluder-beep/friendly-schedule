@@ -358,3 +358,10 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 
 ## 3.32
 - Time off page, for guides and drivers: a "Work and rest" card counted from the schedule. Last 30 days (working days, tours, longest run) with one plain piece of advice; the next 14 days and the next free day; high or low season (Back office rules) and the next busy period (peak dates); the most booked tours now and one the person has not led yet; and "Earn more": how many tours on their free days still need a guide or driver, with a button to the list. No guest names.
+
+## 3.33
+- Work and rest is personal. "My wishes": how many tours a week feel right, best days to rest, and more work / as it is / more rest (saved on the person's account, `display.wr`). The advice then compares the real week with the wish, counts tours on the chosen rest days and warns about a coming tour on one.
+- New lines from the person's own history: this week against their usual week, busier or calmer than the month before, busiest weekday and usual start time.
+- By role: drivers see kilometres and long road days; guides see guests hosted and the languages asked for in the next 30 days next to the ones they speak.
+- Forecast: team bookings for the next 30 days against the previous 30, and the same days last year when the data is there.
+- The card ends with: "Automatic suggestions, counted from your schedule and your answers. They can be wrong: you and the office decide." Everything is recounted on every open.

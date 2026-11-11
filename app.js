@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.32';
+  const APP_VERSION = '3.33';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -1671,25 +1671,53 @@
   const langTags = t => { const l = tourLangs(t); return l.length ? ` <span class="tag t-muted ltag" title="${T('lang_tour')}">${msi('language')}${esc(l.join(' · '))}</span>` : ''; };
   // Delica drivers are offered only the off-road rides the Delica is for.
   const RIDE_4X4 = /4\s*[x×х]\s*4|4\s*wd|delica/i;   // by the tour name only: not every Kazbegi tour is a 4x4 ride (owner, 11 Nov)
-  // Work and rest (Time off page, guides and drivers): how the last month went, what is coming, the season, and honest ways to earn more.
-  // Everything is counted from the schedule itself; no guest names.
+  // Work and rest (Time off page, guides and drivers). Personal: the person's own answers (tours a week that feel right, rest days,
+  // more work or more rest) plus what the schedule shows about them. Counted again on every open; no guest names.
+  // These are automatic suggestions, not decisions: the card says so.
+  const wrPrefs = () => { const d = me() && me().display; return (d && typeof d === 'object' && d.wr && typeof d.wr === 'object') ? d.wr : {}; };
   function workRestHtml() {
-    const m = me(); if (!m || isAdmin()) return ''; const td = today(), r = rules(), mine = db.tours.filter(t => live(t) && involves(t, m.id));
-    const past = mine.filter(t => t.date <= td && t.date > addDays(td, -30)), days = [...new Set(past.map(t => t.date))], run = days.reduce((x, d) => Math.max(x, streakAt(m.id, d)), 0);
-    const next = mine.filter(t => t.date > td && t.date <= addDays(td, 14)), busy = new Set(next.map(t => t.date)); let free = '';
+    const m = me(); if (!m || isAdmin()) return ''; const td = today(), r = rules(), pf = wrPrefs(), driver = m.role === 'driver';
+    const mine = db.tours.filter(t => live(t) && involves(t, m.id)), team = db.tours.filter(live), between = (xs, a, b) => xs.filter(t => t.date > a && t.date <= b);
+    const past = between(mine, addDays(td, -30), td), prev = between(mine, addDays(td, -60), addDays(td, -30)), days = [...new Set(past.map(t => t.date))], run = days.reduce((x, d) => Math.max(x, streakAt(m.id, d)), 0);
+    const next = between(mine, td, addDays(td, 14)), busy = new Set(next.map(t => t.date)); let free = '';
     for (let i = 1; i <= 14 && !free; i++) { const d = addDays(td, i); if (!busy.has(d)) free = d; }
-    const lines = [], mon = n => fmt(`2026-${String(n).padStart(2, '0')}-01`, { month: 'long' });
-    lines.push(['event', T('wr_last', { w: days.length, t: past.length, s: run }) + ' ' + T(run >= (r.maxStreak || 6) ? 'wr_adv_rest' : days.length < 8 ? 'wr_adv_quiet' : 'wr_adv_ok')]);
-    lines.push(['beach_access', next.length ? T('wr_next', { t: next.length, d: free ? fmtDay(free) : '—' }) : T('wr_next_none')]);
-    const mN = Number(td.slice(5, 7)), hi = mN >= r.seasonFrom && mN <= r.seasonTo;
-    lines.push(['sunny', hi ? T('wr_season_hi', { m: mon(r.seasonTo), n: r.maxSeasonBlock }) : T('wr_season_lo', { m: mon(r.seasonFrom) })]);
+    const wk0 = monday(td), wdName = i => fmt(addDays(wk0, i), { weekday: 'short' }), wdOf = d => (D(d).getDay() + 6) % 7;
+    const weeks = [...Array(8)].map((_, i) => between(mine, addDays(wk0, -7 * (i + 1) - 1), addDays(wk0, -7 * i - 1)).length), avg = Math.round(weeks.reduce((a, b) => a + b, 0) / 8 * 10) / 10;
+    const thisWk = between(mine, addDays(wk0, -1), addDays(wk0, 6)).length, target = Number(pf.target) || 0, rest = Array.isArray(pf.rest) ? pf.rest : [], want = pf.want || '';
+    const L = [], add = (ic, tx) => L.push([ic, tx]);
+    // 1. the week against what the person said feels right
+    add('event', T('wr_week', { n: thisWk, avg: nf(avg) }) + ' ' + (target ? T(thisWk > target ? 'wr_over' : thisWk < target ? 'wr_under' : 'wr_fit', { t: target }) : T('wr_ask_target')));
+    // 2. the last month, and whether it is getting busier
+    add('payments', T('wr_last', { w: days.length, t: past.length, s: run }) + ' ' + T(past.length > prev.length ? 'wr_up' : past.length < prev.length ? 'wr_down' : 'wr_same', { n: prev.length }) + (run >= (r.maxStreak || 6) ? ' ' + T('wr_adv_rest') : ''));
+    // 3. habits: the day they work most, and when their day usually starts
+    const h90 = between(mine, addDays(td, -90), td), byWd = [0, 0, 0, 0, 0, 0, 0]; h90.forEach(t => { byWd[wdOf(t.date)]++; });
+    const starts = h90.map(t => t.start_time).filter(Boolean).sort(), topWd = byWd.indexOf(Math.max(...byWd));
+    if (h90.length >= 4) add('sunny', T('wr_habit', { d: wdName(topWd), n: byWd[topWd], time: starts[Math.floor(starts.length / 2)] || '—' }));
+    // 4. the rest days they chose
+    if (rest.length) { const hit = between(mine, addDays(td, -28), td).filter(t => rest.includes(wdOf(t.date))).length, coming = next.filter(t => rest.includes(wdOf(t.date)))[0]; add('beach_access', T('wr_restdays', { days: rest.map(wdName).join(', '), n: hit }) + (coming ? ' ' + T('wr_rest_clash', { d: fmtDay(coming.date) }) : '')); }
+    else add('beach_access', next.length ? T('wr_next', { t: next.length, d: free ? fmtDay(free) : '—' }) : T('wr_next_none'));
+    // 5. by role: drivers get distance, guides get guests and languages
+    if (driver) { const km = past.reduce((a, t) => a + kmOf(t.title), 0), long = past.filter(t => kmOf(t.title) >= 250).length; add('luggage', T('wr_km', { km: nf(km), n: long }) + (long >= 8 ? ' ' + T('wr_km_rest') : '')); }
+    else { const guests = past.reduce((a, t) => a + (Number(t.pax) || 0), 0), lg = {}; between(team, td, addDays(td, 30)).forEach(t => tourLangs(t).forEach(x => { lg[x] = (lg[x] || 0) + 1; }));
+      const lt = Object.keys(lg).sort((a, b) => lg[b] - lg[a]).slice(0, 4).map(x => `${x} ${lg[x]}`).join(', '); add('language', T('wr_guests', { n: nf(guests) }) + (lt ? ' ' + T('wr_langs', { list: lt, mine: String(m.languages || '—') }) : '')); }
+    // 6. what is coming for the whole team: bookings, season, peak dates
+    const tNext = between(team, td, addDays(td, 30)).length, tPrev = between(team, addDays(td, -30), td).length, ly = between(team, addDays(td, -365), addDays(td, -335)).length;
+    const mN = Number(td.slice(5, 7)), hi = mN >= r.seasonFrom && mN <= r.seasonTo, mon = n => fmt(`2026-${String(n).padStart(2, '0')}-01`, { month: 'long' });
+    add('star', T('wr_team', { n: tNext, p: tPrev }) + (ly ? ' ' + T('wr_lastyear', { n: ly }) : '') + ' ' + (hi ? T('wr_season_hi', { m: mon(r.seasonTo), n: r.maxSeasonBlock }) : T('wr_season_lo', { m: mon(r.seasonFrom) })));
     const pk = peaks().filter(p => p.to >= td).sort((x, y) => x.from.localeCompare(y.from))[0];
-    if (pk) lines.push(['star', T('wr_peak', { name: pk.name || T('wr_busy'), from: fmtDay(pk.from), to: fmtDay(pk.to) })]);
-    const cnt = {}, name = {}; db.tours.forEach(t => { if (!live(t) || t.date < addDays(td, -30) || t.date > addDays(td, 30)) return; const k = statKey(t.title); cnt[k] = (cnt[k] || 0) + 1; name[k] = name[k] || aliasOf(t.title); });
+    if (pk) add('cake', T('wr_peak', { name: pk.name || T('wr_busy'), from: fmtDay(pk.from), to: fmtDay(pk.to) }));
+    // 7. room to grow: the most booked tours, and one this person has not done yet
+    const cnt = {}, name = {}; between(team, addDays(td, -30), addDays(td, 30)).forEach(t => { const k = statKey(t.title); cnt[k] = (cnt[k] || 0) + 1; name[k] = name[k] || aliasOf(t.title); });
     const top = Object.keys(cnt).filter(k => cnt[k] >= 2).sort((x, y) => cnt[y] - cnt[x]).slice(0, 3), known = new Set(mine.map(t => statKey(t.title))), fresh = top.find(k => !known.has(k));
-    if (top.length) lines.push(['payments', T('wr_trend', { list: top.map(k => `${name[k]} (${cnt[k]})`).join(', ') }) + (fresh && m.role !== 'driver' ? ' ' + T('wr_learn', { name: name[fresh] }) : '')]);
-    const open = openTours().filter(x => !x.mine).length;
-    return `<div class="card wrcard"><b>${T('wr_title')}</b>${lines.map(([ic, tx]) => `<span class="wrline">${msi(ic)}<span>${esc(tx)}</span></span>`).join('')}${open ? `<button class="banner small wrearn" data-act="wrtours"><span>${esc(T('wr_earn', { n: open, role: T('role_' + (m.role === 'driver' ? 'driver' : 'guide')).toLowerCase() }))}</span><b>${T('xc_see')} ›</b></button>` : ''}</div>`;
+    if (top.length) add('add_task', T('wr_trend', { list: top.map(k => `${name[k]} (${cnt[k]})`).join(', ') }) + (fresh ? ' ' + T(driver ? 'wr_learn_d' : 'wr_learn', { name: name[fresh] }) : ''));
+    const open = openTours().filter(x => !x.mine).length, chip = (k, v, label, on) => `<button type="button" class="btn sm wrchip" data-act="wrset" data-k="${k}" data-v="${v}" aria-pressed="${on}">${esc(label)}</button>`;
+    const asked = target || rest.length || want;
+    const wishes = `<details class="sect wrq" ${asked && !state.wrOpen ? '' : 'open'}><summary>${T('wr_q_title')}${asked ? ` <span class="muted small">${esc([target ? T('wr_q_sum', { t: target }) : '', rest.map(wdName).join(', '), want ? T('wr_want_' + want) : ''].filter(Boolean).join(' · '))}</span>` : ''}</summary>
+      <span class="muted small">${T('wr_q_target')}</span><div class="bar">${[2, 3, 4, 5, 6, 7].map(n => chip('target', n, String(n), target === n)).join('')}</div>
+      <span class="muted small">${T('wr_q_rest')}</span><div class="bar">${[0, 1, 2, 3, 4, 5, 6].map(i => chip('rest', i, wdName(i), rest.includes(i))).join('')}</div>
+      <span class="muted small">${T('wr_q_want')}</span><div class="bar">${['more', 'same', 'rest'].map(v => chip('want', v, T('wr_want_' + v), want === v)).join('')}</div></details>`;
+    const earn = open && want !== 'rest' ? `<button class="banner small wrearn" data-act="wrtours"><span>${esc(T('wr_earn', { n: open, role: T('role_' + (driver ? 'driver' : 'guide')).toLowerCase() }))}</span><b>${T('xc_see')} ›</b></button>` : want === 'rest' ? `<span class="banner small wrearn"><span>${esc(T('wr_rest_first'))}</span></span>` : '';
+    return `<div class="card wrcard"><b>${T('wr_title')}</b>${wishes}${L.map(([ic, tx]) => `<span class="wrline">${msi(ic)}<span>${esc(tx)}</span></span>`).join('')}${earn}<span class="muted small wrnote">${T('wr_note')}</span></div>`;
   }
   function openTours() {
     const m = me(); if (!m || isAdmin()) return []; const role = m.role === 'driver' ? 'driver' : 'guide', td = today(), to = addDays(td, 30);
@@ -2845,6 +2873,7 @@
     pdedit(el) { const x = db.personal_dates.find(q => q.id === el.dataset.id); if (!x) return; state.modal = { type: 'pdate', draft: { ...x } }; renderModal(); requestAnimationFrame(() => wheelSync(true)); },
     tgskip() { const m = me(); run(() => S.save('profiles', { ...stripEmail(m), display: { ...((m.display && typeof m.display === 'object') ? m.display : {}), tgSkip: today() } }), T('saved')); },
     tasksec(el) { state.taskSec = el.dataset.v; render(); window.scrollTo(0, 0); },
+    wrset(el) { const d = (me().display && typeof me().display === 'object') ? me().display : {}, w = { ...(d.wr || {}) }, k = el.dataset.k, v = el.dataset.v; if (k === 'rest') { const cur = Array.isArray(w.rest) ? w.rest : [], n = Number(v); w.rest = cur.includes(n) ? cur.filter(x => x !== n) : [...cur, n].sort(); } else if (k === 'target') w.target = w.target === Number(v) ? 0 : Number(v); else w.want = w.want === v ? '' : v; state.wrOpen = true; run(() => S.save('profiles', { ...stripEmail(me()), display: { ...d, wr: w } })); },
     wrtours() { state.taskSec = 'tours'; acts.viewNow ? acts.viewNow({ dataset: { v: 'tasks' } }) : (state.view = 'tasks', render()); window.scrollTo(0, 0); },
     tasknew(el) { const tour = el.dataset.tour ? db.tours.find(t => t.id === el.dataset.tour) : null; state.modal = { type: 'task', isNew: true, draft: { id: S.uid(), title: '', notes: '', due_date: tour ? tour.date : '', assignees: tour ? [tour.guide_id, tour.driver_id].filter(Boolean) : [], status: 'open', tour_id: tour ? tour.id : null } }; renderModal(); },
     taskedit(el) { const k = db.tasks.find(x => x.id === el.dataset.id); state.modal = { type: 'task', isNew: false, draft: { ...k, assignees: [...(k.assignees || [])] } }; renderModal(); },

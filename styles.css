@@ -1022,3 +1022,8 @@ html[data-accent="amber"]{--accent:#f0901e;--accent-ink:#20251f;--accent-soft:#f
 .wrline .msi{width:20px;height:20px;flex:none;color:var(--muted);margin-top:2px}
 .wrearn{width:100%;text-align:left;justify-content:space-between;flex-wrap:nowrap;color:var(--ink)}
 .wrearn b{white-space:nowrap}
+
+/* 3.33 Work and rest: the person's wishes and the note */
+.wrq{border-top:0;padding:0}.wrq summary{font-weight:600}.wrq .bar{gap:6px;margin:4px 0 8px}
+.wrchip{min-width:44px}.wrchip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.wrnote{border-top:1px solid var(--line);padding-top:8px}
