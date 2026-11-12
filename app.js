@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.57';
+  const APP_VERSION = '3.58';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -580,7 +580,10 @@
     return parts.length ? `<span class="pair">${parts.join('<span class="plus">+</span>')}</span>` : `<span class="tag t-warn">${T('unassigned')}</span>`;
   };
   const paxText = t => t.capacity > 0 ? `${t.pax || 0}/${t.capacity}` : `${t.pax || 0}`;
-  const offTag = o => `<span class="tag ${o.type === 'sick' ? 't-sick' : 't-off'}">${T(o.type === 'sick' ? 'sick' : o.type === 'half' ? 'halfday' : 'dayoff')}${o.status === 'pending' ? ' · ' + T('pending') : ''}</span>`;
+  // A day off, half day or sick day on the calendar can be tapped to change or remove it (office: anyone's; a person: their own, not past ones). The office can also drag it to another day.
+  const offCan = o => isAdmin() || (twin(o.user_id) === me().id && o.date_to >= today());
+  const offAttr = (o, d) => (offCan(o) ? ` data-act="offopen" data-id="${o.id}" role="button" tabindex="0"${isAdmin() ? ` data-dragoff="${o.id}" data-d="${d || o.date_from}"` : ''}` : '');
+  const offTag = (o, d) => `<span class="tag ${o.type === 'sick' ? 't-sick' : 't-off'}"${d ? offAttr(o, d) : ''}>${T(o.type === 'sick' ? 'sick' : o.type === 'half' ? 'halfday' : 'dayoff')}${o.status === 'pending' ? ' · ' + T('pending') : ''}</span>`;
   const opt = (v, label, sel) => `<option value="${esc(v)}"${String(v) === String(sel ?? '') ? ' selected' : ''}>${esc(label)}</option>`;
   const peopleOpts = (role, sel) => {
     const st = staff(), grp = (label, list) => (list.length ? `<optgroup label="${esc(label)}">${list.map(p => opt(p.id, p.name, sel)).join('')}</optgroup>` : '');
@@ -642,7 +645,7 @@
     return `<span class="smk tr ${need ? 'need' : ''} ${ts.length ? '' : 'none'}" ${ts.length ? `aria-label="${esc(T('sm_tours', { n: ts.length }))}"` : 'aria-hidden="true"'}><i></i>${ts.length > 1 || (!id && ts.length) ? `<span class="num">${ts.length}</span>` : ''}</span><span class="smk off ${mine ? 'me' : ''} ${mine || n ? '' : id ? 'gone' : 'none'}" ${mine || n ? `aria-label="${esc(mine ? T('off_mine') : T('sm_off', { n }))}"` : 'aria-hidden="true"'}>${msi(mine && mine.type === 'sick' ? 'sick' : 'beach_access')}${!mine && n ? `<span class="num">${n}</span>` : ''}</span>`;
   }
   // On a computer everyone gets the same switches at the top: the view, and whole team or mine.
-  const viewBarHtml = () => `<div class="bar viewbar"><div class="seg vseg">${[['day', 'D'], ['week', 'W'], ['month', 'M'], ['agenda', 'A']].map(([m, k]) => `<button data-act="mode" data-m="${m}" aria-pressed="${state.mode === m}" title="${T('v_key', { k })}">${T('v_' + m)}</button>`).join('')}</div><span class="spacer"></span><button class="btn" data-act="summary">${T('day_summary')}</button></div>`;
+  const viewBarHtml = () => `<div class="bar viewbar"><div class="seg vseg">${[['day', 'D'], ['week', 'W'], ['month', 'M'], ['agenda', 'A']].map(([m, k]) => `<button data-act="mode" data-m="${m}" aria-pressed="${state.mode === m}" title="${T('v_key', { k })}">${T('v_' + m)}</button>`).join('')}</div><span class="spacer"></span><button class="btn only-wide" data-act="print">${T('v_print')}</button><button class="btn only-wide" data-act="summary">${T('day_summary')}</button><span class="only-wide">${helpBtn()}</span></div>${helpBox('calendar')}`;
   const stripLegend = own => `<div class="striplg muted small" aria-hidden="true"><span><i class="lgd"></i>${T(own ? 'sm_lg_my' : 'sm_lg_tours')}</span>${own || !isAdmin() ? '' : `<span><i class="lgd need"></i>${T('sm_lg_need')}</span>`}<span>${msi('beach_access')}${T(own ? 'sm_lg_myoff' : 'sm_lg_off')}</span></div>`;
   // Whose tours the calendar shows: mine, one chosen person (office, computer view), or everyone.
   const seenBy = () => (state.mine ? me().id : (isAdmin() && state.who) || '');
@@ -654,7 +657,7 @@
       if (!ts.length && !offs.length && !cx.length && d !== td) continue; any++;
       const line = (time, dot, body, right, cls, attr) => `<${attr ? 'button' : 'div'} class="agr ${cls || ''}" ${attr || ''}><span class="agt num">${time}</span><i class="agdot" style="${dot}"></i><span class="agb">${body}</span><span class="agw">${right}</span></${attr ? 'button' : 'div'}>`;
       const pe = id => { const x = person(id); return x ? `${avatar(id)}<span>${esc(x.name)}</span>` : ''; };
-      const list = [...offs.map(o => line('', 'background:var(--private)', `${msi(o.type === 'sick' ? 'sick' : 'beach_access')} ${T(o.type === 'sick' ? 'sick' : o.type === 'half' ? 'halfday' : 'dayoff')}${o.status === 'pending' ? ' · ' + T('pending') : ''}`, pe(o.user_id), 'off')),
+      const list = [...offs.map(o => line('', 'background:var(--private)', `${msi(o.type === 'sick' ? 'sick' : 'beach_access')} ${T(o.type === 'sick' ? 'sick' : o.type === 'half' ? 'halfday' : 'dayoff')}${o.status === 'pending' ? ' · ' + T('pending') : ''}`, pe(o.user_id), 'off', offAttr(o, d).trim())),
         ...ts.map(t => line(`${esc(t.start_time || '')}${t.end_time ? '–' + esc(t.end_time) : ''}`, `background:${esc(tourStyle(t.title).color)}`, `<b>${esc(t.title)}</b> <span class="muted num">${t.kind === 'group' ? `(${Number(t.pax) || 0}/${Number(t.capacity) || 0})` : acText(t)}</span>${!t.guide_id ? ` <span class="tag t-warn">${T('unassigned')}</span>` : ''}`, [t.guide_id, t.driver_id].filter(Boolean).map(pe).join(''), '', `data-act="tour" data-id="${t.id}"`)),
         ...cx.map(t => line(esc(t.start_time || ''), 'background:var(--muted)', `<s>${esc(t.title)}</s> <span class="tag t-danger">${T('cancelled')}</span>`, '', 'cx', `data-act="tour" data-id="${t.id}"`))].join('') || `<div class="agr none"><span class="agt"></span><i></i><span class="agb muted">${T('no_tours')}</span><span></span></div>`;
       rows += `<div class="agday ${d === td ? 'tdy' : ''}"><div class="agd"><b class="num">${D(d).getDate()}</b><span>${esc(fmt(d, { month: 'short', weekday: 'short' }))}</span>${ho ? `<span class="tag t-hol">${esc(trName(ho.name))}</span>` : ''}</div><div class="agl">${list}</div></div>`; }
@@ -666,7 +669,7 @@
     const offs = db.time_off.filter(o => o.status !== 'declined' && o.date_from <= d && o.date_to >= d && (!state.mine || o.user_id === me().id));
     const cxs = cancelledOnDay(d).filter(seen);
     return `<div class="dayhd" id="day-${d}" data-drop="${d}"><b class="${d === td ? 'tdy' : ''}">${esc(fmt(d, { weekday: 'long', day: 'numeric', month: 'long' }))}</b>${ho ? `<span class="tag t-hol">${msi('celebration')}${esc(trName(ho.name))}</span>` : ''}${pubHolOn(d) && !ho ? `<span class="tag t-pub" title="${esc(T('ph_info'))}">${msi('flag')}${esc(T(pubHolOn(d)))}</span>` : ''}${ev ? `<span class="tag t-group">${esc(trName(ev.name))}</span>` : ''}<span class="spacer"></span>${dts.length ? `<button class="lnk" data-act="summary" data-date="${d}">${T('day_summary')}</button>` : ''}${!isAdmin() && d > td && !offOn(me().id, d) ? `<button class="lnk" data-act="offnew" data-date="${d}">${T('ask_dayoff')}</button>` : ''}</div>
-      ${dts.map(agendaCard).join('')}${cxs.map(agendaCard).join('')}${offs.map(o => `<div class="acard off ${o.type === 'sick' ? 'sick' : o.type === 'half' ? 'half' : ''}"><span class="ttl">${msi(o.type === 'sick' ? 'sick' : 'beach_access')}${T(o.type === 'sick' ? 'sick' : o.type === 'half' ? 'halfday' : 'dayoff')}${o.status === 'pending' ? ' · ' + T('pending') : ''}</span><span class="row">${avatar(o.user_id)}<span>${esc(pname(o.user_id))}</span></span></div>`).join('')}
+      ${dts.map(agendaCard).join('')}${cxs.map(agendaCard).join('')}${offs.map(o => `<div class="acard off ${o.type === 'sick' ? 'sick' : o.type === 'half' ? 'half' : ''}"${offAttr(o, d)}><span class="ttl">${msi(o.type === 'sick' ? 'sick' : 'beach_access')}${T(o.type === 'sick' ? 'sick' : o.type === 'half' ? 'halfday' : 'dayoff')}${o.status === 'pending' ? ' · ' + T('pending') : ''}</span><span class="row">${avatar(o.user_id)}<span>${esc(pname(o.user_id))}</span></span></div>`).join('')}
       ${!dts.length && !offs.length && !cxs.length ? `<div class="muted small nothing" data-drop="${d}">${T('no_tours')}</div>` : ''}`;
   }
   function agendaCard(t) {
@@ -759,7 +762,7 @@
   function guideHomeHtml(days, title) {
     const td = today(), sel = state.date, id = me().id, now = days.includes(td) ? tourNow() : null;
     const asks = db.change_requests.filter(q => q.swap_with === id && q.status === 'pending' && !q.agreed);
-    return `<div class="ghome">${setupCard(true)}${greetHtml()}${askCardHtml()}${PHONE() ? '' : viewBarHtml()}${weekCardHtml()}${asks.length ? nextHtml() : ''}
+    return `${PHONE() ? '' : setupCard(true) + greetHtml() + askCardHtml() + viewBarHtml()}<div class="ghome">${PHONE() ? setupCard(true) + greetHtml() + askCardHtml() : ''}${weekCardHtml()}${asks.length ? nextHtml() : ''}
       <div class="bar homebar"><h2>${esc(fmt(days[3], { month: 'long', year: 'numeric' }))}</h2><label class="jump" title="${T('pick_date')}">${ico('cal')}<input type="date" id="jump" data-ch="jump" value="${esc(state.date)}" aria-label="${T('pick_date')}"></label><span class="spacer"></span><div class="seg"><button data-act="nav" data-d="-1" aria-label="${T('prev')}">‹</button><button data-act="today">${T('today')}</button><button data-act="nav" data-d="1" aria-label="${T('next')}">›</button></div></div>
       <div class="list home"><div class="strip">${days.map(d => `<button data-act="day" data-date="${d}" aria-pressed="${d === sel}" class="${d === td ? 'tdy' : ''} ${offCls(offOn(id, d))} ${holidayOn(d) ? 'hol' : ''}"><span>${esc(fmt(d, { weekday: 'short' }))}</span><b class="num">${D(d).getDate()}</b>${dayMarks(d, id)}</button>`).join('')}</div>${stripLegend(true)}
       ${now ? nowCardHtml(now) : ''}${days.map(myDayHtml).join('')}</div>
@@ -832,7 +835,7 @@
     const title0 = state.mode === 'week' ? (days[0].slice(0, 7) === days[6].slice(0, 7) ? `${D(days[0]).getDate()}–${fmt(days[6], { day: 'numeric', month: 'short', year: 'numeric' })}` : `${fmt(days[0], { day: 'numeric', month: 'short' })} – ${fmt(days[6], { day: 'numeric', month: 'short', year: 'numeric' })}`) : fmt(state.date, { month: 'long', year: 'numeric' });
     const title = state.mode === 'day' ? fmt(state.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : state.mode === 'agenda' ? `${fmtDay(state.date)} – ${fmtDay(addDays(state.date, 29))}` : title0;
     if (!isAdmin() && state.mine && state.mode === 'week') return guideHomeHtml(days, title0) + fabHtml();
-    let h = `${setupCard(true)}${window.matchMedia('(max-width:760px)').matches ? installCardHtml(false) : ''}${greetHtml()}${askCardHtml()}${nextHtml()}${fabHtml()}
+    let h = `${setupCard(true)}${window.matchMedia('(max-width:760px)').matches ? installCardHtml(false) : ''}${greetHtml()}${askCardHtml()}${isAdmin() || PHONE() ? nextHtml() : ''}${fabHtml()}
       ${!PHONE() ? '' : `<div class="calhd"><button class="calttl" data-act="mode" data-m="${state.mode === 'month' ? 'week' : 'month'}" aria-expanded="${state.mode === 'month'}" aria-label="${T(state.mode === 'month' ? 'week' : 'month')}"><b>${esc(fmt(state.date, { month: 'long' }))}</b> <span class="yr num">${state.date.slice(0, 4)}</span>${msi(state.mode === 'month' ? 'keyboard_arrow_up' : 'keyboard_arrow_down')}</button><label class="jump" title="${T('pick_date')}">${ico('cal')}<input type="date" id="jump" data-ch="jump" value="${esc(state.date)}" aria-label="${T('pick_date')}"></label><span class="spacer"></span>
         ${monday(state.date) !== monday(td) ? `<button class="btn sm calnow" data-act="today">${T('today')}</button>` : ''}${state.mode === 'month' ? '' : `<button class="iconbtn" data-act="nav" data-d="-1" aria-label="${T('prev')}">‹</button><button class="iconbtn" data-act="nav" data-d="1" aria-label="${T('next')}">›</button>`}
         ${isAdmin() ? `<button class="whochip ${state.mine ? '' : 'txt'}" data-act="mine" data-v="${state.mine ? '0' : '1'}" aria-label="${T(state.mine ? 'mine' : 'team')}">${state.mine ? avatar(me().id) : `<span>${T('who_all')}</span>`}</button>` : ''}</div>`}
@@ -840,7 +843,7 @@
       <div class="seg vseg">${[['day', 'D'], ['week', 'W'], ['month', 'M'], ['agenda', 'A']].map(([m, k]) => `<button data-act="mode" data-m="${m}" aria-pressed="${state.mode === m}" title="${T('v_key', { k })}">${T('v_' + m)}</button>`).join('')}</div>
       ${isAdmin() ? `<div class="seg"><button data-act="mine" data-v="0" aria-pressed="${!state.mine}">${T('team')}</button><button data-act="mine" data-v="1" aria-pressed="${!!state.mine}">${T('mine')}</button></div>` : ''}
       ${isAdmin() && !state.mine ? `<select class="inp whosel" data-ch="who" aria-label="${T('v_who')}"><option value="">${T('v_allteam', { n: crew().length })}</option>${crew().map(p => opt(p.id, p.name, state.who || '')).join('')}</select>` : ''}<span class="spacer"></span><button class="btn only-wide" data-act="print">${T('v_print')}</button><button class="btn only-wide" data-act="summary">${T('day_summary')}</button>${isAdmin() ? `<button class="btn primary only-wide" data-act="newtour">+ ${T('tour')}</button><button class="btn only-wide" data-act="offnew">+ ${T('dayoff')}</button>` : ''}<span class="only-wide">${helpBtn()}</span></div>${helpBox('calendar')}
-      <div class="bar"><h2>${esc(title)}</h2><label class="jump" title="${T('pick_date')}">${ico('cal')}<input type="date" id="jump" data-ch="jump" value="${esc(state.date)}" aria-label="${T('pick_date')}"></label><span class="spacer"></span><div class="seg"><button data-act="nav" data-d="-1" aria-label="${T('prev')}">‹</button><button data-act="today">${T('today')}</button><button data-act="nav" data-d="1" aria-label="${T('next')}">›</button></div></div>`}`;
+      <div class="bar"><h2>${esc(title)}</h2><label class="jump" title="${T('pick_date')}">${ico('cal')}<input type="date" id="jump" data-ch="jump" value="${esc(state.date)}" aria-label="${T('pick_date')}"></label><span class="spacer"></span><div class="seg"><button data-act="nav" data-d="-1" aria-label="${T('prev')}">‹</button><button data-act="today">${T('today')}</button><button data-act="nav" data-d="1" aria-label="${T('next')}">›</button></div></div>`}${isAdmin() || PHONE() ? '' : nextHtml()}`;   // guides on a computer: the view switch stays in one place in every view, the next-tour card comes after it
     const pFrom_To = [state.mode === 'month' ? state.date.slice(0, 8) + '01' : days[0], state.mode === 'month' ? addDays(addDays(state.date.slice(0, 8) + '01', 32).slice(0, 8) + '01', -1) : days[6]];
     const pstats = !(isAdmin() && !state.mine) ? '' : `<div class="only-wide">${periodStatsHtml(pFrom_To[0], pFrom_To[1])}</div>${incBarHtml(pFrom_To[0], pFrom_To[1])}`;
     if (state.mode === 'agenda') return h + agendaHtml() + photoStripHtml();
@@ -852,7 +855,7 @@
       const ts = toursOnDay(d).filter(filter).sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
       const o = id ? offOn(id, d) : null;
       const pdt = id && (isAdmin() || id === me().id) ? personalOn(id, d) : null;
-      return `<div class="cell ${d === td ? 'today' : ''} ${o ? 'isoff' : ''}" data-drop="${d}" data-who="${id || ''}">${o ? offTag(o) : ''}${pdt ? `<span class="tag t-group">${esc(pdt.title)}</span>` : ''}${ts.map(tourChip).join('')}${isAdmin() ? `<button class="add" data-act="newtour" data-date="${d}" data-who="${id || ''}" aria-label="${T('add_tour')}">+</button>` : (id === me().id && !o && d > td ? `<button class="add" data-act="offnew" data-date="${d}" title="${T('ask_dayoff')}" aria-label="${T('ask_dayoff')}">+</button>` : '')}</div>`;
+      return `<div class="cell ${d === td ? 'today' : ''} ${o ? 'isoff' : ''}" data-drop="${d}" data-who="${id || ''}">${o ? offTag(o, d) : ''}${pdt ? `<span class="tag t-group">${esc(pdt.title)}</span>` : ''}${ts.map(tourChip).join('')}${isAdmin() ? `<button class="add" data-act="newtour" data-date="${d}" data-who="${id || ''}" aria-label="${T('add_tour')}">+</button>` : (id === me().id && !o && d > td ? `<button class="add" data-act="offnew" data-date="${d}" title="${T('ask_dayoff')}" aria-label="${T('ask_dayoff')}">+</button>` : '')}</div>`;
     }).join('');
     const un = days.some(d => toursOnDay(d).some(t => !t.guide_id && !t.driver_id));
     h += `<div class="gridwrap only-wide"><div class="wgrid"><div class="hd">${T('team')}</div>${hd}
@@ -1398,6 +1401,8 @@
       list.push(B('world10', 'geo', 'globe', world, 10), B('world25', 'geo', 'globe', world, 25), B('world40', 'geo', 'globe', world, 40));
       [50, 200, 1000].forEach(g => { const b = B('country' + g, 'geo', 'globe', topC ? cty[topC] : 0, g); b.desc = topC ? T('bd_country', { n: g, c: countryName(topC) }) : T('bd_country0', { n: g }); list.push(b); });
       [5, 15].forEach(g => { const b = B('names' + g, 'fun', 'users', topN ? nm[topN] : 0, g); b.desc = topN && nm[topN] >= 2 ? T('bd_names', { n: g, name: cap(topN), have: nm[topN] }) : T('bd_names0', { n: g }); list.push(b); });
+      // Legends: goals so far away that they are a joke and a dream at once. They show real progress all the same.
+      { const b1 = B('legend_country', 'legend', 'globe', topC ? cty[topC] : 0, 100000); b1.desc = topC ? T('bd_legend_country', { c: countryName(topC) }) : T('bd_legend_country0'); const b2 = B('legend_names', 'legend', 'users', topN ? nm[topN] : 0, 2000); b2.desc = topN && nm[topN] >= 2 ? T('bd_legend_names', { name: cap(topN) }) : T('bd_legend_names0'); list.push(b1, b2, B('legend_guests', 'legend', 'users', s.guests, 100000), B('legend_mother', 'legend', 'pin', ts.filter(t => /walking|old tbilisi|old town/i.test(t.title)).length, 10000)); }
       if (isG) list.push(B('tamada5', 'guide', 'glass', wineN, 5), B('tamada25', 'guide', 'glass', wineN, 25), B('tamada100', 'guide', 'glass', wineN, 100), B('baker25', 'guide', 'glass', kakh, 25));
       const cnt = re => ts.filter(t => re.test(t.title + ' ' + (t.notes || ''))).length, mother = cnt(/walking|old tbilisi|old town/i);
       if (isG) list.push(B('mother50', 'guide', 'pin', mother, 50), B('mother200', 'guide', 'pin', mother, 200));
@@ -1459,6 +1464,7 @@
   const seenKey = () => 'fs-badges-' + me().id;
   let celeTimer = null;
   function checkBadges() {
+    if (!gameOn()) return;   // the person turned the game side off: no badge windows, no weekly challenge
     setTimeout(() => { try { weeklySave(); } catch (e) { /* later */ } }, 2500);
     clearTimeout(celeTimer);
     celeTimer = setTimeout(() => {
@@ -1704,12 +1710,12 @@
   }
   function offModalHtml(m) {
     const d = m.draft;
-    return `<div class="hdr"><h2>${T('request')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div><form class="f" data-form="off">
+    return `<div class="hdr"><h2>${T(d.id ? 'off_edit' : 'request')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div><form class="f" data-form="off">
       ${isAdmin() ? `<label>${T('person')}<select id="o-user" data-f="user_id">${staff().map(p => opt(p.id, p.name, d.user_id)).join('')}</select></label>` : ''}
       <label>${T('type')}<select id="o-type" data-f="type">${opt('dayoff', T('dayoff'), d.type)}${opt('half', T('halfday'), d.type)}${opt('sick', T('sick'), d.type)}</select></label>
       <div class="two"><label>${T('from')}<input id="o-from" data-f="date_from" type="date" value="${esc(d.date_from)}" required></label><label>${T('to')}<input id="o-to" data-f="date_to" type="date" value="${esc(d.date_to)}" required></label></div>
       <label>${T('note')}<input id="o-note" data-f="note" value="${esc(d.note || '')}"></label><div id="o-warn"></div>
-      <div class="actions"><button type="button" class="btn" data-act="close">${T('close')}</button><button class="btn primary">${T('send')}</button></div></form>`;
+      <div class="actions">${d.id ? `<button type="button" class="btn danger" data-act="offdel" data-id="${d.id}">${T('remove')}</button><span class="spacer"></span>` : ''}<button type="button" class="btn" data-act="close">${T('close')}</button><button class="btn primary">${T(d.id ? 'save' : 'send')}</button></div></form>`;
   }
   function refreshOffWarn() {
     const m = state.modal, el = $('#o-warn'); if (!m || m.type !== 'off' || !el) return;
@@ -1719,8 +1725,10 @@
   async function saveOff() {
     const d = state.modal.draft;
     if (!d.date_from || !d.date_to || d.date_to < d.date_from) { toast(T('bad_dates')); return; }
-    const byAdmin = isAdmin(), status = byAdmin || d.type === 'sick' ? 'approved' : 'pending';
-    const row = { id: S.uid(), user_id: byAdmin ? (d.user_id || me().id) : me().id, date_from: d.date_from, date_to: d.date_to, type: d.type, status, note: d.note || null, created_at: new Date().toISOString(), decided_by: byAdmin ? me().id : null };
+    const byAdmin = isAdmin(), status = byAdmin || d.type === 'sick' ? 'approved' : 'pending', old = d.id ? db.time_off.find(o => o.id === d.id) : null, uid = byAdmin ? (d.user_id || me().id) : me().id;
+    // The same day entered twice for one person is not saved again.
+    if (db.time_off.some(o => o.id !== d.id && o.status !== 'declined' && twin(o.user_id) === twin(uid) && o.date_from <= d.date_to && o.date_to >= d.date_from && !(old && o.date_from <= old.date_to && o.date_to >= old.date_from))) { toast(T('off_twice')); return; }
+    const row = { id: old ? old.id : S.uid(), user_id: byAdmin ? (d.user_id || me().id) : me().id, date_from: d.date_from, date_to: d.date_to, type: d.type, status, note: d.note || null, created_at: old ? old.created_at : new Date().toISOString(), decided_by: byAdmin ? me().id : null };
     await S.save('time_off', row);
     logAct(`${T('request')}: ${pname(row.user_id)}, ${row.type}, ${row.date_from} to ${row.date_to}`);
     const np = { name: pname(row.user_id), from: row.date_from, to: row.date_to };
@@ -1747,8 +1755,37 @@
     st.push({ k: 'tg', done: !!(p.display || {}).tgSkip || (botOn() ? !!p.telegram_id : !!p.telegram) });   // not everyone uses Telegram: the step can be skipped
     return st;
   }
+  // ---------- Welcome guide: on the first open (and on each new phone) a short walk through set-up. Every step can be skipped, and "Next time" closes it. ----------
+  const wlLocal = k => { try { return localStorage.getItem('fs-wl-' + k); } catch (e) { return null; } }, wlSet = (k, v) => { try { localStorage.setItem('fs-wl-' + k, v); } catch (e) { /* private mode */ } };
+  function welcomeSteps() {
+    const p = me(); if (!p || !p.active || state.viewAs) return []; const d = (p.display && typeof p.display === 'object') ? p.display : {}, skip = new Set(d.wlSkip || []), perm = ('Notification' in window) ? Notification.permission : 'unsupported';
+    const pd = db.payout_details.find(x => x.id === p.id) || {};
+    const st = [{ k: 'look', dev: true, done: !!wlLocal('look') },
+      { k: 'install', dev: true, done: standalone() || !!wlLocal('install') },
+      { k: 'notif', dev: true, done: (perm === 'granted' && !!state.pushSub) || !!wlLocal('notif') },
+      { k: 'details', done: !!(p.phone && String(p.languages || '').trim()) }, { k: 'photo', done: !!p.avatar }];
+    if (p.role === 'guide') st.push({ k: 'tours', done: !!d.toursOk });
+    st.push({ k: 'work', done: Array.isArray(p.work_week) || !!p.work_days || !!d.workOk }, { k: 'payout', done: !!(pd.account || pd.bank_name) }, { k: 'dates', done: db.personal_dates.some(x => twin(x.user_id) === p.id) }, { k: 'tg', done: !!d.tgSkip || (botOn() ? !!p.telegram_id : !!p.telegram) });
+    return st.map(x => ({ ...x, done: x.done || skip.has(x.k) }));
+  }
+  function welcomeModalHtml(m) {
+    const all = welcomeSteps(), left = all.filter(x => !x.done), cur = left.find(x => x.k === m.k) || left[0], n = all.length - left.length, perm = ('Notification' in window) ? Notification.permission : 'unsupported';
+    const head = `<div class="hdr"><h2>${T(m.intro ? 'wl_hello' : 'wl_title', { name: firstName(me()) })}</h2><button class="iconbtn" data-act="wllater" aria-label="${T('close')}">✕</button></div>`;
+    if (!cur) return `${head}<div class="ttres"><svg viewBox="0 0 48 48" aria-hidden="true">${(window.CUTE && window.CUTE.art.star) || ''}</svg><b>${T('wl_done')}</b><span>${T('wl_done_t')}</span></div><div class="actions"><button class="btn primary" data-act="wllater">${T('wl_start')}</button></div>`;
+    if (m.intro) return `${head}<p>${T('wl_intro', { n: left.length })}</p><ul class="wllist">${left.map(x => `<li>${T('wl_' + x.k)}</li>`).join('')}</ul><div class="actions"><button class="btn primary" data-act="wlgo">${T('wl_begin')}</button><button class="btn" data-act="wllater">${T('wl_later')}</button></div>`;
+    const inst = installEvt ? `<button class="btn primary" data-act="install">${T('inst_btn')}</button>` : isIOS() ? `<ol class="insteps"><li>${T('inst_ios1')}</li><li>${T('inst_ios2')}</li><li>${T('inst_ios3')}</li></ol>` : isAndroid() ? `<ol class="insteps"><li>${T('inst_and1')}</li><li>${T('inst_and2')}</li></ol>` : `<span class="muted">${T('install_text')}</span>`;
+    const on = perm === 'granted' && !!state.pushSub;
+    const body = cur.k === 'look' ? `<label>${T('language')}<select data-ch="lang">${opt('en', 'English', lang())}${opt('ru', 'Русский', lang())}${opt('ka', 'ქართული', lang())}</select></label><span class="small">${T('wl_look_size')}</span><div class="seg">${[['s', 'A'], ['m', 'A'], ['l', 'A'], ['xl', 'A']].map(([v], i) => `<button data-act="wlfs" data-v="${v}" aria-pressed="${(dget('fs') || 'm') === v}" style="font-size:${14 + i * 3}px">A</button>`).join('')}</div>`
+      : cur.k === 'install' ? `<span class="muted">${T('inst_why')}</span>${inst}`
+      : cur.k === 'notif' ? `<span class="small">${T(perm === 'unsupported' ? (isIOS() && !standalone() ? 'nf_ios_home' : 'push_unsupported') : perm === 'denied' ? 'nf_blocked' : on ? 'nf_on' : 'wl_notif_t')}</span><div class="bar">${perm !== 'unsupported' && perm !== 'denied' && !on ? `<button class="btn primary" data-act="push">${T('push_enable')}</button>` : ''}${on ? `<button class="btn primary" data-act="pushtest">${T('nf_test')}</button>` : ''}</div>${botOn() ? `<span class="muted small">${T('wl_notif_tg')}</span>` : ''}`
+      : `<span class="small">${T('wl_' + cur.k + '_t')}</span>`;
+    const form = !cur.dev;
+    return `${head}<div class="wlprog"><span class="meter"><i style="width:${Math.round(n / all.length * 100)}%"></i></span><span class="muted small num">${T('wl_step', { n, all: all.length })}</span></div>
+      <div class="card f wlstep"><b>${T('wl_' + cur.k)}</b>${body}</div>
+      <div class="actions wlacts">${form ? `<button class="btn primary" data-act="wldo" data-k="${cur.k}">${T('wl_do')}</button>` : `<button class="btn primary" data-act="wlnext" data-k="${cur.k}">${T('wl_next')}</button>`}<button class="btn" data-act="wlskip" data-k="${cur.k}">${T('wl_skip')}</button><button class="lnk" data-act="wllater">${T('wl_later')}</button></div>`;
+  }
   function setupCard(compact) {
-    const st = setupSteps(), left = st.filter(x => !x.done).length; if (!st.length || !left) return '';
+    const st = setupSteps(), left = st.filter(x => !x.done).length; if (compact && welcomeSteps().some(x => !x.done) && (S.mode === 'supabase' || window.__fsSetupDemo)) { const w = welcomeSteps(), wl = w.filter(x => !x.done).length; return `<button class="banner small setupban" data-act="wlgo"><span>${T('su_banner', { n: w.length - wl, all: w.length })}</span><b>${T('su_finish')} ›</b></button>`; } if (!st.length || !left) return '';
     if (compact) return `<button class="banner small setupban" data-act="gosetup"><span>${T('su_banner', { n: st.length - left, all: st.length })}</span><b>${T('su_finish')} ›</b></button>`;
     return `<div class="card f setupcard"><b>${T('su_title')}</b><span class="muted">${T('su_text')}</span>${st.map(x => `<button class="surow ${x.done ? 'done' : ''}" data-act="gosetup" data-k="${x.k}"><span class="sudot">${x.done ? '✓' : ''}</span><span class="grow-l">${T('su_' + x.k)}</span>${x.done ? '' : '<b>›</b>'}</button>${x.k === 'tg' && !x.done ? `<button class="lnk suskip" data-act="tgskip">${T('su_tg_skip')}</button>` : ''}`).join('')}</div>`;
   }
@@ -1819,14 +1856,14 @@
   const MOODS = [5, 4, 3, 2, 1], moodKey = () => 'fs-mood-' + (me() ? me().id : ''), moodToday = () => { try { const v = JSON.parse(localStorage.getItem(moodKey()) || '{}'); return v.day === today() ? v : null; } catch (e) { return null; } };
   const moodFace = n => `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="${['', '#c9b3ee', '#bcd3ea', '#fff3d6', '#cfeecd', '#ffd166'][n]}" stroke="#4a3526" stroke-width="1.600"/><circle cx="8.500" cy="10" r="1.100" fill="#4a3526"/><circle cx="15.500" cy="10" r="1.100" fill="#4a3526"/><path d="${['', 'M8 17q4-3.500 8 0', 'M8.500 16.500q3.500-2 7 0', 'M8.500 16h7', 'M8.500 15q3.500 2.400 7 0', 'M7.500 14.500q4.500 4.500 9 0'][n]}" fill="none" stroke="#4a3526" stroke-width="1.600" stroke-linecap="round"/></svg>`;
   const moodBtns = () => `<div class="moods">${MOODS.map(n => `<button class="moodb" data-act="mood" data-v="${n}">${moodFace(n)}<span>${T('md_' + n)}</span></button>`).join('')}</div>`;
-  function moodCardHtml() { const m = me(); if (!m || !m.active || state.viewAs || moodToday()) return ''; return `<div class="card f moodcard"><div class="row nw"><b class="grow-l">${T('md_q', { name: firstName(m) })}</b><button class="lnk small" data-act="mood" data-v="0">${T('md_skip')}</button></div>${moodBtns()}<span class="muted small">${T('md_note')}</span></div>`; }
+  function moodCardHtml() { const m = me(); if (!m || !m.active || state.viewAs || pref('mood') === 'off' || moodToday()) return ''; return `<div class="card f moodcard"><div class="row nw"><b class="grow-l">${T('md_q', { name: firstName(m) })}</b><button class="lnk small" data-act="mood" data-v="0">${T('md_skip')}</button></div>${moodBtns()}<span class="muted small">${T('md_note')}</span><button class="lnk small askoff" data-act="askoff" data-k="mood">${T('ask_never')}</button></div>`; }
   function moodLineHtml() { const v = moodToday(); return v && v.v ? `<span class="wrline moodline">${moodFace(v.v)}<span>${T('md_today', { m: T('md_' + v.v) })} <button class="lnk small" data-act="moodredo">${T('md_change')}</button></span></span>` : ''; }
   // ---------- after a tour: one tap to say how it went ----------
   const rateSkip = () => { try { return JSON.parse(localStorage.getItem('fs-rate-skip') || '[]'); } catch (e) { return []; } };
   function rateCardHtml() {
-    const m = me(); if (!m || !m.active || state.viewAs) return ''; const td = today(), now = hm(new Date().toISOString()), skip = rateSkip();
+    const m = me(); if (!m || !m.active || state.viewAs || pref('rate') === 'off') return ''; const td = today(), now = hm(new Date().toISOString()), skip = rateSkip();
     const t = db.tours.filter(x => live(x) && involves(x, m.id) && x.date <= td && x.date >= addDays(td, -2) && (endOf(x) < td || !x.end_time || x.end_time <= now) && !myScore(x.id, m.id) && !skip.includes(x.id)).sort((a, b) => (b.date + (b.start_time || '')).localeCompare(a.date + (a.start_time || '')))[0];
-    if (!t) return ''; return `<div class="card f ratecard"><div class="row nw"><b class="grow-l">${T('rt_q', { tour: aliasOf(t.title), day: t.date === td ? T('today').toLowerCase() : fmtDay(t.date) })}</b><button class="lnk small" data-act="rateskip" data-id="${t.id}">${T('md_skip')}</button></div><div class="moods">${[[10, 5, 'rt_great'], [7, 4, 'rt_good'], [5, 3, 'rt_ok'], [3, 2, 'rt_hard']].map(([sc, f, k]) => `<button class="moodb" data-act="ratequick" data-id="${t.id}" data-s="${sc}">${moodFace(f)}<span>${T(k)}</span></button>`).join('')}</div></div>`;
+    if (!t) return ''; return `<div class="card f ratecard"><div class="row nw"><b class="grow-l">${T('rt_q', { tour: aliasOf(t.title), day: t.date === td ? T('today').toLowerCase() : fmtDay(t.date) })}</b><button class="lnk small" data-act="rateskip" data-id="${t.id}">${T('md_skip')}</button></div><div class="moods">${[[10, 5, 'rt_great'], [7, 4, 'rt_good'], [5, 3, 'rt_ok'], [3, 2, 'rt_hard']].map(([sc, f, k]) => `<button class="moodb" data-act="ratequick" data-id="${t.id}" data-s="${sc}">${moodFace(f)}<span>${T(k)}</span></button>`).join('')}</div><button class="lnk small askoff" data-act="askoff" data-k="rate">${T('ask_never')}</button></div>`;
   }
   // One question at a time at the top of the home page: the tour that just ended first, otherwise today's mood.
   const askCardHtml = () => rateCardHtml() || moodCardHtml();
@@ -1876,7 +1913,7 @@
     const tm = totem(m.id), totem0 = `<div class="wrtotem"><svg viewBox="0 0 48 48" aria-hidden="true">${(window.CUTE && window.CUTE.art[tm.an]) || ''}</svg><span class="grow-l"><span class="muted small">${T('wa_last')}</span><b>${T('wa_' + tm.an)}</b><span class="small">${esc(T('wa_' + tm.an + '_t', tm.v))}</span><button class="lnk small" data-act="totem">${T('tt_how')} ›</button></span></div>`, totemHtml = totem0;
     const tiles = `<div class="stats wrstats"><div class="stat"><b class="num">${thisWk}</b>${T('wa_thisweek')}<span class="muted small num">${T('wa_usual', { n: nf(avg) })}</span></div><div class="stat"><b class="num">${days.length}</b>${T('wa_days30')}<span class="muted small num">${T('wa_run', { n: run })}</span></div><div class="stat"><b class="num">${free ? esc(fmt(free, { day: 'numeric', month: 'short' })) : '—'}</b>${T('wa_free')}<span class="muted small num">${T('wa_next14', { n: next.length })}</span></div></div>`;
     const tip = run >= (r.maxStreak || 6) ? T('wr_adv_rest') : target && thisWk > target ? T('wr_over', { t: target }) : target && thisWk < target ? T('wr_under', { t: target }) : '';
-    return `<div class="card wrcard"><b>${T('wr_title')}</b>${totemHtml}${moodLineHtml()}${tiles}${tip ? `<span class="wrline">${msi('info')}<span>${esc(tip)}</span></span>` : ''}${earn}${wishes}<details class="sect wrmore bpmore" data-keep="wr-more" ${(state.keep || {})['wr-more'] ? 'open' : ''}><summary data-s="${T('show')}" data-h="${T('hide')}">${T('wa_more')}</summary>${L.map(([ic, tx]) => `<span class="wrline">${msi(ic)}<span>${esc(tx)}</span></span>`).join('')}</details><span class="muted small wrnote">${T('wr_note')}</span></div>`;
+    return `<div class="card wrcard"><b>${T('wr_title')}</b>${gameOn() ? totemHtml : ''}${moodLineHtml()}${tiles}${tip ? `<span class="wrline">${msi('info')}<span>${esc(tip)}</span></span>` : ''}${earn}${wishes}<details class="sect wrmore bpmore" data-keep="wr-more" ${(state.keep || {})['wr-more'] ? 'open' : ''}><summary data-s="${T('show')}" data-h="${T('hide')}">${T('wa_more')}</summary>${L.map(([ic, tx]) => `<span class="wrline">${msi(ic)}<span>${esc(tx)}</span></span>`).join('')}</details><span class="muted small wrnote">${T('wr_note')}</span></div>`;
   }
   function openTours() {
     const m = me(); if (!m || isAdmin()) return []; const role = m.role === 'driver' ? 'driver' : 'guide', td = today(), to = addDays(td, 30);
@@ -2714,6 +2751,7 @@
     } catch (e) { /* private mode */ }
   }
   function photoStripHtml() {
+    if (!photoOn()) return '';
     if (!me() || !me().active) return ''; const td = today(), ps = photosOn(td), show = ps.length ? ps : photosOn(addDays(td, -1));
     return `<button class="phstrip" data-act="photos">${msi('photo_camera')}<span class="grow-l"><b>${T('ph_title')}</b><span class="muted small">${ps.length ? T('ph_n', { n: ps.length }) : T(myPhoto(td) ? 'ph_n' : 'ph_add_first', { n: 0 })}</span></span><span class="phs-th">${show.slice(0, 3).map(p => phImg(p, 't', 'phs-i')).join('')}</span><b>›</b></button>`;
   }
@@ -2795,8 +2833,8 @@
   }
   function badgesHtml(id) {
     const g = game(id), delta = (a, b) => (a === b ? '' : ` <span class="muted small num">${a > b ? '+' : '−'}${nf(Math.abs(a - b))}</span>`);
-    const next = g.list.filter(b => !b.done && !b.hidden && b.track !== 'master' && b.have > 0).sort((x, y) => y.have / y.goal - x.have / x.goal).slice(0, 3);
-    const tracks = [['titles', T('tr_titles')], ['all', ''], ['master', T('tr_master')], ['guide', T('tr_guide')], ['driver', T('tr_driver')], ['own', T('tr_own')], ['delica', 'Delica'], ['new', T('tr_new')], ['now', T('tr_now')], ['geo', T('tr_geo')], ['fun', T('tr_fun')], ['secret', T('tr_secret')]];
+    const next = g.list.filter(b => !b.done && !b.hidden && b.track !== 'master' && b.track !== 'legend' && b.have > 0).sort((x, y) => y.have / y.goal - x.have / x.goal).slice(0, 3);
+    const tracks = [['titles', T('tr_titles')], ['all', ''], ['master', T('tr_master')], ['guide', T('tr_guide')], ['driver', T('tr_driver')], ['own', T('tr_own')], ['delica', 'Delica'], ['new', T('tr_new')], ['now', T('tr_now')], ['geo', T('tr_geo')], ['fun', T('tr_fun')], ['legend', T('tr_legend')], ['secret', T('tr_secret')]];
     const pals = Object.entries(g.partners).sort((x, y) => y[1] - x[1]).slice(0, 3);
     return `<div class="card lvl"><div class="row nw">${avatar(id, true)}<div class="grow-l" style="flex-direction:column;align-items:stretch;gap:4px;min-width:0"><b class="lvn">${T('level')} ${g.level}</b><details class="lvhelp"><summary class="lnk small">${T('lv_how')}</summary><p class="small">${T('lv_text')}</p><ul class="small"><li>${T('lv_tour')}</li><li>${T('lv_guest')}</li><li>${T('lv_km')}</li><li>${T('lv_badge')}</li></ul><p class="small muted">${T('lv_steps')}</p></details><span class="meter"><i style="width:${Math.round((g.xp - g.base) / (g.next - g.base) * 100)}%"></i></span><span class="muted small num">${T('g_xp', { xp: nf(g.xp), next: nf(g.next) })} · ${g.done}/${g.list.length} ${T('badges').toLowerCase()}</span></div></div></div>
       ${next.length ? `<h3>${T('g_next')}</h3><div class="medals">${next.map(b => medal(b)).join('')}</div>` : ''}
@@ -2814,10 +2852,10 @@
   function meHtml() {
     const m = me(), perm = ('Notification' in window) ? Notification.permission : 'unsupported', tab = state.meTab, mo = state.listMonth || today().slice(0, 7);
     const pd = db.payout_details.find(x => x.id === m.id) || {};
-    let h = `<div class="bar"><h2>${T('nav_me')}</h2><span class="spacer"></span>${helpBtn()}</div>${helpBox('me')}<div class="seg">${['profile', 'settings', 'month', 'stats', 'badges'].map(x => `<button data-act="metab" data-v="${x}" aria-pressed="${tab === x}">${T('me_' + x)}</button>`).join('')}</div>`;
+    let h = `<div class="bar"><h2>${T('nav_me')}</h2><span class="spacer"></span>${helpBtn()}</div>${helpBox('me')}<div class="seg">${['profile', 'settings', 'month', 'stats', 'badges'].filter(x => x !== 'badges' || gameOn()).map(x => `<button data-act="metab" data-v="${x}" aria-pressed="${tab === x}">${T('me_' + x)}</button>`).join('')}</div>`;
     if (tab === 'month') { const pr = payRange(); return h + rangeBar() + (pr.month ? statementHtml(m.id, pr.month, false) : payRangeHtml(m.id, pr.from, pr.to, false)) + expensesHtml(m.id, pr.from, pr.to) + adviceHtml(m.id); }
     if (tab === 'stats') return h + statsHtml(isAdmin() ? (state.statUser || m.id) : m.id);
-    if (tab === 'badges') return h + badgesHtml(m.id);
+    if (tab === 'badges') return h + (gameOn() ? badgesHtml(m.id) : `<div class="empty">${T('pf_off')}</div>`);
     if (tab === 'settings') return h + settingsHtml(m, perm);
     return h + `<div class="cols"><div class="list"><div class="card f">
       <div class="row">${avatar(m.id, true)}<div><b>${esc(m.name)}</b> <span class="tag t-muted">${T('role_' + m.role)}</span>${m.email ? `<div class="muted small">${esc(m.email)}</div>` : ''}</div></div>
@@ -2844,6 +2882,8 @@
       <label>${T('language')}<select id="me-lang" data-ch="lang">${opt('en', 'English', lang())}${opt('ru', 'Русский', lang())}${opt('ka', 'ქართული', lang())}</select></label>
       ${notifCardHtml(perm)}<div class="checks col">${Object.keys(NOTE_GROUPS).map(g => `<label><input type="checkbox" id="mute-${g}" data-ch="mutepref" data-g="${g}" ${(m.mute || []).includes(g) ? '' : 'checked'}>${T('note_' + g)}</label>`).join('')}</div></div>
       </div><div class="list">${installCardHtml(true)}<div class="card f">
+      <button class="btn" data-act="welcome">${T('wl_again')}</button>
+      <b>${T('pf_title')}</b><div class="checks col"><label><input type="checkbox" data-ch="pref" data-k="game" ${gameOn() ? 'checked' : ''}>${T('pf_game')}</label><label><input type="checkbox" data-ch="pref" data-k="photo" ${photoOn() ? 'checked' : ''}>${T('pf_photo')}</label><label><input type="checkbox" data-ch="pref" data-k="mood" ${pref('mood') !== 'off' ? 'checked' : ''}>${T('pf_mood')}</label><label><input type="checkbox" data-ch="pref" data-k="rate" ${pref('rate') !== 'off' ? 'checked' : ''}>${T('pf_rate')}</label></div><span class="muted small">${T('pf_note')}</span>
       <details class="sect"><summary>${T('privacy_link')}</summary><p class="muted small">${T('privacy_text', { n: pv().guideDays })}</p></details>
       <button class="btn" data-act="signout">${T('signout')}</button>${testOn() ? `<button class="lnk" data-act="testinfo">${T('tb_chip')}: ${T('tb_title')}</button>` : ''}<span class="muted small num">${T('version')} ${APP_VERSION}${S.syncedAt ? ' · ' + T('updated_at', { time: new Intl.DateTimeFormat(LOCALES[lang()], { hour: '2-digit', minute: '2-digit' }).format(new Date(S.syncedAt)) }) : ''}</span></div></div></div>`;
   }
@@ -2994,7 +3034,7 @@
     const el = $('#modal'); if (!el) return; const m = state.modal;
     if (m && !modalHist) { modalHist = true; navPush(); } else if (!m && modalHist) { modalHist = false; navPop(); }
     if (!m) { el.innerHTML = ''; modalKey = ''; return; }
-    const inner = m.type === 'exp' ? expModalHtml(m) : m.type === 'tnames' ? tnamesHtml(m) : m.type === 'tour' ? tourModalHtml(m) : m.type === 'off' ? offModalHtml(m) : m.type === 'task' ? taskModalHtml(m) : m.type === 'client' ? clientModalHtml(m) : m.type === 'offer' ? offerModalHtml(m) : m.type === 'guest' ? guestSheetHtml(m) : m.type === 'creq' ? creqModalHtml(m) : m.type === 'cancel' ? cancelModalHtml(m) : m.type === 'person' ? personModalHtml(m) : m.type === 'invite' ? inviteModalHtml(m) : m.type === 'tip' ? tipModalHtml(m) : m.type === 'share' ? shareModalHtml(m) : m.type === 'test' ? testModalHtml() : m.type === 'display' ? `<div class="hdr"><h2>${T('ds_title')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div><div class="f">${displayHtml()}</div>` : m.type === 'move' ? moveModalHtml(m) : m.type === 'totem' ? totemModalHtml(m) : m.type === 'photos' ? photosModalHtml(m) : m.type === 'thanks' ? thanksModalHtml() : m.type === 'recap' ? recapModalHtml() : m.type === 'celebrate' ? celebrateHtml(m) : m.type === 'cat' ? catModalHtml(m) : m.type === 'dispute' ? disputeModalHtml(m) : m.type === 'prange' ? payRangeHtml(m.id, payRange().from, payRange().to, true) : m.type === 'badge' ? badgeModalHtml(m) : m.type === 'summary' ? summaryHtml(m) : m.type === 'statement' ? statementHtml(m.id, m.month, true) : m.type === 'pstats' ? `<div class="hdr"><h2>${T(state.mode === 'month' ? 'inc_month' : 'inc_week')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>${periodStatsHtml(m.from, m.to).replace('<details class="wstats">', '<details class="wstats" open>')}` : m.type === 'addmenu' ? addMenuHtml() : m.type === 'pdate' ? pdModalHtml(m) : m.type === 'confirm' ? `<div class="hdr"><h2>${esc(m.text)}</h2></div><div class="actions"><button class="btn" data-act="close">${T('close')}</button><button class="btn danger" data-act="confirmyes">${esc(m.yes)}</button></div>` : bellHtml();
+    const inner = m.type === 'exp' ? expModalHtml(m) : m.type === 'tnames' ? tnamesHtml(m) : m.type === 'tour' ? tourModalHtml(m) : m.type === 'off' ? offModalHtml(m) : m.type === 'task' ? taskModalHtml(m) : m.type === 'client' ? clientModalHtml(m) : m.type === 'offer' ? offerModalHtml(m) : m.type === 'guest' ? guestSheetHtml(m) : m.type === 'creq' ? creqModalHtml(m) : m.type === 'cancel' ? cancelModalHtml(m) : m.type === 'person' ? personModalHtml(m) : m.type === 'invite' ? inviteModalHtml(m) : m.type === 'tip' ? tipModalHtml(m) : m.type === 'share' ? shareModalHtml(m) : m.type === 'test' ? testModalHtml() : m.type === 'display' ? `<div class="hdr"><h2>${T('ds_title')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div><div class="f">${displayHtml()}</div>` : m.type === 'move' ? moveModalHtml(m) : m.type === 'welcome' ? welcomeModalHtml(m) : m.type === 'totem' ? totemModalHtml(m) : m.type === 'photos' ? photosModalHtml(m) : m.type === 'thanks' ? thanksModalHtml() : m.type === 'recap' ? recapModalHtml() : m.type === 'celebrate' ? celebrateHtml(m) : m.type === 'cat' ? catModalHtml(m) : m.type === 'dispute' ? disputeModalHtml(m) : m.type === 'prange' ? payRangeHtml(m.id, payRange().from, payRange().to, true) : m.type === 'badge' ? badgeModalHtml(m) : m.type === 'summary' ? summaryHtml(m) : m.type === 'statement' ? statementHtml(m.id, m.month, true) : m.type === 'pstats' ? `<div class="hdr"><h2>${T(state.mode === 'month' ? 'inc_month' : 'inc_week')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>${periodStatsHtml(m.from, m.to).replace('<details class="wstats">', '<details class="wstats" open>')}` : m.type === 'addmenu' ? addMenuHtml() : m.type === 'pdate' ? pdModalHtml(m) : m.type === 'confirm' ? `<div class="hdr"><h2>${esc(m.text)}</h2></div><div class="actions"><button class="btn" data-act="close">${T('close')}</button><button class="btn ${m.plain ? 'primary' : 'danger'}" data-act="confirmyes">${esc(m.yes)}</button></div>` : bellHtml();
     const key = m.type + ':' + (m.id || (m.draft && m.draft.id) || '') + ':' + (m.edit ? 'e' : '');
     // On a computer the tour card opens as a small window next to the tour that was clicked (like a calendar popup), not in the middle of the screen.
     const pop = m.type === 'tour' && !m.edit && !m.back && m.at && !PHONE();
@@ -3003,7 +3043,7 @@
     if (key !== modalKey) { const sh = el.querySelector('.sheet'); if (sh) sh.scrollTop = 0; modalKey = key; }
     refreshTourWarn(); refreshOffWarn();
   }
-  const confirmDo = (text, yes, fn) => { state.modal = { type: 'confirm', text, yes, fn }; renderModal(); };
+  const confirmDo = (text, yes, fn, plain) => { state.modal = { type: 'confirm', text, yes, fn, plain }; renderModal(); };   // plain = not a removal, so the button is not red
   // Closing a window with typed but unsaved data asks first. The question is drawn on top, so nothing typed is lost if the person stays.
   document.addEventListener('input', ev => { const el = ev.target; if (state.modal && el && el.closest && el.closest('#modal form') && el.type !== 'search') state.modal.touched = true; }, true);
   document.addEventListener('submit', ev => { if (state.modal && ev.target.closest && ev.target.closest('#modal')) state.modal.touched = false; }, true);
@@ -3150,6 +3190,16 @@
     moodredo() { try { localStorage.removeItem(moodKey()); } catch (e) { /* private mode */ } state.view = 'calendar'; render(); window.scrollTo(0, 0); },
     rateskip(el) { try { localStorage.setItem('fs-rate-skip', JSON.stringify([...rateSkip(), el.dataset.id].slice(-40))); } catch (e) { /* private mode */ } render(); },
     ratequick(el) { const tid = el.dataset.id, old = myScore(tid, me().id); run(() => S.save('tour_ratings', { id: old ? old.id : S.uid(), tour_id: tid, user_id: me().id, score: Number(el.dataset.s), created_at: new Date().toISOString() })).then(() => { toast(T('rt_thanks')); render(); }); track('score'); },
+    askoff(el) { const k = el.dataset.k; try { localStorage.setItem('fs-pref-' + k, 'off'); } catch (e) { /* private mode */ } const m = me(); if (m) S.save('profiles', { ...stripEmail(m), display: { ...((m.display && typeof m.display === 'object') ? m.display : {}), [k]: 'off' } }).catch(() => {}); toast(T('ask_off')); render(); },
+    welcome() { state.modal = { type: 'welcome', intro: true }; renderModal(); },
+    wlgo() { state.modal = { type: 'welcome' }; renderModal(); },
+    wlfs(el) { setDisplay('fs', el.dataset.v); renderModal(); },
+    wlnext(el) { wlSet(el.dataset.k, '1'); renderModal(); },
+    wlskip(el) { const k = el.dataset.k, st = welcomeSteps().find(x => x.k === k); if (st && st.dev) { wlSet(k, 'skip'); renderModal(); return; } const m = me(), d = (m.display && typeof m.display === 'object') ? m.display : {}; run(() => S.save('profiles', { ...stripEmail(m), display: { ...d, wlSkip: [...new Set([...(d.wlSkip || []), k])] } })).then(renderModal); },
+    wllater() { try { sessionStorage.setItem('fs-wl-later', '1'); localStorage.setItem('fs-wl-n', String((Number(localStorage.getItem('fs-wl-n')) || 0) + 1)); } catch (e) { /* private mode */ } state.modal = null; render(); renderModal(); },
+    wldo(el) { const k = el.dataset.k; try { sessionStorage.setItem('fs-wl-later', '1'); } catch (e) { /* private mode */ } state.modal = null; state.view = 'me'; state.meTab = 'profile'; if (k === 'photo') state.avOpen = true; render(); renderModal();
+      const sel = { details: '#me-details', photo: '#me-photo', tours: '#me-tours', tg: '#me-tgbot, #me-tg', work: 'form[data-form=worksched]', payout: 'form[data-form=payout], [data-act=payedit]', dates: '.pdform' }[k], x = sel && document.querySelector(sel);
+      if (x) { x.scrollIntoView({ block: 'center', behavior: 'smooth' }); x.classList.add('wlflash'); setTimeout(() => x.classList.remove('wlflash'), 2600); } },
     usf(el) { state.usageF = { ...(state.usageF || {}), [el.dataset.k]: el.dataset.v }; render(); },
     refresh() { if (state.refreshing) return; state.refreshing = true; render(); (async () => { try { if (S.offline) await S.sync(); else await S.pulse(); } catch (e) { console.error(e); } state.refreshing = false; render(); if (!S.warming) toast(T(S.offline ? 'rf_off' : 'up_to_date')); })(); },
     pvcount() { run(async () => { state.staleN = await S.staleGuests(pv().keepMonths); }); },
@@ -3234,6 +3284,7 @@
     tourclone(el) { const t = db.tours.find(x => x.id === el.dataset.id); if (!t) return; const { id, external_id, status, pax, adults, children, cancel_reason, created_at, ...keep } = t; openTour(null, { ...keep, pax: 1, adults: 1, children: 0, status: 'confirmed', external_id: null }); state.modal.touched = true; toast(T('clone_hint')); },
     offdecide(el) { const o = db.time_off.find(x => x.id === el.dataset.id); logAct(`Time off ${el.dataset.s} for ${pname(o.user_id)}: ${o.date_from} to ${o.date_to}`); run(async () => { await S.save('time_off', { ...o, status: el.dataset.s, decided_by: me().id }); await notify([o.user_id], el.dataset.s === 'approved' ? 'off_approved' : 'off_declined', { from: o.date_from, to: o.date_to }); }); },
     offdel(el) { confirmDo(T('confirm_remove'), T('remove'), () => S.remove('time_off', el.dataset.id)); },
+    offopen(el) { const o = db.time_off.find(x => x.id === el.dataset.id); if (!o || !offCan(o)) return; state.modal = { type: 'off', draft: { id: o.id, user_id: o.user_id, type: o.type, date_from: o.date_from, date_to: o.date_to, note: o.note || '' } }; renderModal(); refreshOffWarn(); },
     taskfilter(el) { state.taskFilter = el.dataset.v; render(); },
     pdkind(el) { const m = state.modal; if (!m || m.type !== 'pdate') return; const t = $('#pd-title'), y = $('#pd-yearly'); if (t) { t.value = T('pdk_' + el.dataset.k); dirty.add(t); } if (y) { y.checked = ['birthday', 'anniversary', 'family'].includes(el.dataset.k); dirty.add(y); } m.touched = true; document.querySelectorAll('#modal .chip2').forEach(c => c.classList.toggle('on', c === el)); },
     pdnew() { state.modal = { type: 'pdate', draft: { title: '', date: today(), yearly: false } }; renderModal(); requestAnimationFrame(() => wheelSync(true)); },
@@ -3296,6 +3347,7 @@
       setTimeout(() => { if (state.modal === m) renderModal(); }, 0); toast(T('cat_filled'));
     },
     statuser(el) { state.statUser = el.value; render(); },
+    pref(el) { const k = el.dataset.k, v = el.checked ? 'on' : 'off'; try { localStorage.setItem('fs-pref-' + k, v); } catch (e) { /* private mode */ } const m = me(); if (m) S.save('profiles', { ...stripEmail(m), display: { ...((m.display && typeof m.display === 'object') ? m.display : {}), [k]: v } }).catch(() => {}); if (k === 'game' && v === 'off' && state.meTab === 'badges') state.meTab = 'settings'; toast(T('saved')); render(); },
     lang(el) { const v = el.value; S.ls.set('fs-lang', v); run(() => S.save('profiles', { ...stripEmail(me()), lang: v })); },
     prelang(el) { S.ls.set('fs-lang', el.value); render(); },
     payfrom(el) { if (el.value) { (state.pay = state.pay || {}).from = el.value; render(); } },
@@ -3451,13 +3503,13 @@
   const dropAt = (x, y) => { const e = document.elementFromPoint(x, y); return e ? e.closest('[data-drop]') : null; };
   function dragDown(src, x, y, touch) {
     if (!me() || !isAdmin() || state.modal || state.view !== 'calendar') return;
-    const el = src.closest('[data-drag]'); if (!el) return; const cell = el.closest('.cell');
-    dg = { el, id: el.dataset.drag, x, y, on: false, touch, from: cell ? cell.dataset.who || '' : null };
+    const el = src.closest('[data-drag], [data-dragoff]'); if (!el) return; const cell = el.closest('.cell');
+    dg = { el, off: el.dataset.dragoff || '', d0: el.dataset.d || '', id: el.dataset.drag, x, y, on: false, touch, from: cell ? cell.dataset.who || '' : null };
     if (touch) dg.tm = setTimeout(() => { if (dg && !dg.on) dragStart(dg.x, dg.y); }, 380);
   }
   function dragStart(x, y) {
     const r = dg.el.getBoundingClientRect(), g = dg.el.cloneNode(true);
-    g.removeAttribute('data-act'); g.removeAttribute('data-drop'); g.removeAttribute('data-drag'); g.removeAttribute('data-key'); g.className += ' dragghost'; g.style.width = r.width + 'px'; g.style.left = r.left + 'px'; g.style.top = r.top + 'px';
+    g.removeAttribute('data-act'); g.removeAttribute('data-drop'); g.removeAttribute('data-drag'); g.removeAttribute('data-dragoff'); g.removeAttribute('data-key'); g.className += ' dragghost'; g.style.width = r.width + 'px'; g.style.left = r.left + 'px'; g.style.top = r.top + 'px';
     dg.dx = x - r.left; dg.dy = y - r.top; dg.ghost = g; dg.on = true; sw = null;
     document.body.appendChild(g); dg.el.classList.add('dragsrc'); document.documentElement.classList.add('dragging');
     if (dg.touch && navigator.vibrate) { try { navigator.vibrate(12); } catch (e) { /* not allowed */ } }
@@ -3475,7 +3527,12 @@
     if (!dg) return; const d = dg; dg = null; clearTimeout(d.tm);
     if (!d.on) return;
     d.ghost.remove(); d.el.classList.remove('dragsrc'); document.documentElement.classList.remove('dragging'); document.querySelectorAll('.dropon').forEach(e => e.classList.remove('dropon')); dragEnd = Date.now();
-    const tg = x === undefined ? null : dropAt(x, y), t = db.tours.find(z => z.id === d.id); if (!tg || !t) return;
+    const tg = x === undefined ? null : dropAt(x, y);
+    if (tg && d.off) { const o = db.time_off.find(z => z.id === d.off); if (!o) return; const by = daysBetween(d.d0 || o.date_from, tg.dataset.drop), np = d.from !== null && tg.dataset.who && twin(tg.dataset.who) !== twin(o.user_id) ? person(tg.dataset.who) : null; if (!by && !np) return;
+      const row = { ...o, date_from: addDays(o.date_from, by), date_to: addDays(o.date_to, by), user_id: np ? np.id : o.user_id };
+      if (db.time_off.some(z => z.id !== o.id && z.status !== 'declined' && twin(z.user_id) === twin(row.user_id) && z.date_from <= row.date_to && z.date_to >= row.date_from && !(z.date_from <= o.date_to && z.date_to >= o.date_from && twin(z.user_id) === twin(o.user_id)))) { toast(T('off_twice')); return; }
+      track('drag'); confirmDo(T('off_move_q', { what: T(o.type === 'sick' ? 'sick' : o.type === 'half' ? 'halfday' : 'dayoff'), name: pname(row.user_id), when: fmtRange(row.date_from, row.date_to) }), T('mv_btn'), async () => { await S.save('time_off', row); logAct(`${T('request')}: ${pname(row.user_id)}, ${row.type}, ${row.date_from} to ${row.date_to}`); await notify([row.user_id], 'off_approved', { name: pname(row.user_id), from: row.date_from, to: row.date_to }); }, true); return; }
+    const t = db.tours.find(z => z.id === d.id); if (!tg || !t) return;
     const date = tg.dataset.drop, p = d.from !== null && tg.dataset.who && tg.dataset.who !== d.from ? person(tg.dataset.who) : null;
     const who = p ? { [p.role === 'driver' ? 'driver_id' : 'guide_id']: p.id } : null;
     if (date === t.date && !who) return;
@@ -3522,6 +3579,10 @@
   });
   S.authEvent = ev => { if (ev === 'PASSWORD_RECOVERY') { state.auth = 'newpass'; render(); } };
   // Text size, colours and contrast: kept on this phone and on the account, so they follow the person to another phone.
+  // Personal switches (Me > Settings): the game side of the app (badges, levels, challenges, totem animal) and Photo of the day can each be turned off.
+  // Kept on the phone for speed and in the person's profile so it follows them to another phone.
+  const pref = k => { try { const v = localStorage.getItem('fs-pref-' + k); if (v) return v; } catch (e) { /* private mode */ } const d = me() && me().display; return (d && typeof d === 'object' && d[k]) || 'on'; };
+  const gameOn = () => pref('game') !== 'off', photoOn = () => pref('photo') !== 'off';
   const DKEYS = { fs: 'fs-fsize', theme: 'fs-theme', contrast: 'fs-contrast', accent: 'fs-accent' };
   const ACCENTS = [['', '#314b3c'], ['sea', '#1f5f7a'], ['plum', '#5b3f7a'], ['terra', '#b8441c'], ['sky', '#5aa9e6'], ['mint', '#45b88a'], ['lilac', '#b39ddb'], ['rose', '#f28fad'], ['sun', '#f2c94c'], ['amber', '#f0901e']];
   const dget = k => { try { return localStorage.getItem(DKEYS[k]) || ''; } catch (e) { return ''; } };
@@ -3554,6 +3615,7 @@
     document.addEventListener('visibilitychange', () => { if (!document.hidden && state.newVersion && !state.modal && !document.querySelector('form [data-dirty], .qsave.on')) { try { location.reload(); } catch (e) { /* stays on the banner */ } } });
     // A folded section the person opened stays open while the page redraws.
     document.addEventListener('toggle', e => { const d = e.target; if (d && d.dataset && d.dataset.keep) { state.keep = state.keep || {}; state.keep[d.dataset.keep] = d.open; } }, true);
+    { let tries = 0; const wl = () => { try { if (!(S.mode === 'supabase' || window.__fsSetupDemo) || window.__noWelcome || sessionStorage.getItem('fs-wl-later') || (Number(localStorage.getItem('fs-wl-n')) || 0) >= 3) return; if (state.modal || !me() || !me().active) { if (++tries < 40) setTimeout(wl, 2000); return; } if (welcomeSteps().some(x => !x.done)) acts.welcome(); } catch (e) { /* private mode */ } }; setTimeout(wl, 1800); }   // waits its turn behind any other pop-up
     setTimeout(trackDevice, 3000); setTimeout(privacyAuto, 4000); checkBadges(); weekCheck(); setInterval(weekCheck, 30 * 60000); setTimeout(fxRefresh, 6000); setInterval(fxRefresh, 6 * 3600000);
     setInterval(() => { if (me() && me().active && !isAdmin() && state.view === 'calendar' && !state.modal && !document.hidden) render(); }, 5 * 60000);
     if ('serviceWorker' in navigator && location.protocol === 'https:' && S.mode === 'supabase') { try { swReg = await navigator.serviceWorker.register('sw.js'); const had = !!navigator.serviceWorker.controller; const openedAt = Date.now(); navigator.serviceWorker.addEventListener('controllerchange', () => { if (!had) return; if (Date.now() - openedAt < 15000 && !state.modal && !document.querySelector('form [data-dirty], .qsave.on') && !(S.pending > 0)) { try { location.reload(); return; } catch (e) { /* banner instead */ } } state.newVersion = true; render(); }); document.addEventListener('visibilitychange', () => { if (!document.hidden) { try { swReg.update(); } catch (e) { /* later */ } } }); setInterval(() => { try { swReg.update(); } catch (e) { /* later */ } }, 30 * 60000); } catch (e) { /* no service worker here */ } }
