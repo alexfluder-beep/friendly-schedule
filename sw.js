@@ -1,5 +1,5 @@
 // Service worker: keeps the app shell available offline and shows push notifications.
-const CACHE = 'fs-shell-v82';
+const CACHE = 'fs-shell-v83';
 const SHELL = ['./', 'index.html', 'styles.css', 'config.js', 'catalog.js', 'icons.js', 'cute.js', 'i18n.js', 'store.js', 'app.js', 'vendor/qrcode.js', 'vendor/supabase.js', 'vendor/591.supabase.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'badge-96.png'];
 // A new version is fetched whole and fresh (past the browser's own cache) before it replaces the old one, so the app never runs a mix of old and new files.
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting())); });

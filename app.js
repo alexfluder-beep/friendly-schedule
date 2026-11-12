@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.60';
+  const APP_VERSION = '3.61';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -328,7 +328,8 @@
   const staffBtns = (p, copy) => { if (!p) return ''; const tg = tgLink(p.telegram); return p.phone || tg ? `<span class="cbtns">${p.phone ? ib('wa', 'WhatsApp', waLink(p.phone)) + ib('call', T('call'), 'tel:' + p.phone) : ''}${tg ? ib('tg', 'Telegram', tg) : ''}${copy && p.phone ? ibCopy(p.phone, T('copy')) : ''}</span>` : ''; };
   // Booking platforms (GetYourGuide, Viator / Tripadvisor, Booking.com, Airbnb) give a relay address in place of the guest's own.
   // It is of no use to a guide or driver, so only the office sees it. Nothing changes in the data.
-  const relayEmail = a => { const s = String(a || '').trim().toLowerCase(), i = s.lastIndexOf('@'); if (i < 0) return false; const lp = s.slice(0, i), dom = s.slice(i + 1); return lp.length > 30 || /(^|\.)getyourguide\.com$/.test(dom) || dom === 'expmessaging.tripadvisor.com' || /(^|\.)viator\.com$/.test(dom) || dom === 'guest.booking.com' || /(^|\.)airbnb\.com$/.test(dom); };
+  const relayEmail = a => { const s = String(a || '').trim().toLowerCase(), i = s.lastIndexOf('@'); if (i < 0) return false; const lp = s.slice(0, i), dom = s.slice(i + 1); return lp.length > 30 || dom === 'privaterelay.appleid.com' || /(^|\.)(reply|relay|noreply|no-reply)\./.test(dom) || /^(no-?reply|donotreply)$/.test(lp) || /(^|\.)getyourguide\.com$/.test(dom) || dom === 'expmessaging.tripadvisor.com' || /(^|\.)viator\.com$/.test(dom) || dom === 'guest.booking.com' || /(^|\.)airbnb\.com$/.test(dom); };
+  const guestEmail = v => cleanEmail(v);   // the guest's email as the platform gave it, relay addresses included: the office can still write to them (guides and drivers do not see relay addresses, see shownEmail)
   const shownEmail = a => (a && (isAdmin() || !relayEmail(a)) ? a : '');
   const contactBtns = (phone, email) => `<span class="cbtns">${phone ? ib('wa', 'WhatsApp', waLink(phone)) + ib('call', T('call'), 'tel:' + phone) : ''}${email ? ib('mail', T('email'), 'mailto:' + email) : ''}${phone ? ibCopy(phone, T('copy')) : ''}</span>`;
   const cashDue = bk => bk.filter(b => b.payment === 'cash' || b.payment === 'unpaid').reduce((a, b) => a + (Number(b.amount_due) || 0), 0);
@@ -1163,7 +1164,7 @@
     const keep = new Set();
     for (const b of d.bookings) {
       if (!(b.guest || '').trim()) continue;
-      b.phone = normPhone(b.phone); const em = cleanEmail(b.email) || null;
+      b.phone = normPhone(b.phone); const em = guestEmail(b.email) || null;
       let c = findClient(b) || (em && db.clients.find(x => (x.email || '').toLowerCase() === em)) || null;
       if (!c) { c = { id: S.uid(), name: cleanName(b.guest) || b.guest.trim(), phone: b.phone || null, email: em, notes: null }; await S.save('clients', c); }
       else if ((em && !c.email) || (b.phone && !c.phone)) { c = { ...c, email: c.email || em, phone: c.phone || b.phone || null }; await S.save('clients', c); }
@@ -2357,7 +2358,7 @@
     const ce = catFind(mm.title) || {};
     if (!t) { t = { id: S.uid(), date: mm.date, date_to: ce.days > 1 ? addDays(mm.date, ce.days - 1) : null, start_time: mm.start, end_time: ce.end || null, title: mm.title, kind: mm.kind, capacity: ce.capacity || 0, pickup_url: ce.pickup_url || null, pax: 0, adults: 0, children: 0, language: null, pickup: ce.pickup || null, notes: null, status: 'confirmed', guide_id: null, driver_id: null, guide_pay: null, driver_pay: null, external_id: null }; }
     let c = findClient({ phone: mm.phone, guest: mm.guest });
-    if (!c) { c = { id: S.uid(), name: mm.guest, phone: mm.phone || null, email: mm.email || null, notes: null }; await S.save('clients', c); }
+    if (!c) { c = { id: S.uid(), name: mm.guest, phone: mm.phone || null, email: guestEmail(mm.email) || null, notes: null }; await S.save('clients', c); }
     await S.save('tours', { ...t, adults: (t.adults || 0) + mm.adults, children: (t.children || 0) + mm.children, pax: (t.pax || 0) + mm.adults + mm.children });
     await S.save('bookings', { id: S.uid(), tour_id: t.id, client_id: c.id, guest: mm.guest, adults: mm.adults, children: mm.children, pax: mm.adults + mm.children, phone: mm.phone || null, ref: mm.ref, notes: mm.price ? `${mm.cur} ${mm.price}${mm.due ? ', ' + T('pay_unpaid').toLowerCase() + ' ' + mm.cur + ' ' + mm.due : ''}` : null, marks: [], source: mm.source, payment: mm.payment, amount_due: mm.due && mm.cur === guestCur() ? mm.due : null });
     logAct(`Added booking ${mm.ref} from email: ${mm.title}, ${mm.date}`);
@@ -2452,32 +2453,51 @@
     return { date, time };
   }
   const LANG_CODES = { english: 'EN', russian: 'RU', german: 'DE', french: 'FR', spanish: 'ES', italian: 'IT', georgian: 'KA', hebrew: 'HE', chinese: 'ZH', arabic: 'AR', polish: 'PL', ukrainian: 'UK', turkish: 'TR', dutch: 'NL', japanese: 'JA', korean: 'KO' };
+  // A pasted email may be the raw message (headers, quoted-printable, HTML). Turn it into plain lines first; plain text passes through unchanged.
+  function mailText(raw) {
+    let t = String(raw || '').replace(/\r\n?/g, '\n');
+    const subj = (t.match(/^Subject:\s*([^\n]+)/im) || [])[1] || '';
+    if (/^Content-Transfer-Encoding:\s*quoted-printable/im.test(t) || /=3D["']/.test(t)) {
+      t = t.replace(/=\n/g, ''); const bytes = []; for (let i = 0; i < t.length; i++) { const h = t[i] === '=' ? t.slice(i + 1, i + 3) : ''; if (/^[0-9A-F]{2}$/i.test(h)) { bytes.push(parseInt(h, 16)); i += 2; } else { const c = t.charCodeAt(i); if (c < 128) bytes.push(c); else bytes.push(...new TextEncoder().encode(t[i])); } }
+      try { t = new TextDecoder('utf-8').decode(new Uint8Array(bytes)); } catch (e) { /* keep as is */ }
+    }
+    if (/<(html|body|div|table|p|br)\b/i.test(t)) {
+      const at = t.search(/<(!doctype|html)\b/i); if (at > 0) t = t.slice(at);
+      t = t.replace(/<(head|style|script)\b[\s\S]*?<\/\1>/gi, ' ').replace(/<(br|\/div|\/p|\/tr|\/td|\/h\d|\/li|\/span|\/b)\b[^>]*>/gi, '\n').replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&mdash;|&ndash;/gi, '-').replace(/&quot;/gi, '"').replace(/&#0?39;|&apos;/gi, "'").replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&#(\d+);/g, (m, n) => String.fromCharCode(+n));
+      t = t.split('\n').map(x => x.trim()).filter(Boolean).join('\n'); if (subj) t = 'Subject: ' + subj + '\n' + t;
+    }
+    return t;
+  }
   function parseBooking(raw) {
-    const t = String(raw || '').replace(/\[[^\]]*\]\([^)]*\)/g, ' ').replace(/https?:\/\/\S+/g, ' ').replace(/\|/g, '\n').replace(/[ \t\u00a0]+/g, ' ').replace(/\n\s*\n+/g, '\n').replace(/^\s*(ticket-booking|calendar|users|single-person|globe|pin|currency)\s*$/gim, '').replace(/^(Booking time|Booked (?:at|on)|Please confirm the booking before)[^\n]*\n?[^\n]*$/gim, '');
+    const t = mailText(raw).replace(/\[[^\]]*\]\([^)]*\)/g, ' ').replace(/https?:\/\/\S+/g, ' ').replace(/\|/g, '\n').replace(/[ \t\u00a0]+/g, ' ').replace(/\n\s*\n+/g, '\n').replace(/^\s*(ticket-booking|calendar|users|single-person|globe|pin|currency)\s*$/gim, '').replace(/^(Booking time|Booked (?:at|on)|Please confirm the booking before)[^\n]*\n?[^\n]*$/gim, '');
     const get = re => { const m = t.match(re); return m ? m[1].trim() : ''; };
     const src = /getyourguide/i.test(t) ? 'GetYourGuide' : /viator|tripadvisor/i.test(t) ? 'Viator' : /klook/i.test(t) ? 'Klook' : /trip\.com|ctrip|VBK system/i.test(t) ? 'Trip.com' : /airbnb|booked your experience|Hosted by/i.test(t) ? 'Airbnb' : /civitatis/i.test(t) ? 'Civitatis' : /freetour/i.test(t) ? 'FreeTour' : /tourradar/i.test(t) ? 'TourRadar' : /trekksoft/i.test(t) ? 'Website' : '';
     const ref = get(/\b(GYG[A-Z0-9]{8,})\b/) || get(/\b(BR-\d{6,})\b/) || get(/Booking reference ID\s*:?\s*([A-Z0-9-]{5,})/i) || get(/Confirmation code\s*:?\s*([A-Z0-9]{6,})/i) || get(/(?:Booking (?:Reference|ID|number|No\.?|code)|Reference (?:number|no\.?)|Order (?:number|ID|No\.?)|Confirmation (?:number|code)|Voucher (?:number|code))\s*[:#]?\s*([A-Z0-9][A-Z0-9-]{4,})/i) || get(/order[^#\n]{0,80}#\s?(\d{6,})/i);
-    let title = get(/(?:Tour Name|Activity name|Product name)\s*:\s*([^\n]+)/i) || get(/Booked product\s*\n\s*([^\n]+)/i) || get(/has been booked:?\s*\n\s*([^\n]+)/i) || get(/new reservation for ([^.\n]+)/i) || get(/order for (.+?) and issued/i) || get(/\n([^\n]+)\n\s*Hosted by/i) || get(/(?:Activity|Product|Experience)\s*:\s*([^\n]+)/i);
+    let title = get(/(?:Tour Name|Activity name|Product name)\s*:\s*([^\n]+)/i) || get(/(?:^|\n)([^\n:]{6,120})\n\s*Tour Reservation\b/i) || get(/Booked product\s*\n\s*([^\n]+)/i) || get(/has been booked:?\s*\n\s*([^\n]+)/i) || get(/new reservation for ([^.\n]+)/i) || get(/order for (.+?) and issued/i) || get(/\n([^\n]+)\n\s*Hosted by/i) || get(/(?:Activity|Product|Experience)\s*:\s*([^\n]+)/i);
     title = title.replace(/\s+Reference number.*$/i, '').replace(/^\d{5,}-/, '').replace(/\t.*$/, '').trim();
     let when = parseWhen(get(/(?:Travel Date|Activity Date|Tour date|Date of (?:the )?(?:tour|activity|use)|Departure date|Date Request|Date and time)\s*:?\s*([^\n]+)/i) || get(/\bDate\s*:?\s*([^\n]+)/));
     if (!when.time) when.time = parseWhen(get(/(?:Tour Grade|Start time|Time|Option)\s*:?\s*([^\n]*\d{1,2}:\d{2}[^\n]*)/i)).time;
-    let guest = get(/(?:Lead Traveler Name|Lead traveller(?: name)?|Lead participant|Main customer|Customer name|Contact (?:name|person)|Guest name|Booked by|Traveler name)\s*:?\s*([^\n]+)/i) || get(/^\s*([^\n]{2,40}?) booked your experience/im);
+    let guest = get(/(?:Booking Name|Lead Traveler Name|Lead traveller(?: name)?|Lead participant|Main customer|Customer name|Contact (?:name|person)|Guest name|Booked by|Traveler name)\s*:?\s*([^\n]+)/i) || get(/^\s*([^\n]{2,40}?) booked your experience/im);
     guest = guest.replace(/\S+@\S+.*$/, '').replace(/\s*(Phone|Tel|Mobile)\b.*$/i, '').replace(/^\((?:MR|MRS|MS|MISS|DR)\)\s*/i, '').trim();
     if (/^[A-Z' -]+\/[A-Z' -]+$/.test(guest)) { const [sn, gn] = guest.split('/'); const cap = s => s.toLowerCase().replace(/\b\w/g, x => x.toUpperCase()); guest = `${cap(gn)} ${cap(sn)}`.trim(); }
     const native = get(/\bName\s*:\s*([^\n]+)/); if (native && /[^\u0000-\u024f]/.test(native) && !guest.includes(native)) guest = guest ? `${guest} (${native.trim()})` : native.trim();
     const num = re => { const m = t.match(re), n = m ? Number(m[1]) : 0; return n >= 1 && n <= 99 ? n : 0; };   // a head count is 1-99; a longer number is a booking code, not people
-    let adults = num(/(\d+)\s*x?\s*Adults?\b/i), children = num(/(\d+)\s*x?\s*(?:Child|Children|Kids?)\b/i) + num(/(\d+)\s*x?\s*Youths?\b/i) + num(/(\d+)\s*x?\s*Infants?\b/i);
+    let adults = num(/(\d+)\s*x?\s*Adults?\b/i) || num(/\bAdults?\s*:\s*(\d+)/i), children = num(/\b(?:Children|Kids|Minors)\s*:\s*(\d+)/i) + num(/(\d+)\s*x?\s*(?:Child|Children|Kids?)\b/i) + num(/(\d+)\s*x?\s*Youths?\b/i) + num(/(\d+)\s*x?\s*Infants?\b/i);
     if (!adults && !children) adults = num(/(?:Travell?ers|Participants|Persons|People|Guests|Number of (?:participants|people|guests)|Booking Quantity|Quantity)\s*:?\s*(\d+)/i) || 1;
     const phs = [...t.matchAll(/(?:Phone|Mobile|Tel(?:ephone)?|WhatsApp)\s*(?:number)?\s*:?\s*(?:\([^)]*\))?\s*(?:[A-Z]{2}\s*)?(\+?\d[\d\s()*-]{6,}\d)/gi)].map(m => m[1]).filter(x => !x.includes('*')).map(x => x.replace(/[\s()-]/g, ''));
     const phone = normPhone(phs.find(x => x.startsWith('+')) || (phs[0] ? (phs[0].length > 10 && !/^5/.test(phs[0]) ? '+' + phs[0] : phs[0]) : ''));
-    const email = (t.match(/[\w.+*-]+@[\w-]+(?:\.[\w-]+)+/g) || []).find(e => !/\*|reply|expmessaging|tripadvisor|notification|no-?reply|friendly\.ge|klook\.com|trip\.com|viator|getyourguide|trekksoft|airbnb|example/i.test(e)) || '';
+    // The guest's email: the address on an "E-mail:" line first, else the first address that is not ours or the platform's own sender. Relay addresses (GetYourGuide, Viator, Airbnb, Apple) are the guest's and are kept.
+    const notGuest = e => /\*|no-?reply|do-?not-?reply|notification|mailer|support@|bookings?@|info@|hello@|partner|supplier|friendly\.ge|friendlygeorg|trekksoft|@(?:www\.)?(?:freetour|klook|trip|viator|getyourguide|airbnb|civitatis|tourradar)\.com$|example/i.test(e);
+    const mails = (t.match(/[\w.+*-]+@[\w-]+(?:\.[\w-]+)+/g) || []), labelled = get(/(?:Booking E-?mail|Customer e-?mail|Guest e-?mail|E-?mail(?: address)?)\s*:?\s*([\w.+-]+@[\w-]+(?:\.[\w-]+)+)/i);
+    const email = (labelled && !notGuest(labelled) ? labelled : '') || mails.find(e => !notGuest(e)) || '';
     const lv = (get(/(?:Tour Language|Guide language|Preferred language|Language)\s*:?\s*([^\n]+)/i) || '').toLowerCase(), lang = (Object.entries(LANG_CODES).find(([k]) => lv.includes(k)) || [])[1] || '';
     const pickup = get(/(?<!at )(?:Pick-?up(?: point| location| address)?|Meeting Point|Departure location|Hotel(?: name)?)\s*:?\s*([^\n]+)/i).replace(/\s*Open in Google Maps.*$/i, '').trim();
     const marks = []; if (/non[\s-]?refundable|no refund/i.test(t)) marks.push('nonref'); if (/wine tasting/i.test(t)) marks.push('wine'); if (/front seat/i.test(t)) marks.push('front_seat'); if (/\bPick-?up\b/i.test(t) && pickup && !/Meeting Point/i.test(t)) marks.push('pickup'); if (src === 'FreeTour') marks.push('freetour');
     const price = get(/Total \((?:USD|EUR|GEL)\)\s*:?\s*([^\n]+)/i) ? get(/Total \(((?:USD|EUR|GEL))\)/i) + ' ' + get(/Total \((?:USD|EUR|GEL)\)\s*:?\s*\$?€?([\d,.]+)/i) : get(/(?:Price|Net Rate|Total(?: price)?|Amount(?: paid)?|Sales Price)\s*:?\s*((?:USD|EUR|GEL|\$|€|₾)\s*\$?\s*[\d,.]+)/i);
     const pnum = Number(String(price).replace(/[^\d.,]/g, '').replace(/,(?=\d{3}\b)/g, '').replace(',', '.')) || null, pcur = /EUR|€/.test(price) ? 'EUR' : /GEL|₾/.test(price) ? 'GEL' : price ? 'USD' : '';
     const status = /cancell?ed|cancellation/i.test(t.slice(0, 600)) ? 'cancel' : /amended|changed|modified|rescheduled|has been updated/i.test(t.slice(0, 600)) ? 'change' : 'new';
-    const kind = /private/i.test(title) ? 'private' : /group|shared|small-group|join-in/i.test(title) ? 'group' : /private tour/i.test(t) ? 'private' : /join-in|small group/i.test(t) ? 'group' : '';
+    const kind = /private/i.test(title) ? 'private' : /group|shared|small-group|join-in/i.test(title) ? 'group' : /private tour/i.test(t) ? 'private' : /join-in|small group/i.test(t) || src === 'FreeTour' ? 'group' : '';
     const res = { src, ref, title, date: when.date, time: when.time, guest, adults, children, phone, email: email.toLowerCase(), lang, pickup, marks, price, pnum, pcur, status, kind };
     // Website (TrekkSoft) order lines: "2 x Tour name (24 November, 2026, 10:30)", then "Guest 1 / First name / Last name / phone" blocks.
     const tk = t.match(/^\s*(\d+)\s*x\s+(.+?)\s*\(([^()]*\d{4}[^()]*)\)\s*$/m);
@@ -2920,12 +2940,12 @@
   // App settings, apart from the profile: how the app looks on this phone, language, notifications, install, privacy, sign out.
   function settingsHtml(m, perm) {
     return `<div class="cols"><div class="card f">
+      <div class="f" id="me-see"><b>${T('pf_title')}</b><div class="checks col"><label><input type="checkbox" data-ch="pref" data-k="game" ${gameOn() ? 'checked' : ''}>${T('pf_game')}</label>${gameOn() ? '' : `<span class="muted small" id="me-see-off">${T('pf_game_off')}</span>`}<label><input type="checkbox" data-ch="pref" data-k="photo" ${photoOn() ? 'checked' : ''}>${T('pf_photo')}</label><label><input type="checkbox" data-ch="pref" data-k="mood" ${pref('mood') !== 'off' ? 'checked' : ''}>${T('pf_mood')}</label><label><input type="checkbox" data-ch="pref" data-k="rate" ${pref('rate') !== 'off' ? 'checked' : ''}>${T('pf_rate')}</label></div><span class="muted small">${T('pf_note')}</span></div>
       <div class="f"><b>${T('ds_title')}</b>${displayHtml()}</div>
       <label>${T('language')}<select id="me-lang" data-ch="lang">${opt('en', 'English', lang())}${opt('ru', 'Русский', lang())}${opt('ka', 'ქართული', lang())}</select></label>
       ${notifCardHtml(perm)}<div class="checks col">${Object.keys(NOTE_GROUPS).map(g => `<label><input type="checkbox" id="mute-${g}" data-ch="mutepref" data-g="${g}" ${(m.mute || []).includes(g) ? '' : 'checked'}>${T('note_' + g)}</label>`).join('')}</div></div>
       </div><div class="list">${installCardHtml(true)}<div class="card f">
       <button class="btn" data-act="welcome">${T('wl_again')}</button>
-      <div class="f" id="me-see"><b>${T('pf_title')}</b><div class="checks col"><label><input type="checkbox" data-ch="pref" data-k="game" ${gameOn() ? 'checked' : ''}>${T('pf_game')}</label>${gameOn() ? '' : `<span class="muted small" id="me-see-off">${T('pf_game_off')}</span>`}<label><input type="checkbox" data-ch="pref" data-k="photo" ${photoOn() ? 'checked' : ''}>${T('pf_photo')}</label><label><input type="checkbox" data-ch="pref" data-k="mood" ${pref('mood') !== 'off' ? 'checked' : ''}>${T('pf_mood')}</label><label><input type="checkbox" data-ch="pref" data-k="rate" ${pref('rate') !== 'off' ? 'checked' : ''}>${T('pf_rate')}</label></div><span class="muted small">${T('pf_note')}</span></div>
       <details class="sect"><summary>${T('privacy_link')}</summary><p class="muted small">${T('privacy_text', { n: pv().guideDays })}</p></details>
       <button class="btn" data-act="signout">${T('signout')}</button>${testOn() ? `<button class="lnk" data-act="testinfo">${T('tb_chip')}: ${T('tb_title')}</button>` : ''}<span class="muted small num">${T('version')} ${APP_VERSION}${S.syncedAt ? ' · ' + T('updated_at', { time: new Intl.DateTimeFormat(LOCALES[lang()], { hour: '2-digit', minute: '2-digit' }).format(new Date(S.syncedAt)) }) : ''}</span></div></div></div>`;
   }
@@ -3658,7 +3678,7 @@
     if (S.recall && window.showDirectoryPicker && isAdmin()) S.recall('offdir').then(async h => { if (h && h.queryPermission) { OFFDIR.handle = h; OFFDIR.ok = (await h.queryPermission({ mode: 'readwrite' })) === 'granted'; } }).catch(() => {});
     if (S.remember) S.remember('lang', lang()); if ((S.pending || 0) > 0) setTimeout(() => toast(T('st_waiting_open', { n: S.pending || 0 })), 600);
     if (S.warming) { let warm = true; S.onChange((t, r, type) => { if (warm && type === 'STATE' && !S.warming) { warm = false; PH.asked.clear(); displayFromAccount(); saveHello(); weekCheck(); } }); }
-    if (S.mode === 'demo') window.__test = { T: (k, v) => T(k, v), relayEmail, badgeNote: () => { const b = game(me().id).list.find(x => x.done); if (b) badgeNote([b]); }, checkBadges, newVersion: v => { state.newVersion = !!v; render(); }, pageFor: (title, kind) => { const u = pageFor({ title, kind }), m = /\/activity\/(\d+)/.exec(u); return m ? { id: Number(m[1]) } : null; } };          // for the automatic tests only
+    if (S.mode === 'demo') window.__test = { T: (k, v) => T(k, v), relayEmail, guestEmail, parseBooking, badgeNote: () => { const b = game(me().id).list.find(x => x.done); if (b) badgeNote([b]); }, checkBadges, newVersion: v => { state.newVersion = !!v; render(); }, pageFor: (title, kind) => { const u = pageFor({ title, kind }), m = /\/activity\/(\d+)/.exec(u); return m ? { id: Number(m[1]) } : null; } };          // for the automatic tests only
     if (me() && !isAdmin()) state.mine = true;
     displayFromAccount();
     try { history.scrollRestoration = 'manual'; } catch (e) { /* old browser */ }

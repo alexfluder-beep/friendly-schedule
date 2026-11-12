@@ -550,3 +550,8 @@ A tidy-up round after the owner's phone recording of 3.57. Nothing new to learn;
 - **Status bar colour (Android).** The bar above the app takes the header colour, light or dark, not teal.
 - **Relay emails.** Guides and drivers no longer see a guest's email when it is only a booking platform's relay address (GetYourGuide, Viator / Tripadvisor, Booking.com, Airbnb, or a very long machine-made address). The office sees every email as before; nothing is changed in the data.
 - Not changed, waiting for a check on a real iPhone: the header moving a few pixels after a tab change.
+
+## 3.61
+- **Free tour bookings from email.** "Booking from email" now reads Freetour.com confirmations: tour, date and time, guest, number of people, phone, language and booking code, and marks the booking as a free tour. It also reads the message when the whole raw email is pasted.
+- **Guest emails from booking emails are saved.** "Booking from email" now keeps the guest's email on the client card also when it is a coded relay address (GetYourGuide, Viator, Airbnb, Apple "Hide my email"): the office can still write to it. Guides and drivers do not see relay addresses.
+- **Badges and animals switch is easier to find.** "What I see" is now the first block in Me > Settings.
