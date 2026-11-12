@@ -567,6 +567,10 @@ A tidy-up round after the owner's phone recording of 3.57. Nothing new to learn;
 - **Soft notice about open tours.** The app makes one quiet notice for the person: only while the app is open, only inside their working hours (8:00-20:00 when none are set), never during one of their tours, only for tours they were not told about before, at most every 3 days. People who switched off reminders in Me do not get it. Nothing is sent by the server, so nothing is sent at night or to people who do not open the app. A phone push shows the general text "Something new for you" until the `push` function is updated (not done, needs OK).
 - No database change.
 
+## 3.67
+
+- One frame for the calendar on a computer: Day, Week, Month and Agenda (office and guides) now have the same width, the same centring and the same order: view switch, next-tour and day-off cards, date title with arrows, then the content. Nothing jumps when you switch views. The guide week is built in the same frame. Only the office team grid (behind its button) uses the full width.
+
 ## 3.66
 - **Pay per booking.** The pay table (Back office > Pay) has two new columns, Guide per booking and Driver per booking. Pay = fixed + per guest × guests + per booking × bookings. One booking of two people counts once. Made for group tours such as the walking tour, where 4 bookings × 10 = 40.
 

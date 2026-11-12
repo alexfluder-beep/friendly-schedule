@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.66';
+  const APP_VERSION = '3.67';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -817,8 +817,8 @@
   function guideHomeHtml(days, title) {
     const td = today(), sel = state.date, id = me().id, now = days.includes(td) ? tourNow() : null;
     const asks = db.change_requests.filter(q => q.swap_with === id && q.status === 'pending' && !q.agreed);
-    return `${PHONE() ? '' : setupCard(true) + greetHtml() + askCardHtml() + viewBarHtml()}<div class="ghome">${PHONE() ? setupCard(true) + greetHtml() + askCardHtml() : ''}${weekCardHtml()}${asks.length ? nextHtml() : ''}
-      <div class="bar homebar"><h2>${esc(fmt(days[3], { month: 'long', year: 'numeric' }))}</h2><label class="jump" title="${T('pick_date')}">${ico('cal')}<input type="date" id="jump" data-ch="jump" value="${esc(state.date)}" aria-label="${T('pick_date')}"></label><span class="spacer"></span><div class="seg"><button data-act="nav" data-d="-1" aria-label="${T('prev')}">‹</button><button data-act="today">${T('today')}</button><button data-act="nav" data-d="1" aria-label="${T('next')}">›</button></div></div>
+    return `${PHONE() ? '' : setupCard(true) + greetHtml() + askCardHtml() + viewBarHtml() + weekCardHtml() + nextHtml()}<div class="ghome">${PHONE() ? setupCard(true) + greetHtml() + askCardHtml() + weekCardHtml() + (asks.length ? nextHtml() : '') : ''}
+      <div class="bar ${PHONE() ? 'homebar' : ''}"><h2>${esc(PHONE() ? fmt(days[3], { month: 'long', year: 'numeric' }) : title)}</h2><label class="jump" title="${T('pick_date')}">${ico('cal')}<input type="date" id="jump" data-ch="jump" value="${esc(state.date)}" aria-label="${T('pick_date')}"></label><span class="spacer"></span><div class="seg"><button data-act="nav" data-d="-1" aria-label="${T('prev')}">‹</button><button data-act="today">${T('today')}</button><button data-act="nav" data-d="1" aria-label="${T('next')}">›</button></div></div>
       <div class="list home"><div class="strip">${days.map(d => `<button data-act="day" data-date="${d}" aria-pressed="${d === sel}" class="${d === td ? 'tdy' : ''} ${offCls(offOn(id, d))} ${holidayOn(d) ? 'hol' : ''}"><span>${esc(fmt(d, { weekday: 'short' }))}</span><b class="num">${D(d).getDate()}</b>${dayMarks(d, id)}</button>`).join('')}</div>${stripLegend(true)}
       ${now ? nowCardHtml(now) : ''}${days.map(myDayHtml).join('')}</div>
       ${photoStripHtml()}
@@ -882,7 +882,12 @@
       <dl class="fields"><dt>${T('wf_revenue')}</dt><dd class="num">${m(s.rev)}</dd>${s.comm ? `<dt>${T('wf_comm')}</dt><dd class="num">− ${m(Math.round(s.comm))}</dd>` : ''}<dt>${T('wf_pay')}</dt><dd class="num">− ${m(s.pay)}</dd><dt>${T('wf_costs')}</dt><dd class="num">− ${m(s.cost)}</dd><dt><b>${T('wf_profit')}</b></dt><dd class="num"><b>${m(s.profit)}</b></dd></dl>
       <span class="muted small">${T('wf_note', { n: s.noPrice, b: s.bookings })}${s.noRate.length ? ' ' + T('wf_norate', { c: s.noRate.join(', ') }) : ''}</span></details>`;
   }
+  // One frame for every calendar view and both roles: same width, same centring, same order (cards, view bar, next-tour cards, date title, content)
   function calendarHtml() {
+    const wide = isAdmin() && state.mode === 'week' && state.wgrid && !state.mine;
+    return `<div class="calframe ${wide ? 'calwide' : ''}">${calendarInner()}</div>`;
+  }
+  function calendarInner() {
     const wk = monday(state.date), days = [...Array(7)].map((_, i) => addDays(wk, i)), td = today();
     const people = crew().filter(p => (!state.mine || p.id === me().id) && (state.mine || !isAdmin() || !state.who || p.id === state.who));
     if (!isAdmin()) state.mine = true;   // guides and drivers: personal schedule only, in every view
@@ -890,15 +895,15 @@
     const title0 = state.mode === 'week' ? (days[0].slice(0, 7) === days[6].slice(0, 7) ? `${D(days[0]).getDate()}–${fmt(days[6], { day: 'numeric', month: 'short', year: 'numeric' })}` : `${fmt(days[0], { day: 'numeric', month: 'short' })} – ${fmt(days[6], { day: 'numeric', month: 'short', year: 'numeric' })}`) : fmt(state.date, { month: 'long', year: 'numeric' });
     const title = state.mode === 'day' ? fmt(state.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : state.mode === 'agenda' ? `${fmtDay(state.date)} – ${fmtDay(addDays(state.date, 29))}` : title0;
     if (!isAdmin() && state.mine && state.mode === 'week') return guideHomeHtml(days, title0) + fabHtml();
-    let h = `${setupCard(true)}${window.matchMedia('(max-width:760px)').matches ? installCardHtml(false) : ''}${greetHtml()}${askCardHtml()}${isAdmin() || PHONE() ? nextHtml() : ''}${fabHtml()}
+    let h = `${setupCard(true)}${window.matchMedia('(max-width:760px)').matches ? installCardHtml(false) : ''}${greetHtml()}${askCardHtml()}${PHONE() ? nextHtml() : ''}${fabHtml()}
       ${!PHONE() ? '' : `<div class="calhd"><button class="calttl" data-act="mode" data-m="${state.mode === 'month' ? 'week' : 'month'}" aria-expanded="${state.mode === 'month'}" aria-label="${T(state.mode === 'month' ? 'week' : 'month')}"><b>${esc(fmt(state.date, { month: 'long' }))}</b> <span class="yr num">${state.date.slice(0, 4)}</span>${msi(state.mode === 'month' ? 'keyboard_arrow_up' : 'keyboard_arrow_down')}</button><label class="jump" title="${T('pick_date')}">${ico('cal')}<input type="date" id="jump" data-ch="jump" value="${esc(state.date)}" aria-label="${T('pick_date')}"></label><span class="spacer"></span>
         ${monday(state.date) !== monday(td) ? `<button class="btn sm calnow" data-act="today">${T('today')}</button>` : ''}${state.mode === 'month' ? '' : `<button class="iconbtn" data-act="nav" data-d="-1" aria-label="${T('prev')}">‹</button><button class="iconbtn" data-act="nav" data-d="1" aria-label="${T('next')}">›</button>`}
         ${isAdmin() ? `<button class="whochip ${state.mine ? '' : 'txt'}" data-act="mine" data-v="${state.mine ? '0' : '1'}" aria-label="${T(state.mine ? 'mine' : 'team')}">${state.mine ? avatar(me().id) : `<span>${T('who_all')}</span>`}</button>` : ''}</div>`}
       ${PHONE() ? '' : `<div class="bar">
       <div class="seg vseg">${[['day', 'D'], ['week', 'W'], ['month', 'M'], ['agenda', 'A']].map(([m, k]) => `<button data-act="mode" data-m="${m}" aria-pressed="${state.mode === m}" title="${T('v_key', { k })}">${T('v_' + m)}</button>`).join('')}</div>
       ${isAdmin() ? `<div class="seg"><button data-act="mine" data-v="0" aria-pressed="${!state.mine}">${T('team')}</button><button data-act="mine" data-v="1" aria-pressed="${!!state.mine}">${T('mine')}</button></div>` : ''}
-      ${isAdmin() && !state.mine ? `<select class="inp whosel" data-ch="who" aria-label="${T('v_who')}"><option value="">${T('v_allteam', { n: crew().length })}</option>${crew().map(p => opt(p.id, p.name, state.who || '')).join('')}</select>` : ''}<span class="spacer"></span><button class="btn only-wide" data-act="print">${T('v_print')}</button><button class="btn only-wide" data-act="summary">${T('day_summary')}</button>${isAdmin() ? `<button class="btn primary only-wide" data-act="newtour">+ ${T('tour')}</button><button class="btn only-wide" data-act="offnew">+ ${T('dayoff')}</button>` : ''}<span class="only-wide">${helpBtn()}</span></div>${helpBox('calendar')}
-      <div class="bar"><h2>${esc(title)}</h2><label class="jump" title="${T('pick_date')}">${ico('cal')}<input type="date" id="jump" data-ch="jump" value="${esc(state.date)}" aria-label="${T('pick_date')}"></label><span class="spacer"></span><div class="seg"><button data-act="nav" data-d="-1" aria-label="${T('prev')}">‹</button><button data-act="today">${T('today')}</button><button data-act="nav" data-d="1" aria-label="${T('next')}">›</button></div></div>`}${isAdmin() || PHONE() ? '' : nextHtml()}`;   // guides on a computer: the view switch stays in one place in every view, the next-tour card comes after it
+      ${isAdmin() && !state.mine ? `<select class="inp whosel" data-ch="who" aria-label="${T('v_who')}"><option value="">${T('v_allteam', { n: crew().length })}</option>${crew().map(p => opt(p.id, p.name, state.who || '')).join('')}</select>` : ''}<span class="spacer"></span><button class="btn only-wide" data-act="print">${T('v_print')}</button><button class="btn only-wide" data-act="summary">${T('day_summary')}</button>${isAdmin() ? `<button class="btn primary only-wide" data-act="newtour">+ ${T('tour')}</button><button class="btn only-wide" data-act="offnew">+ ${T('dayoff')}</button>` : ''}<span class="only-wide">${helpBtn()}</span></div>${helpBox('calendar')}${nextHtml()}
+      <div class="bar"><h2>${esc(title)}</h2><label class="jump" title="${T('pick_date')}">${ico('cal')}<input type="date" id="jump" data-ch="jump" value="${esc(state.date)}" aria-label="${T('pick_date')}"></label><span class="spacer"></span><div class="seg"><button data-act="nav" data-d="-1" aria-label="${T('prev')}">‹</button><button data-act="today">${T('today')}</button><button data-act="nav" data-d="1" aria-label="${T('next')}">›</button></div></div>`}`;
     const pFrom_To = [state.mode === 'month' ? state.date.slice(0, 8) + '01' : days[0], state.mode === 'month' ? addDays(addDays(state.date.slice(0, 8) + '01', 32).slice(0, 8) + '01', -1) : days[6]];
     const pstats = !(isAdmin() && !state.mine) ? '' : `<div class="only-wide">${periodStatsHtml(pFrom_To[0], pFrom_To[1])}</div>${incBarHtml(pFrom_To[0], pFrom_To[1])}`;
     if (state.mode === 'agenda') return h + agendaHtml() + photoStripHtml();

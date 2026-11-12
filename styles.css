@@ -1161,7 +1161,7 @@ details.bpmore[open]>summary{border-radius:14px 14px 0 0}
 button.agr{cursor:pointer}button.agr:hover{background:var(--surface2)}
 .agt{text-align:right;color:var(--muted);white-space:nowrap}.agdot{width:12px;height:12px;border-radius:50%}.agb{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.agb .msi{width:16px;height:16px;vertical-align:-3px}
 .agw{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;justify-content:flex-start}.agw .avatar{width:24px;height:24px;font-size:10px}.agr.cx{opacity:.6}
-.whosel{width:auto;max-width:220px;min-height:40px}.vseg button{min-width:64px}.daylist{max-width:760px}
+.whosel{width:auto;max-width:220px;min-height:40px}.vseg button{min-width:64px}
 @media print{header.top,.tabs,.nav,.fab,.bar,.calhd,.banner,.subtop,#toasts,.demo,.vabar,.phstrip,.incbar,.homelinks,button.add{display:none!important}body{background:#fff}main{padding:0;max-width:none}.card,.agenda{border:0;box-shadow:none}.agr{break-inside:avoid}.only-wide{display:block!important}}
 
 /* 3.48 guest marks: one small button each (the coloured tag is the button) */
@@ -1184,7 +1184,7 @@ code.ref{font:inherit;font-variant-numeric:tabular-nums;letter-spacing:.02em;use
 .pflag{font-size:1.15em;margin-left:6px;vertical-align:-1px}
 
 /* 3.51 guide and driver home on a computer: the same switches at the top as the office, one centred column, full-width week strip */
-@media (min-width:761px){.ghome{max-width:980px;margin:0 auto}.ghome .list.home{max-width:none}.ghome .homelinks{display:none}.ghome .strip{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}}
+@media (min-width:761px){.ghome .list.home{max-width:none}.ghome .homelinks{display:none}.ghome .strip{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}}
 /* a chosen day that is also a day off or a sick day keeps dark text (it was white on pink) */
 .strip button.myoff[aria-pressed="true"]{color:var(--ink);border-color:var(--ink)}.strip button.myoff[aria-pressed="true"] b,.strip button.myoff[aria-pressed="true"] span{color:var(--ink)}
 @media (min-width:761px){.ghome{display:flex;flex-direction:column;gap:12px}.ghome>.bar{margin:0}}
@@ -1513,3 +1513,7 @@ a.phl{color:var(--accent);font-weight:600;text-decoration:underline;white-space:
 .agr{grid-template-columns:110px 12px minmax(0,1fr) 290px}.agp>span:last-child{max-width:120px}
 
 .gridwrap.gone{display:none!important}
+
+/* one calendar frame for Day, Week, Month and Agenda (guides and office) */
+.calframe{display:flex;flex-direction:column;gap:16px;width:100%}
+@media (min-width:761px){.calframe{max-width:980px;margin:0 auto}.calframe.calwide{max-width:none}}
