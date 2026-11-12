@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.62';
+  const APP_VERSION = '3.63';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -427,7 +427,7 @@
   }
 
   // ---------- notifications ----------
-  const NOTE_GROUPS = { assigned: ['tour_assigned', 'tour_removed'], changed: ['tour_changed'], cancelled: ['tour_cancelled', 'tour_restored'], reminder: ['tour_tomorrow'] };
+  const NOTE_GROUPS = { assigned: ['tour_assigned', 'tour_removed'], changed: ['tour_changed'], cancelled: ['tour_cancelled', 'tour_restored'], reminder: ['tour_tomorrow', 'xc_open'] };
   const muted = (id, kind) => ((person(id) || {}).mute || []).some(g => (NOTE_GROUPS[g] || []).includes(kind));
   async function notify(userIds, kind, params) {
     const ids = [...new Set(userIds.filter(Boolean))].filter(id => id !== me().id && !muted(id, kind));
@@ -1963,10 +1963,26 @@
     const tip = run >= (r.maxStreak || 6) ? T('wr_adv_rest') : target && thisWk > target ? T('wr_over', { t: target }) : target && thisWk < target ? T('wr_under', { t: target }) : '';
     return { wishes, sum: wishSum, body: `<div class="card wrcard">${gameOn() ? totemHtml : ''}${moodLineHtml()}${tiles}${tip ? `<span class="wrline">${msi('info')}<span>${esc(tip)}</span></span>` : ''}${earn}<details class="sect wrmore bpmore" data-keep="wr-more" ${(state.keep || {})['wr-more'] ? 'open' : ''}><summary data-s="${T('show')}" data-h="${T('hide')}">${T('wa_more')}</summary>${L.map(([ic, tx]) => `<span class="wrline">${msi(ic)}<span>${esc(tx)}</span></span>`).join('')}</details></div>` };
   }
+  // A soft nudge about open tours: one quiet notice for the person, only while the app is open, only inside their working hours
+  // (8:00-20:00 when they have not set any), never during a tour, only for tours they have not been told about, and at most every 3 days.
+  function xcNudge() {
+    try {
+      if (!me() || isAdmin() || state.viewAs || (S.mode !== 'supabase' && !window.__xcNudgeTest)) return;
+      const get = k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, put = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* private window */ } };
+      const key = 'fs-xc-' + me().id, last = Number(get(key + '-at') || 0); if (Date.now() - last < 3 * 864e5) return;
+      const list = openTours().filter(x => !x.mine); if (!list.length) return;
+      let seen = []; try { seen = JSON.parse(get(key) || '[]'); } catch (e) { seen = []; }
+      const fresh = list.filter(x => !seen.includes(x.t.id)); if (!fresh.length) return;
+      const wd = (D(today()).getDay() + 6) % 7, hrs = weekOf(me(), today())[wd], hm = nowHM(), from = (hrs && hrs[0]) || '08:00', to = (hrs && hrs[1]) || '20:00';
+      if (hm < from || hm > to || tourNow()) return;   // not now: it is tried again next time the app is opened
+      put(key, JSON.stringify([...seen, ...fresh.map(x => x.t.id)].slice(-200))); put(key + '-at', String(Date.now()));
+      S.save('notifications', { id: S.uid(), user_id: me().id, kind: 'xc_open', params: { n: list.length }, read: false, created_at: new Date().toISOString() }).catch(() => {});
+    } catch (e) { console.error(e); }
+  }
   function openTours() {
-    const m = me(); if (!m || isAdmin()) return []; const role = m.role === 'driver' ? 'driver' : 'guide', td = today(), to = addDays(td, 30);
-    const f = role + '_id';   // tours with nobody in my role (next 30 days), and every upcoming tour of a person whose tours are offered to the team
-    return db.tours.filter(t => live(t) && t.date >= td && !involves(t, m.id) && ((xOpen(t, f) && (S.mode !== 'supabase' || !t.guide_id || !t.driver_id)) || (t.date <= to && !t[f])) && (role === 'guide' || (kmOf(t.title) > 0 && (m.vehicle !== 'delica' || RIDE_4X4.test(t.title)))) && !offOn(m.id, t.date))
+    const m = me(); if (!m || isAdmin()) return []; const role = m.role === 'driver' ? 'driver' : 'guide', td = today(), to = addDays(td, 14);
+    const f = role + '_id';   // open tours of the next 2 weeks: nobody in my role, or the person whose tours are offered to the team
+    return db.tours.filter(t => live(t) && t.date >= td && !involves(t, m.id) && t.date <= to && ((xOpen(t, f) && (S.mode !== 'supabase' || !t.guide_id || !t.driver_id)) || !t[f]) && (role === 'guide' || (kmOf(t.title) > 0 && (m.vehicle !== 'delica' || RIDE_4X4.test(t.title)))) && !offOn(m.id, t.date))
       .sort((x, y) => (x.date + (x.start_time || '')).localeCompare(y.date + (y.start_time || ''))).map(t => ({ t, role, mine: db.change_requests.find(q => q.tour_id === t.id && q.user_id === m.id && q.status === 'pending') }));
   }
   // Admins: confirmed tours in the next 30 days that still have no guide, or no driver where one is needed.
@@ -1978,7 +1994,7 @@
   }
   function exchangeHtml() {
     const list = openTours(); if (!list.length) return '';
-    return `<div class="card f xcard"><b>${T('xc_title', { n: list.length })}</b><span class="muted">${T('xc_text')}</span>${list.slice(0, 40).map(({ t, role, mine }) => `<div class="xrow"><button class="grow-l arow" data-act="tour" data-id="${t.id}">${emblem(t)}<span><b class="num">${esc(fmt(t.date, { weekday: 'short', day: 'numeric', month: 'short' }))} ${esc(t.start_time || '')}</b> ${esc(aliasOf(t.title))}${langTags(t)}${t[role + '_id'] ? ` <span class="tag t-off xfrom">${esc(T('xc_from', { name: pname(t[role + '_id']) }))}</span>` : ''}</span></button>${mine ? `<span class="xasked"><span class="tag t-off">${T('xc_asked')}</span><button class="lnk" data-act="xcback" data-id="${mine.id}">${T('xc_back')}</button></span>` : `<button class="btn sm primary" data-act="xctake" data-id="${t.id}" data-role="${role}">${T('xc_can')}</button>`}</div>`).join('')}</div>`;
+    return `<div class="card f xcard"><b>${T('xc_title', { n: list.length })}</b><ol class="xhow muted"><li>${T('xc_h1')}</li><li>${T('xc_h2')}</li><li>${T('xc_h3')}</li></ol>${list.slice(0, 40).map(({ t, role, mine }) => `<div class="xrow"><button class="grow-l arow" data-act="tour" data-id="${t.id}">${emblem(t)}<span><b class="num">${esc(fmt(t.date, { weekday: 'short', day: 'numeric', month: 'short' }))} ${esc(t.start_time || '')}</b> ${esc(aliasOf(t.title))}${langTags(t)}</span></button>${mine ? `<span class="xasked"><span class="tag t-off">${T('xc_asked')}</span><button class="lnk" data-act="xcback" data-id="${mine.id}">${T('xc_back')}</button></span>` : `<button class="btn sm primary" data-act="xctake" data-id="${t.id}" data-role="${role}">${T('xc_can')}</button>`}</div>`).join('')}</div>`;
   }
   function tasksHtml() {
     const f = state.taskFilter, admin = isAdmin();
@@ -3451,7 +3467,7 @@
   };
   const stripEmail = p => { const { email, ...rest } = p; return rest; };
   const forms = {
-    async signin(fd) { await S.signIn(fd.get('email'), fd.get('password')); displayFromAccount(); state.mine = !isAdmin(); state.mode = 'week'; state.view = 'calendar'; checkBadges(); weekCheck(); },
+    async signin(fd) { await S.signIn(fd.get('email'), fd.get('password')); displayFromAccount(); state.mine = !isAdmin(); state.mode = 'week'; state.view = 'calendar'; checkBadges(); weekCheck(); setTimeout(xcNudge, 4000); },
     async signup(fd) { const inside = await S.signUp(fd.get('name'), fd.get('email'), fd.get('password')); if (!inside) { state.auth = 'signin'; state.authMsg = T('check_email'); } },
     async reset(fd) { await S.resetPassword(fd.get('email')); state.auth = 'signin'; state.authMsg = T('reset_sent'); },
     async newpass(fd) { await S.setPassword(fd.get('password')); state.auth = 'signin'; state.authMsg = T('saved'); location.reload(); },
@@ -3687,8 +3703,8 @@
     saveHello(); document.addEventListener('visibilitychange', () => { if (document.hidden) saveHello(); });
     if (S.recall && window.showDirectoryPicker && isAdmin()) S.recall('offdir').then(async h => { if (h && h.queryPermission) { OFFDIR.handle = h; OFFDIR.ok = (await h.queryPermission({ mode: 'readwrite' })) === 'granted'; } }).catch(() => {});
     if (S.remember) S.remember('lang', lang()); if ((S.pending || 0) > 0) setTimeout(() => toast(T('st_waiting_open', { n: S.pending || 0 })), 600);
-    if (S.warming) { let warm = true; S.onChange((t, r, type) => { if (warm && type === 'STATE' && !S.warming) { warm = false; PH.asked.clear(); displayFromAccount(); saveHello(); weekCheck(); } }); }
-    if (S.mode === 'demo') window.__test = { T: (k, v) => T(k, v), relayEmail, guestEmail, parseBooking, badgeNote: () => { const b = game(me().id).list.find(x => x.done); if (b) badgeNote([b]); }, checkBadges, newVersion: v => { state.newVersion = !!v; render(); }, pageFor: (title, kind) => { const u = pageFor({ title, kind }), m = /\/activity\/(\d+)/.exec(u); return m ? { id: Number(m[1]) } : null; } };          // for the automatic tests only
+    if (S.warming) { let warm = true; S.onChange((t, r, type) => { if (warm && type === 'STATE' && !S.warming) { warm = false; PH.asked.clear(); displayFromAccount(); saveHello(); weekCheck(); setTimeout(xcNudge, 4000); } }); }
+    if (S.mode === 'demo') window.__test = { T: (k, v) => T(k, v), xcNudge, relayEmail, guestEmail, parseBooking, badgeNote: () => { const b = game(me().id).list.find(x => x.done); if (b) badgeNote([b]); }, checkBadges, newVersion: v => { state.newVersion = !!v; render(); }, pageFor: (title, kind) => { const u = pageFor({ title, kind }), m = /\/activity\/(\d+)/.exec(u); return m ? { id: Number(m[1]) } : null; } };          // for the automatic tests only
     if (me() && !isAdmin()) state.mine = true;
     displayFromAccount();
     try { history.scrollRestoration = 'manual'; } catch (e) { /* old browser */ }

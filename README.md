@@ -301,7 +301,7 @@ Art (tools/art): `make_art.py` makes avatar and badge pictures with Gemini once,
 - Special dates: the dots are typed for you (24111990 becomes 24.11.1990).
 
 ## 3.19 – 3.20
-- Tasks has two sections: **Tasks** and **Tours to staff** (for guides and drivers: **Tours to take**). The number on the Tasks tab counts only your own open tasks. The help button sits on the title row; adding a task is a labelled **New task** button.
+- Tasks has two sections: **Tasks** and **Tours to staff** (for guides and drivers: **Open tours**). The number on the Tasks tab counts only your own open tasks. The help button sits on the title row; adding a task is a labelled **New task** button.
 - Special dates: one-tap suggestions (Birthday, Anniversary, Family day, Private, Doctor, Car service, Trip) and the phone's own date picker.
 - Open-tour lists show the language the guests asked for, and the icon sits beside the text.
 - Drivers with the Delica are offered only 4x4 rides (4x4 in the name, Kazbegi, Gareji, Tusheti, Truso, Juta, Khevsureti).
@@ -560,3 +560,9 @@ A tidy-up round after the owner's phone recording of 3.57. Nothing new to learn;
 - **Boss tours are open for exchange.** Every upcoming tour that sits on "Boss" now appears for guides in Tasks > Tours to take, marked "Boss's tour", with the "I can do it" button. The office approves each request as before; on approval the tour moves to the guide who asked. No setting is needed.
 - **Not for exchange.** The tour card of a Boss tour has a box "Not for exchange" (office only). Tick it and that tour stays with Boss and is not offered.
 - Limit: a Boss tour that also has a driver set is not offered, because the database accepts "I can do it" only for a tour with an empty guide or driver place.
+
+## 3.63
+- **Open tours (was "Tours to take").** In Tasks the list for guides and drivers now shows only the next 2 weeks (no more 30 days). The "Boss's tour" tag is gone.
+- **Short how-to above the list, in EN, RU and KA:** press "I can do it"; it is only a request and the office must approve it (until then the tour stays with its current person); the answer comes as a message. The tag on a pressed tour now says "Waiting for office".
+- **Soft notice about open tours.** The app makes one quiet notice for the person: only while the app is open, only inside their working hours (8:00-20:00 when none are set), never during one of their tours, only for tours they were not told about before, at most every 3 days. People who switched off reminders in Me do not get it. Nothing is sent by the server, so nothing is sent at night or to people who do not open the app. A phone push shows the general text "Something new for you" until the `push` function is updated (not done, needs OK).
+- No database change.

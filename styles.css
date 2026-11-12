@@ -1410,3 +1410,7 @@ html[data-fs="xl"] .vabar .vapre,html[data-fs="l"] .vabar .vapre{display:none}
 .xlock{display:flex;align-items:flex-start;gap:12px;padding:12px;border:1px solid var(--line);border-radius:var(--r-m);cursor:pointer}
 .xlock input{flex:none;width:24px;height:24px;margin:0}.xlock>span{display:flex;flex-direction:column;gap:4px;min-width:0}
 .xfrom{margin-left:4px}
+
+/* 3.63: how-to above the open tours */
+.xhow{margin:0;padding-left:20px;display:grid;gap:4px;font-size:var(--t-body-s,14px)}
+.xhow li{padding-left:2px}
