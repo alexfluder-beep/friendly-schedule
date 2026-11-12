@@ -1,6 +1,6 @@
 # Friendly Schedule: look and build guidebook
 
-Rules for anyone (person or agent) who changes the app. Version 3.53, 11 Nov 2026. If a rule here and the code disagree, fix the code or change the rule here in the same release.
+Rules for anyone (person or agent) who changes the app. Version 3.60, 12 Nov 2026. If a rule here and the code disagree, fix the code or change the rule here in the same release.
 
 ## 1. One set of sizes
 
@@ -14,7 +14,7 @@ Everything in `styles.css` uses these names (they are defined once, at the top o
 | Corner, extra | `--r-xl` | 28px | sign-in card, question card, wide round button |
 | Pill | `--r-pill` | 999px | buttons, tags, chips, segmented switches |
 | Circle | `50%` | | avatars, icon buttons, dots |
-| Text, tiny | `--t-micro` | 11px | marks under dates, uppercase weekday names |
+| Text, tiny | `--t-micro` | 11px | marks under dates, uppercase weekday names, bottom bar labels on phones 360px and narrower |
 | Text, caption | `--t-cap` | 12px | secondary numbers, bottom bar labels |
 | Text, small | `--t-sm` | 14px | notes, tags, compact buttons |
 | Text, body | `--t-body` | 16px | everything else; inputs are never smaller (iPhone zooms in below 16px) |
@@ -22,7 +22,9 @@ Everything in `styles.css` uses these names (they are defined once, at the top o
 | Heading 2 | `--t-h2` | 22px | page and sheet titles (20px on phones) |
 | Heading 1 | `--t-h1` | 28px | month name on phones |
 
-Touch sizes: a thing people tap is at least 44px tall on phones (40px inside dense rows, 36px only in the computer popup). Icon buttons are 40 or 44px circles.
+Touch sizes: a thing people tap is at least 44px tall on phones (40px inside dense rows, 36px only in the computer popup). Icon buttons are 40 or 44px circles. Gaps and padding are steps of 4px.
+
+Motion (3.60): one curve and one length for cards, tab changes and week changes (`--ease`, `--dur` = 0.18s). Nothing bouncy, nothing that loops except loading spinners; the gift box shakes twice. With the phone's "reduce motion" setting nothing moves.
 
 Font: the phone's own system font (`--font`). No web fonts are downloaded, so text shows at once and works on phones without Google services.
 
@@ -44,11 +46,23 @@ Use the existing ones before making a new one. Names are in `APP-CHANGE-LOG-AND-
 - **Folded section**: a card row with the count by the title and Show / Hide on the right.
 - **List row**: what it is on the left (person, holiday, tour), the date or number on the right.
 - **Icons**: one set of line icons (24 box, 2px stroke) for navigation and buttons, Material Symbols for facts inside cards, hand-drawn stickers only for badges, greetings and the animal of the week.
+- **Action row** (3.60): one filled button (the main action), up to two quiet outlined ones, then **More**. Anything red (cancel, delete) is inside More and still asks first.
+- **One banner at a time** (3.60): looking as someone > new version > set-up line. The maintenance notice, the demo line and the test-version line are not counted. A banner is one line and has no full stop.
+- **Bar that must not be lost** (3.60): the "looking as" bar is pinned under the header (`--toph`, then `--vabar-h` for anything pinned below it).
+- **People row** (3.60): several people with the same state on one day are one row: icon, word with a colon, then one small tag per person. Not one card per person.
+- **Warning line** (3.60): the amber warning icon and ink text. No "!" prefix and no red text.
+- **Empty state** (3.60): one plain line in a dashed box (`.empty`) that says when something will appear. No zeros, no empty charts, no empty bars.
+- **Number tiles** (3.60): one number and one short label per tile, equal heights; extra numbers go into a fold.
+- **Tappable things are not selectable** (3.60): anything with a tap action has `user-select:none` (a long press on Android must not open "Copy / Select all"). Text worth copying (phone, booking reference, address, note, form fields) stays selectable.
+- **Floating round button** (3.60): a page that has one gives `main` the class `hasfab` (extra bottom room), so the last item scrolls clear of it.
+- **Notice over the page** (3.60): one at a time, above the bottom menu, with an X; it leaves after about 6 seconds or as soon as the person touches something else.
+- **Looking as someone** (3.60): shows, never acts: no badge windows, no notices, nothing marked as seen, nothing saved.
+- **Guest email for guides and drivers** (3.60): always through `shownEmail()`; platform relay addresses (`relayEmail()`) are for the office only.
 - **Words on buttons**: verbs, short. A button keeps its word unless the icon is one everybody knows (phone, message, map pin, refresh, close, back).
 
 ## 4. Writing
 
-Plain, short, warm. "You" form. No exclamation marks except greetings. Every text exists in English, Russian and Georgian (`i18n.js`); a new text is added to all three in the same release. Numbers that can go out of date are counted, never typed.
+Plain, short, warm. "You" form. No exclamation marks in the app's own texts (since 3.60 also not in greetings; messages sent to guests are the owner's voice and are left alone). No full stop at the end of a button, tag, banner, tile or empty-state line. Part of a whole is written `4/5`, without spaces. Every text name is used once per language (two texts with one name silently replace each other). Every text exists in English, Russian and Georgian (`i18n.js`); a new text is added to all three in the same release. Numbers that can go out of date are counted, never typed.
 
 ## 5. Phones and browsers
 
@@ -69,7 +83,7 @@ The app must work on: iPhone (Safari and the installed app), Android (Chrome and
 
 ## 7. Before a release
 
-1. Run all automatic checks (71 scripts: phone and computer, three languages, pretend database, offline copy).
+1. Run all automatic checks (t1 to t84: phone and computer, three languages, pretend database, offline copy).
 2. Look at a phone-size picture of every screen you changed.
 3. Add the version to `README.md` in plain words.
 4. Bump `APP_VERSION` in `app.js` and the cache name in `sw.js` together.

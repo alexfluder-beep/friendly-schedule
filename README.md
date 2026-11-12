@@ -513,3 +513,40 @@ Special dates (Me): an open list with an icon per kind, edit and delete icon but
 - **Welcome guide.** On the first open, and on each new phone, a short guide walks through set-up, one step per screen: language and text size, adding the app to the home screen (instructions for iPhone, Android or a computer), turning on notifications and sending a test, phone and languages, a profile picture, the tours you can lead (guides), usual working days, where to send pay, special dates, and Telegram. Every step has "Skip this step"; "Next time" closes the guide. Steps already done are left out, so a person who set up before sees only the two phone steps on a new phone. It opens by itself at most three times per phone; after that a small banner and a button in Me > Settings lead back to it.
 - **Time off on the calendar can be opened.** Tap a day off, half day or sick day (agenda, day list, team week) to change its type, dates or note, or remove it. The office can open anyone's; a guide or driver only their own, not past ones. The office can also drag one to another day or, on the team week, to another person; the app asks before moving. A second entry for the same person on the same days is no longer saved.
 - **View switch stays put (guides and drivers, computer).** Day / Week / Month / Agenda sit in the same place in every view; the next-tour card moved below them.
+
+## 3.59
+- **Leaving a screen.** The title row with the ✕ (or ‹ Back) button now stays in view while a pop-up card scrolls. On phones a card can also be pulled down to close it. The badge screen has a ✕. In Back office the "‹ Back office" row stays in view while the page scrolls.
+
+## 3.60
+A tidy-up round after the owner's phone recording of 3.57. Nothing new to learn; the same screens are shorter and calmer.
+- **"Looking as" bar.** One line: "Looking as Mariam" and the button "Back to me". It stays under the header on every tab while you scroll, so the way back is always there. Nothing can be changed while looking, as before.
+- **One banner at a time.** If several want to show, only the most important one does: looking as someone, then "A new version is ready", then the set-up line.
+- **Where the app opens.** Guides and drivers open the calendar at the very top (the week strip marks today, and Today is one tap). The office still opens on today. After the app reloads itself the page opens at the top, not where it was scrolled before.
+- **"Hide badges and animals".** A quiet link at the bottom of Me > Badges and in the totem window. It opens Me > Settings > What I see, where the switch is. When badges are hidden, a line there says how to bring them back.
+- **People off in the day list.** One short row per day, "Day off:" and then one small name tag per person (a second row "Sick:" when someone is ill), in place of one big card per person. Tap a name to open that entry; the office can still drag it to another day. A person appears once.
+- **Week strip.** One row of marks under the dates (a dot for tours, an umbrella for people off). The numbers moved to the day title below: "2 tours · 1 off".
+- **Warnings.** An amber warning sign and plain dark text, for example "Nino has another tour at the same time". No "!" and no red text; red is kept for Cancel and Delete.
+- **Tour card buttons (office).** Edit, Move, Copy, More. "Cancel tour" and "Delete tour" are inside More, and both still ask first.
+- **Guest rows.** Name and number of guests on one line; the message and call buttons are in the same place on every row, also when a guest has no phone.
+- **Time off for guides and drivers.** The request button and "My requests" come first, then the three numbers, then the Team ready calendar. Work and rest, My wishes, Best time for a rest, Earlier requests and Company holidays are folded; one you open stays open. The page is about three screens long, not nine.
+- **My requests.** Every row has the same shape: type and answer on the left, dates and number of days on the right. The import note "Setmore" is shown to the office only.
+- **Number tiles.** Same height, short words ("Days off", "Sick days", "Waiting"); the year is in the small title above. Work and rest tiles show one number and one label; the extra numbers (usual week, most working days in a row, tours in 14 days) are the first lines of "More about my schedule".
+- **Best time for a rest.** The reason is said once above the list; each row is only the dates and "Ask". The note about automatic suggestions appears once.
+- **Team ready calendar.** A percent is printed only on days below 100. No number means the whole team is working.
+- **Tasks.** The "Getting started" card is gone from Tasks. Set-up lives in the welcome guide; the one line on the calendar opens it. The Telegram step, with "Skip this step", is in the guide.
+- **Me tabs.** Shorter words (Profile, Settings, Pay, Stats, Badges) so all five fit on most phones. On a narrow phone the row runs off the right edge to show there is more, and the chosen tab is always in view.
+- **Telegram bot help.** Three numbered lines and one button: "Get code", then "Open the bot". "New code" is a small link.
+- **Empty pages.** A person with no tours yet sees one line ("Your numbers appear after your first tour", "Badges appear after your first tour") in place of zeros, an empty chart and "0.00% of the way to the Moon".
+- **Bottom menu.** Labels are one size, never cut; on small phones each tab is as wide as its word needs.
+- **Same things, same size.** Buttons and fields are at least 44 px tall on phones; calendar arrows and day cells are bigger; the bell keeps its round shape with the count on its corner; month letters under the statistics bars are no longer cut; small gaps were evened out.
+- **Motion.** One short, plain movement for cards and tab changes. Nothing bounces or loops; the gift box shakes twice and then waits. With "reduce motion" on the phone nothing moves.
+- **Words.** No exclamation marks in the app's own texts (messages sent to guests are unchanged). Counts are written "4/5". "Happy birthday, Nino" and the greeting while the app loads stay.
+- **Fixed.** Two pairs of texts shared one name, so the team-goal card showed the Telegram title and the "Tours I do" card showed "We are updating the app". Each has its own text again.
+- **Long press (Android).** Holding a finger on a tour card, a row, a name tag, a tab or a button no longer selects its text or opens "Copy / Select all". Phone numbers, booking references, addresses, notes and form fields can still be selected.
+- **Looking as someone is quiet.** While the office looks at the app as another person, that person's "New badge" gift box, confetti and badge notice are never shown, and none of their badges is marked as seen. They still get them when they open the app themselves.
+- **"New badge" notice.** It leaves by itself after about 6 seconds, has an ✕, can be swiped away, and goes as soon as you touch anything else. It sits above the bottom menu, one at a time.
+- **Round "+" and "New task" buttons.** Pages that have one get more room at the bottom, so the last card or link can always be scrolled clear of the button.
+- **Text size "Very big".** The "Looking as" bar stays one line (it shows the name alone when room is short; "Back to me" is always whole). Me tabs and the bottom menu stay readable at every text size.
+- **Status bar colour (Android).** The bar above the app takes the header colour, light or dark, not teal.
+- **Relay emails.** Guides and drivers no longer see a guest's email when it is only a booking platform's relay address (GetYourGuide, Viator / Tripadvisor, Booking.com, Airbnb, or a very long machine-made address). The office sees every email as before; nothing is changed in the data.
+- Not changed, waiting for a check on a real iPhone: the header moving a few pixels after a tab change.
