@@ -1405,3 +1405,8 @@ html[data-fs="xl"] .vabar .vapre,html[data-fs="l"] .vabar .vapre{display:none}
 /* 3.60 tour card: the last action is named for what is inside it, and takes its own row */
 @media (min-width:421px){.tacts{grid-template-columns:1.4fr 1fr 1fr auto}}
 @media (max-width:420px){.tacts{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.tacts .tmore{grid-column:1 / -1;white-space:normal}}
+
+/* 3.62 tour exchange: lock box on the tour card and the person form */
+.xlock{display:flex;align-items:flex-start;gap:12px;padding:12px;border:1px solid var(--line);border-radius:var(--r-m);cursor:pointer}
+.xlock input{flex:none;width:24px;height:24px;margin:0}.xlock>span{display:flex;flex-direction:column;gap:4px;min-width:0}
+.xfrom{margin-left:4px}

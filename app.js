@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.61';
+  const APP_VERSION = '3.62';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -82,6 +82,13 @@
   const lang = () => (me() && me().lang) || S.ls.get('fs-lang') || (['ru', 'ka'].includes((navigator.language || '').slice(0, 2)) ? navigator.language.slice(0, 2) : 'en');
   const T = (k, v) => window.I18N.t(lang(), k, v);
   const rules = () => ({ reviewGoogle: 'https://g.page/r/CYVGOaetm7xDEBE/review', tipUrl: 'https://tiny.keepz.me/46b6ewkt', ...DEFAULT_RULES, ...((db.settings.find(s => s.id === 'rules') || {}).value || {}) });
+  // Tour exchange: every upcoming tour that sits on the stand-in person (the one called "Boss", who holds tours until someone takes them) is offered to the team. A single tour can be locked on its card: it then stays there.
+  const STANDIN = 'boss';
+  const xrules = () => rules().exchange || {};
+  const offersAll = id => !!id && (String((person(twin(id)) || {}).name || '').trim().toLowerCase() === STANDIN || (xrules().from || []).includes(twin(id)));
+  const xLocked = t => (xrules().locked || []).includes(t.id);
+  const xOpen = (t, f) => offersAll(t[f]) && !xLocked(t);
+  async function xSave(patch) { const td = today(), cur = xrules(), next = { from: cur.from || [], locked: cur.locked || [], ...patch }; next.locked = next.locked.filter(id => db.tours.some(t => t.id === id && endOf(t) >= td)); await S.save('settings', { id: 'rules', value: { ...rules(), exchange: next } }); }
   const pv = () => ({ guideDays: 14, keepMonths: 24, auto: true, ...(rules().privacy || {}) });
   // Guides and drivers see guest names only around the tour; the database enforces the same limit.
   const guestsHidden = t => !isAdmin() && endOf(t) < addDays(today(), -pv().guideDays);
@@ -1022,6 +1029,7 @@
           ${scoreHtml(d)}
           ${tasks.length ? `<div class="list"><b>${T('tasks')}</b>${tasks.map(taskCard).join('')}</div>` : ''}
           <div class="actions">${canOffer() ? `<button class="btn" data-act="offer">${T('offer_title')}</button>` : ''}${isAdmin() ? `<button class="btn" data-act="tasknew" data-tour="${d.id}">+ ${T('task_for_tour')}</button>` : (mine && endOf(d) >= today() && live(d) ? `<button class="btn" data-act="creq" data-id="${d.id}">${T('suggest_change')}</button><button class="btn danger" data-act="cancelask" data-id="${d.id}">${T('report_cancel')}</button>` : '')}</div></div></details>
+        ${isAdmin() && live(d) && endOf(d) >= today() && (offersAll(d.guide_id) || offersAll(d.driver_id)) ? `<label class="xlock"><input type="checkbox" data-ch="xlock" data-id="${d.id}" ${xLocked(d) ? 'checked' : ''}><span><b>${T('xl_lock')}</b><span class="muted small">${esc(T(xLocked(d) ? 'xl_on' : 'xl_off', { name: pname(offersAll(d.guide_id) ? d.guide_id : d.driver_id) }))}</span></span></label>` : ''}
         ${isAdmin() ? `<div class="tacts">
           <button class="btn primary" data-act="touredit">${msi('edit')}${T('edit')}</button>
           ${live(d) ? `<button class="btn" data-act="move" data-id="${d.id}">${msi('swap_horiz')}${T('mv_btn')}</button>` : ''}
@@ -1957,7 +1965,8 @@
   }
   function openTours() {
     const m = me(); if (!m || isAdmin()) return []; const role = m.role === 'driver' ? 'driver' : 'guide', td = today(), to = addDays(td, 30);
-    return db.tours.filter(t => live(t) && t.date >= td && t.date <= to && !involves(t, m.id) && (role === 'guide' ? !t.guide_id : (!t.driver_id && kmOf(t.title) > 0 && (m.vehicle !== 'delica' || RIDE_4X4.test(t.title)))) && !offOn(m.id, t.date))
+    const f = role + '_id';   // tours with nobody in my role (next 30 days), and every upcoming tour of a person whose tours are offered to the team
+    return db.tours.filter(t => live(t) && t.date >= td && !involves(t, m.id) && ((xOpen(t, f) && (S.mode !== 'supabase' || !t.guide_id || !t.driver_id)) || (t.date <= to && !t[f])) && (role === 'guide' || (kmOf(t.title) > 0 && (m.vehicle !== 'delica' || RIDE_4X4.test(t.title)))) && !offOn(m.id, t.date))
       .sort((x, y) => (x.date + (x.start_time || '')).localeCompare(y.date + (y.start_time || ''))).map(t => ({ t, role, mine: db.change_requests.find(q => q.tour_id === t.id && q.user_id === m.id && q.status === 'pending') }));
   }
   // Admins: confirmed tours in the next 30 days that still have no guide, or no driver where one is needed.
@@ -1969,7 +1978,7 @@
   }
   function exchangeHtml() {
     const list = openTours(); if (!list.length) return '';
-    return `<div class="card f xcard"><b>${T('xc_title', { n: list.length })}</b><span class="muted">${T('xc_text')}</span>${list.slice(0, 12).map(({ t, role, mine }) => `<div class="xrow"><button class="grow-l arow" data-act="tour" data-id="${t.id}">${emblem(t)}<span><b class="num">${esc(fmt(t.date, { weekday: 'short', day: 'numeric', month: 'short' }))} ${esc(t.start_time || '')}</b> ${esc(aliasOf(t.title))}${langTags(t)}</span></button>${mine ? `<span class="xasked"><span class="tag t-off">${T('xc_asked')}</span><button class="lnk" data-act="xcback" data-id="${mine.id}">${T('xc_back')}</button></span>` : `<button class="btn sm primary" data-act="xctake" data-id="${t.id}" data-role="${role}">${T('xc_can')}</button>`}</div>`).join('')}</div>`;
+    return `<div class="card f xcard"><b>${T('xc_title', { n: list.length })}</b><span class="muted">${T('xc_text')}</span>${list.slice(0, 40).map(({ t, role, mine }) => `<div class="xrow"><button class="grow-l arow" data-act="tour" data-id="${t.id}">${emblem(t)}<span><b class="num">${esc(fmt(t.date, { weekday: 'short', day: 'numeric', month: 'short' }))} ${esc(t.start_time || '')}</b> ${esc(aliasOf(t.title))}${langTags(t)}${t[role + '_id'] ? ` <span class="tag t-off xfrom">${esc(T('xc_from', { name: pname(t[role + '_id']) }))}</span>` : ''}</span></button>${mine ? `<span class="xasked"><span class="tag t-off">${T('xc_asked')}</span><button class="lnk" data-act="xcback" data-id="${mine.id}">${T('xc_back')}</button></span>` : `<button class="btn sm primary" data-act="xctake" data-id="${t.id}" data-role="${role}">${T('xc_can')}</button>`}</div>`).join('')}</div>`;
   }
   function tasksHtml() {
     const f = state.taskFilter, admin = isAdmin();
@@ -3412,6 +3421,7 @@
       setTimeout(() => { if (state.modal === m) renderModal(); }, 0); toast(T('cat_filled'));
     },
     statuser(el) { state.statUser = el.value; render(); },
+    xlock(el) { const id = el.dataset.id, cur = (xrules().locked || []).filter(x => x !== id); if (el.checked) cur.push(id); return run(() => xSave({ locked: cur }), T('saved')).then(() => { renderModal(); }); },
     pref(el) { const k = el.dataset.k, v = el.checked ? 'on' : 'off'; try { localStorage.setItem('fs-pref-' + k, v); } catch (e) { /* private mode */ } const m = me(); if (m) S.save('profiles', { ...stripEmail(m), display: { ...((m.display && typeof m.display === 'object') ? m.display : {}), [k]: v } }).catch(() => {}); if (k === 'game' && v === 'off' && state.meTab === 'badges') state.meTab = 'settings'; toast(T('saved')); render(); },
     lang(el) { const v = el.value; S.ls.set('fs-lang', v); run(() => S.save('profiles', { ...stripEmail(me()), lang: v })); },
     prelang(el) { S.ls.set('fs-lang', el.value); render(); },
