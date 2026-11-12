@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.63';
+  const APP_VERSION = '3.64';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -459,6 +459,24 @@
     await S.save('notifications', { ...n, read: true, params: { ...(n.params || {}), done: ok ? 'applied' : 'declined' } });
     toast(T(ok ? 'tc_applied' : 'tc_declined')); renderModal();
   }
+  // A notice can lead somewhere: the tour it is about, and for the office the request itself with Approve and Decline.
+  const NOTE_TOUR = ['tour_assigned', 'tour_changed', 'tour_removed', 'tour_cancelled', 'tour_restored', 'tour_tomorrow', 'creq_new', 'creq_approved', 'creq_declined', 'swap_ask', 'noshow'];
+  function noteTour(n) {
+    const p = n.params || {}; if (!NOTE_TOUR.includes(n.kind)) return null;
+    if (p.tour) return db.tours.find(x => String(x.id) === String(p.tour)) || null;
+    if (!p.title || !p.date) return null;
+    const c = db.tours.filter(x => x.title === p.title && x.date === p.date); return c.length === 1 ? c[0] : (p.time ? c.find(x => (x.start_time || '') === p.time) || null : null);
+  }
+  function noteReq(n, t) {
+    if (n.kind !== 'creq_new' || !t) return null; const name = (n.params || {}).name;
+    return db.change_requests.filter(q => q.tour_id === t.id && pname(q.user_id) === name).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))[0] || null;
+  }
+  function noteActs(n) {
+    const t = noteTour(n); if (!t) return '';
+    const q = isAdmin() && !state.viewAs ? noteReq(n, t) : null;
+    const ask = q ? (q.status === 'pending' ? `<div class="small">${esc(creqText(q))}</div><div class="bar nacts"><button class="btn sm danger" data-act="creqdecide" data-id="${q.id}" data-s="0">${msi('close')}${T('decline')}</button><button class="btn sm primary" data-act="creqdecide" data-id="${q.id}" data-s="1">${msi('check')}${T('approve')}</button></div>` : `<div><span class="tag ${q.status === 'approved' ? 't-ok' : 't-muted'}">${T(q.status)}</span></div>`) : '';
+    return `${ask}<div class="bar nacts"><button class="btn sm" data-act="tour" data-id="${t.id}">${msi('open_in_new')}${T('nt_open')}</button></div>`;
+  }
   function noteText(n) { const p = { ...(n.params || {}) }; if (p.date) p.date = fmtDay(p.date); if (p.from) p.range = fmtRange(p.from, p.to || p.from); return T('n_' + n.kind, p); }
   let swReg = null;
   function systemNotify(text) {
@@ -614,7 +632,7 @@
   }
   async function run(fn, okText) {
     if (state.viewAs) { toast(T('va_readonly')); return; }
-    try { await fn(); if (okText) { toast(okText); fx.ok(); } } catch (e) { fx.err(); console.error(e); const m = String((e && e.message) || ''); logErr('save', `${errCode(e)} ${m || 'Save failed'}`, e && e.stack); toast(/invalid login/i.test(m) ? T('err_login') : /already registered|already exists/i.test(m) ? T('err_exists') : `${T('err_save')} (${errCode(e)}): ${T('ec_' + errCode(e))}`); }
+    try { await fn(); if (okText) { toast(okText); fx.ok(); } } catch (e) { fx.err(); console.error(e); const m = String((e && e.message) || ''); if (!/invalid login/i.test(m)) logErr('save', `${errCode(e)} ${m || 'Save failed'}`, e && e.stack);   /* a wrong password is not a fault of the app */ toast(/invalid login/i.test(m) ? T('err_login') : /already registered|already exists/i.test(m) ? T('err_exists') : `${T('err_save')} (${errCode(e)}): ${T('ec_' + errCode(e))}`); }
     render();
   }
 
@@ -743,10 +761,10 @@
   function guestRow(b, needAddr) {
     const due = b.payment && b.payment !== 'prepaid' ? `${T('pay_' + b.payment)}${b.amount_due ? ' ' + b.amount_due + ' ' + (b.currency || guestCur()) : ''}` : '';
     const lg = b.lang || ({ RUS: 'RU', GER: 'DE', FRA: 'FR' })[(String(b.guest).match(/\b(RUS|GER|FRA)\b/) || [])[1]] || '';
-    const marks = (b.marks || []).map(markLabel), bits = [...(lg && !/^EN/i.test(lg) ? [langName(String(lg).toUpperCase())] : []), ...(isFree(b) ? [T('free_guest')] : []), ...marks], more = bits.length > 2 ? bits.length - 2 : 0;
+    const fr = isFree(b), marks = (b.marks || []).map(markLabel), bits = [...(lg && !/^EN/i.test(lg) ? [langName(String(lg).toUpperCase())] : []), ...marks], more = bits.length > 2 ? bits.length - 2 : 0;
     const trouble = (clientRating(b.client_id) || {}).rating === 'trouble';
-    const sum = [due ? `<b class="due num">${esc(due)}</b>` : '', ...bits.slice(0, 2).map(esc), more ? `+${more}` : ''].filter(Boolean).join(' · ');   // the guest count sits at the end of the name line; this second line shows only when there is something to say
-    return `<div class="grow gst"><span class="grid"><button class="gbtn" data-act="guest" data-id="${b.id}"><span class="avatar ini">${esc(initials(cleanName(b.guest) || b.guest))}</span><span class="gtxt"><span class="gline"><span class="gname">${esc(cleanName(b.guest) || b.guest)}</span><span class="gcnt num">${esc(acText(b))}</span></span>${sum ? `<span class="gsum">${sum}</span>` : ''}</span></button>${b.attendance ? `<span class="tag ${b.attendance === 'arrived' ? 't-ok' : 't-danger'}">${T('att_' + b.attendance)}</span>` : '<span></span>'}${b.phone ? `<span class="cbtns">${ib('wa', 'WhatsApp', waLink(b.phone))}${ib('call', T('call'), 'tel:' + b.phone)}</span>` : '<span class="cbtns" aria-hidden="true"></span>'}</span>${needAddr && b.pickup_addr ? `<span class="gaddr">${ico('pin')}<span>${esc(b.pickup_addr)}</span></span>` : ''}${trouble ? `<span class="row">${ratingTag(b.client_id)}</span>` : ''}</div>`;
+    const sum = [fr ? `<span class="tag t-free">${esc(T('free_guest'))}</span>` : '', due ? `<b class="due num">${esc(due)}</b>` : '', ...bits.slice(0, 2).map(esc), more ? `+${more}` : ''].filter(Boolean).join(' · ');   // the guest count sits at the end of the name line; this second line shows only when there is something to say
+    return `<div class="grow gst ${fr ? 'free' : ''}"><span class="grid"><button class="gbtn" data-act="guest" data-id="${b.id}"><span class="avatar ini ${fr ? 'free' : ''}">${esc(initials(cleanName(b.guest) || b.guest))}</span><span class="gtxt"><span class="gline"><span class="gname">${esc(cleanName(b.guest) || b.guest)}</span><span class="gcnt num">${esc(acText(b))}</span></span>${sum ? `<span class="gsum">${sum}</span>` : ''}</span></button>${b.attendance ? `<span class="tag ${b.attendance === 'arrived' ? 't-ok' : 't-danger'}">${T('att_' + b.attendance)}</span>` : '<span></span>'}${b.phone ? `<span class="cbtns">${ib('wa', 'WhatsApp', waLink(b.phone))}${ib('call', T('call'), 'tel:' + b.phone)}</span>` : '<span class="cbtns" aria-hidden="true"></span>'}</span>${needAddr && b.pickup_addr ? `<span class="gaddr">${ico('pin')}<span>${esc(b.pickup_addr)}</span></span>` : ''}${trouble ? `<span class="row">${ratingTag(b.client_id)}</span>` : ''}</div>`;
   }
   function guestRowsHtml(t) {
     const bks = tourBookings(t.id); if (!bks.length) return `<div class="empty">${guestsHidden(t) ? T('pv_hidden', { n: pv().guideDays }) : T('no_guests')}</div>`;
@@ -792,7 +810,7 @@
       <div class="list home"><div class="strip">${days.map(d => `<button data-act="day" data-date="${d}" aria-pressed="${d === sel}" class="${d === td ? 'tdy' : ''} ${offCls(offOn(id, d))} ${holidayOn(d) ? 'hol' : ''}"><span>${esc(fmt(d, { weekday: 'short' }))}</span><b class="num">${D(d).getDate()}</b>${dayMarks(d, id)}</button>`).join('')}</div>${stripLegend(true)}
       ${now ? nowCardHtml(now) : ''}${days.map(myDayHtml).join('')}</div>
       ${photoStripHtml()}
-      <div class="bar homelinks"><button class="lnk" data-act="mode" data-m="month">${T('month')}</button><button class="lnk" data-act="summary">${T('day_summary')}</button></div></div>`;
+      <div class="bar homelinks"><button class="btn" data-act="mode" data-m="month">${T('month')}</button><button class="btn" data-act="summary">${T('day_summary')}</button></div></div>`;
   }
   // Exchange rates to the pay currency (Rules), so money in USD, EUR and GEL can be added up.
   // Exchange rates. Official rates of the National Bank of Georgia, one per working day, are loaded by the admin's app
@@ -896,12 +914,13 @@
   }
   function monthHtml() {
     const first = state.date.slice(0, 8) + '01', start = monday(first), td = today(), mo = state.date.slice(0, 7), sel = state.date, my = me().id;
-    const wd = [...Array(7)].map((_, i) => `<div class="hd">${esc(fmt(addDays('2024-01-01', i), { weekday: 'short' }))}</div>`).join('');
+    const wd = `<div class="hd wkh"></div>` + [...Array(7)].map((_, i) => `<div class="hd">${esc(fmt(addDays('2024-01-01', i), { weekday: PHONE() ? 'narrow' : 'short' }))}</div>`).join('');
+    const isoWk = d => { const x = D(d); x.setHours(12); x.setDate(x.getDate() + 3 - ((x.getDay() + 6) % 7)); const y = new Date(x.getFullYear(), 0, 4); return 1 + Math.round(((x - y) / 86400000 - 3 + ((y.getDay() + 6) % 7)) / 7); };   // week numbers, shown on phones only
     let cells = '';
     for (let i = 0; i < 42; i++) {
       const d = addDays(start, i); if (i % 7 === 0 && i >= 28 && d.slice(0, 7) !== mo) break;
       const all = toursOnDay(d), ts = all.filter(seen), myOff = offOn(my, d), ho = holidayOn(d);
-      cells += `<button class="${d.slice(0, 7) !== mo ? 'out' : ''} ${d === td ? 'today' : ''} ${d === sel ? 'sel' : ''} ${offCls(myOff)} ${ho ? 'hol' : ''} ${pubHolOn(d) ? 'pub' : ''}" title="${esc(pubHolOn(d) ? T(pubHolOn(d)) : '')}" data-act="pickday" data-date="${d}" data-drop="${d}" aria-pressed="${d === sel}" aria-label="${esc(fmtDay(d))}: ${ts.length} ${T('tours_n')}"><b class="num">${D(d).getDate()}</b><span class="dots">${ts.slice(0, 4).map(t => `<i style="background:${esc(tourStyle(t.title).color)}"></i>`).join('')}${ts.length > 4 ? `<span class="num">+${ts.length - 4}</span>` : ''}</span><span class="mrows">${ts.slice().sort((x, y) => (x.start_time || '').localeCompare(y.start_time || '')).slice(0, 4).map(t => `<span class="mrow${live(t) ? '' : ' cx'}" data-act="tour" data-id="${t.id}"${isAdmin() && live(t) ? ` data-drag="${t.id}"` : ''}><i style="background:${esc(tourStyle(t.title).color)}"></i><span class="num">${esc(t.start_time || '')}</span> ${esc(t.title)} <span class="num muted">${paxText(t)}</span></span>`).join('')}${ts.length > 4 ? `<span class="mrow more">${T('more_n', { n: ts.length - 4 })}</span>` : ''}</span>${offMark(d)}</button>`;
+      cells += `${i % 7 === 0 ? `<span class="wk num" aria-hidden="true">${isoWk(d)}</span>` : ''}<button class="${d.slice(0, 7) !== mo ? 'out' : ''} ${i % 7 > 4 ? 'we' : ''} ${i % 7 === 6 ? 'sun' : ''} ${d === td ? 'today' : ''} ${d === sel ? 'sel' : ''} ${offCls(myOff)} ${ho ? 'hol' : ''} ${pubHolOn(d) ? 'pub' : ''}" title="${esc(pubHolOn(d) ? T(pubHolOn(d)) : '')}" data-act="pickday" data-date="${d}" data-drop="${d}" aria-pressed="${d === sel}" aria-label="${esc(fmtDay(d))}: ${ts.length} ${T('tours_n')}"><b class="num">${D(d).getDate()}</b><span class="dots">${ts.slice(0, 4).map(t => `<i style="background:${esc(tourStyle(t.title).color)}"></i>`).join('')}${ts.length > 4 ? `<span class="num">+${ts.length - 4}</span>` : ''}</span><span class="mrows">${ts.slice().sort((x, y) => (x.start_time || '').localeCompare(y.start_time || '')).slice(0, 4).map(t => `<span class="mrow${live(t) ? '' : ' cx'}" data-act="tour" data-id="${t.id}"${isAdmin() && live(t) ? ` data-drag="${t.id}"` : ''}><i style="background:${esc(tourStyle(t.title).color)}"></i><span class="num">${esc(t.start_time || '')}</span> ${esc(t.title)} <span class="num muted">${paxText(t)}</span></span>`).join('')}${ts.length > 4 ? `<span class="mrow more">${T('more_n', { n: ts.length - 4 })}</span>` : ''}</span>${offMark(d)}</button>`;
     }
     const legend = `<div class="row small muted lgrow"><span class="lg"><i class="dotk"></i>${T('lg_tour')}</span><span class="lg"><i class="sq myoff"></i>${T('lg_myoff')}</span><span class="lg"><i class="sq myoff mysick"></i>${T('sick')}</span><span class="lg"><i class="sq hol"></i>${T('holidays')}</span><span class="lg"><i class="sq pub"></i>${T('ph_legend')}</span></div>`;
     const mAt = n => { const d = D(first); d.setMonth(d.getMonth() + n); return fmt(iso(d), { month: 'short' }); };
@@ -1015,7 +1034,7 @@
         ${d.status === 'cancelled' && d.cancel_reason ? `<div class="warnline">${msi('warning')}<span>${T('cancel_info', { reason: d.cancel_reason })}</span></div>` : ''}
         ${d.pickup ? `<div class="meet">${ico('pin')}<span class="grow-l">${esc(placeName(d.pickup))}</span><a class="btn sm" href="${esc(tourMap(d))}" target="_blank" rel="noopener" aria-label="${T('open_map')}">${T('map')}</a></div>` : ''}
         ${d.notes ? `<div class="small"><span class="muted">${T('notes')}:</span> ${esc(d.notes)}</div>` : ''}
-        ${d.bookings.length ? `<div class="tsum num"><div>${esc(acText(d))}${d.bookings.some(isFree) ? ' · ' + T('free_n', { n: d.bookings.filter(isFree).reduce((n, b) => n + (Number(b.pax) || 1), 0) }) : ''}</div>${staysN(d.bookings) ? `<div>${T('stay_line', { n: staysN(d.bookings), back: Math.max(0, (d.pax || 0) - staysN(d.bookings)) })}</div>` : ''}${cashDue(d.bookings) ? `<div class="due">${T('cash_collect')}: ${esc(cashText(d.bookings))}</div>` : ''}</div>` : ''}
+        ${d.bookings.length ? `<div class="tsum num"><div>${esc(acText(d))}${d.bookings.some(isFree) ? ' · <span class="tag t-free">' + esc(T('free_n', { n: d.bookings.filter(isFree).reduce((n, b) => n + (Number(b.pax) || 1), 0) })) + '</span>' : ''}</div>${staysN(d.bookings) ? `<div>${T('stay_line', { n: staysN(d.bookings), back: Math.max(0, (d.pax || 0) - staysN(d.bookings)) })}</div>` : ''}${cashDue(d.bookings) ? `<div class="due">${T('cash_collect')}: ${esc(cashText(d.bookings))}</div>` : ''}</div>` : ''}
         ${isAdmin() ? warnHtml : ''}${isAdmin() && live(d) && (d.pax || 0) > (rules().carSeats || 6) && kmOf(d.title) > 0 ? `<div><button class="btn sm" data-act="car2" data-id="${d.id}">${ico('car')}${T('car2_btn')}</button></div>` : ''}${isAdmin() && costOf(d.id).total ? `<div class="muted small num">${T('cost_title')}: <b>${nf(costOf(d.id).total)} ${esc(rules().currency || 'GEL')}</b></div>` : ''}
         <div class="glist crew">${[['guide', d.guide_id], ['driver', d.driver_id]].filter(x => x[1]).map(([r, id]) => `<div class="grow" style="--k:${esc((person(id) || {}).color || '#66737f')}"><span class="row nw">${avatar(id)}<span class="grow-l" style="flex-direction:column;align-items:flex-start;gap:0"><b>${esc(pname(id))}</b><span class="muted small">${esc([T('role_' + r), ...titlesOf(id).slice(0, 1)].join(' · '))}</span></span>${staffBtns(person(id))}</span></div>`).join('') || `<div class="grow"><span class="tag t-warn">${T('unassigned')}</span></div>`}</div>
         <h3>${T('guests_title')} (${d.bookings.length})</h3>${canCheck && d.bookings.some(b => b.attendance) ? `<div class="muted small num">${T('att_sum', { a: d.bookings.filter(b => b.attendance === 'arrived').length, n: d.bookings.length, x: d.bookings.filter(b => b.attendance === 'noshow').length })}</div>` : ''}
@@ -1024,7 +1043,7 @@
         <details class="sect"><summary>${T('more')}</summary><div class="f">
           <div class="bar"><button class="btn sm" data-act="share" data-title="${esc(d.title)}" data-v="${esc(tourText(d))}">${ico('share')}${T('share')}</button><a class="btn sm" href="${esc(gcalLink(d))}" target="_blank" rel="noopener">${ico('cal')}${T('cal_short')}</a><button class="btn sm" data-act="copy" data-v="${esc(tourText(d))}">${ico('copy')}${T('copy')}</button>${tipUrl(d) && (mine || isAdmin()) ? `<button class="btn sm" data-act="tipqr" data-id="${d.id}">${T('tip_btn')}</button>` : ''}</div>
           <div class="muted small num">${esc([T('kind_' + d.kind), paxText(d), d.language, cn.duration, cn.note, endOf(d) !== d.date ? T('multiday', { n: tourDays(d).length }) : ''].filter(Boolean).join(' · '))}</div>
-          ${mine && !isAdmin() ? `<div class="row small"><span class="muted">${T('my_pay')}: <b class="num">${myPay} ${esc(cur)}</b></span>${disputeTag(disputeOf(d.id, me().id))}<button class="lnk" data-act="dispute" data-id="${d.id}">${T('dp_btn')}</button></div>` : (mine && myPay ? `<div class="muted small">${T('my_pay')}: <b class="num">${myPay} ${esc(cur)}</b></div>` : '')}${isAdmin() ? `<div class="muted small num">${T('a_pay')}: ${payFor(d, 'guide')} + ${payFor(d, 'driver')} ${esc(cur)}</div>` : ''}
+          ${mine && !isAdmin() ? `<div class="row small"><span class="muted">${T('my_pay')}: <b class="num">${myPay} ${esc(cur)}</b></span>${disputeTag(disputeOf(d.id, me().id))}<button class="btn sm dpbtn" data-act="dispute" data-id="${d.id}">${msi('flag')}${T('dp_btn')}</button></div>` : (mine && myPay ? `<div class="muted small">${T('my_pay')}: <b class="num">${myPay} ${esc(cur)}</b></div>` : '')}${isAdmin() ? `<div class="muted small num">${T('a_pay')}: ${payFor(d, 'guide')} + ${payFor(d, 'driver')} ${esc(cur)}</div>` : ''}
           ${isAdmin() ? '' : warnHtml}${reqs}
           ${scoreHtml(d)}
           ${tasks.length ? `<div class="list"><b>${T('tasks')}</b>${tasks.map(taskCard).join('')}</div>` : ''}
@@ -1230,7 +1249,7 @@
       if (db.change_requests.some(q => q.tour_id === t.id && q.user_id === me().id && q.status === 'pending' && (q.patch || {}).status === 'cancelled')) { toast(T('creq_pending')); }
       else {
         await S.save('change_requests', { id: S.uid(), tour_id: t.id, user_id: me().id, patch: { status: 'cancelled' }, cant: false, swap_with: null, agreed: false, message: reason || null, status: 'pending', created_at: new Date().toISOString(), decided_by: null });
-        await notify(admins(), 'creq_new', { name: me().name, title: t.title, date: t.date });
+        await notify(admins(), 'creq_new', { name: me().name, title: t.title, date: t.date, tour: t.id });
         logAct(`Cancellation reported for ${t.title}, ${t.date}`); toast(T('sent'));
       }
     }
@@ -1267,7 +1286,7 @@
     if (!Object.keys(patch).length && !d.cant && !d.swap_with && !(d.message || '').trim()) { toast(T('creq_empty')); return; }
     await S.save('change_requests', { id: S.uid(), tour_id: t.id, user_id: me().id, patch, cant: !!d.cant && !d.swap_with, swap_with: d.swap_with || null, agreed: false, message: (d.message || '').trim() || null, status: 'pending', created_at: new Date().toISOString(), decided_by: null });
     if (d.swap_with) await notify([d.swap_with], 'swap_ask', { name: me().name, title: t.title, date: t.date });
-    await notify(admins(), 'creq_new', { name: me().name, title: t.title, date: t.date });
+    await notify(admins(), 'creq_new', { name: me().name, title: t.title, date: t.date, tour: t.id });
     logAct(`Change suggested for ${t.title}, ${t.date}`); state.modal = null; toast(T('sent'));
   }
   async function decideCreq(id, ok) {
@@ -1828,10 +1847,20 @@
       <div class="card f wlstep"><b>${T('wl_' + cur.k)}</b>${body}</div>
       <div class="actions wlacts">${form ? `<button class="btn primary" data-act="wldo" data-k="${cur.k}">${T('wl_do')}</button>` : `<button class="btn primary" data-act="wlnext" data-k="${cur.k}">${T('wl_next')}</button>`}<button class="btn" data-act="wlskip" data-k="${cur.k}">${T('wl_skip')}</button><button class="lnk" data-act="wllater">${T('wl_later')}</button></div>`;
   }
+  // Notifications off? One tap turns them on. Only where the phone can do it (not blocked, not an iPhone tab outside the Home Screen), and "Not now" hides it for 7 days.
+  function pushBanner() {
+    try {
+      const demoOk = window.__fsPushDemo, perm = 'Notification' in window ? Notification.permission : 'unsupported';
+      if (perm !== 'default' || (!demoOk && (state.pushSub !== false || !swReg || !CFG.vapidPublicKey))) return '';
+      if (isIOS() && !standalone()) return '';
+      if (Date.now() - Number(localStorage.getItem('fs-push-later') || 0) < 7 * 864e5) return '';
+    } catch (e) { return ''; }
+    return `<div class="banner small setupban pushban"><span>${T('pn_text')}</span><span class="pnacts"><button class="btn sm primary" data-act="push">${msi('notifications')}${T('push_enable')}</button><button class="btn sm" data-act="pushlater">${T('pn_later')}</button></span></div>`;
+  }
   // Set-up reminder: one line on the calendar that opens the welcome guide. (The "Getting started" card in Tasks was removed in 3.60: the guide and this line are enough.)
   function setupCard(compact) {
     if (!compact || state.viewAs || state.newVersion) return '';   // one banner at a time: looking as > new version > set-up
-    if (!(S.mode === 'supabase' || window.__fsSetupDemo)) return ''; const w = welcomeSteps(), wl = w.filter(x => !x.done).length; if (!wl) return '';
+    if (!(S.mode === 'supabase' || window.__fsSetupDemo)) return ''; const w = welcomeSteps(), wl = w.filter(x => !x.done).length; if (!wl) return pushBanner();
     return `<button class="banner small setupban" data-act="wlgo"><span>${T('su_banner', { n: w.length - wl, all: w.length })}</span><b>${T('su_finish')} ›</b></button>`;
   }
   function myToursHtml(m) {
@@ -1979,31 +2008,41 @@
       S.save('notifications', { id: S.uid(), user_id: me().id, kind: 'xc_open', params: { n: list.length }, read: false, created_at: new Date().toISOString() }).catch(() => {});
     } catch (e) { console.error(e); }
   }
-  function openTours() {
+  // Work the person already has on the days of a tour: used to refuse a second tour on the same day and to name what is in the way.
+  const dayWork = (id, t) => db.tours.filter(x => x.id !== t.id && live(x) && involves(x, id) && tourDays(x).some(d => tourDays(t).includes(d)));
+  const workText = list => list.map(x => `${x.title}${x.start_time ? ' ' + x.start_time : ''} (${fmt(x.date, { weekday: 'short', day: 'numeric', month: 'short' })})`).join('; ');
+  function openTours(all) {
     const m = me(); if (!m || isAdmin()) return []; const role = m.role === 'driver' ? 'driver' : 'guide', td = today(), to = addDays(td, 14);
     const f = role + '_id';   // open tours of the next 2 weeks: nobody in my role, or the person whose tours are offered to the team
     return db.tours.filter(t => live(t) && t.date >= td && !involves(t, m.id) && t.date <= to && ((xOpen(t, f) && (S.mode !== 'supabase' || !t.guide_id || !t.driver_id)) || !t[f]) && (role === 'guide' || (kmOf(t.title) > 0 && (m.vehicle !== 'delica' || RIDE_4X4.test(t.title)))) && !offOn(m.id, t.date))
-      .sort((x, y) => (x.date + (x.start_time || '')).localeCompare(y.date + (y.start_time || ''))).map(t => ({ t, role, mine: db.change_requests.find(q => q.tour_id === t.id && q.user_id === m.id && q.status === 'pending') }));
+      .sort((x, y) => (x.date + (x.start_time || '')).localeCompare(y.date + (y.start_time || ''))).map(t => ({ t, role, mine: db.change_requests.find(q => q.tour_id === t.id && q.user_id === m.id && q.status === 'pending'), busy: dayWork(m.id, t) })).filter(x => all || !x.busy.length);
   }
+  // Admins: people who pressed "I can do it" and wait for an answer.
+  const pendingTakes = () => !isAdmin() ? [] : db.change_requests.filter(q => q.status === 'pending' && !q.swap_with && q.patch && (q.patch.guide_id === q.user_id || q.patch.driver_id === q.user_id) && db.tours.some(t => t.id === q.tour_id && live(t))).sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
+  function takeReqHtml() {
+    const list = pendingTakes(); if (!list.length) return '';
+    return `<div class="card f xcard xreqs"><b>${T('xc_req_title', { n: list.length })}</b><span class="muted small">${T('xc_req_text')}</span>${list.map(q => { const t = db.tours.find(x => x.id === q.tour_id), busy = dayWork(q.user_id, t); return `<div class="xrow xreq"><button class="grow-l arow" data-act="tour" data-id="${t.id}">${avatar(q.user_id)}<span><b>${esc(pname(q.user_id))}</b> <span class="muted">${esc(creqText(q))}</span><br><b class="num">${esc(fmt(t.date, { weekday: 'short', day: 'numeric', month: 'short' }))} ${esc(t.start_time || '')}</b> ${esc(aliasOf(t.title))}</span></button><span class="xbtns"><button class="btn sm danger" data-act="creqdecide" data-id="${q.id}" data-s="0">${msi('close')}${T('decline')}</button><button class="btn sm primary" data-act="creqdecide" data-id="${q.id}" data-s="1">${msi('check')}${T('approve')}</button></span>${busy.length ? `<div class="warnline soft xbusy">${msi('warning')}<span>${esc(T('xc_busy_adm', { name: pname(q.user_id), what: workText(busy) }))}</span></div>` : ''}</div>`; }).join('')}</div>`;
+  }
+  const adminOpenN = () => new Set([...unstaffed().map(t => t.id), ...pendingTakes().map(q => q.tour_id)]).size;
   // Admins: confirmed tours in the next 30 days that still have no guide, or no driver where one is needed.
-  function unstaffed() { if (!isAdmin()) return []; const td = today(), to = addDays(td, 30); return db.tours.filter(t => live(t) && t.date >= td && t.date <= to && (!t.guide_id || (!t.driver_id && kmOf(t.title) > 0))).sort((x, y) => (x.date + (x.start_time || '')).localeCompare(y.date + (y.start_time || ''))); }
+  function unstaffed() { if (!isAdmin()) return []; const td = today(), to = addDays(td, 30), asked = new Set(pendingTakes().map(q => q.tour_id)); return db.tours.filter(t => live(t) && t.date >= td && t.date <= to && (!t.guide_id || (!t.driver_id && kmOf(t.title) > 0))).sort((x, y) => (asked.has(y.id) ? 1 : 0) - (asked.has(x.id) ? 1 : 0) || (x.date + (x.start_time || '')).localeCompare(y.date + (y.start_time || ''))); }
   const tasksBadge = () => db.tasks.filter(k => k.status === 'open' && (k.assignees || []).includes(me().id)).length;
   function unstaffedHtml() {
     const list = unstaffed(); if (!list.length) return '';
-    return `<div class="card f xcard"><b>${T('us_title', { n: list.length })}</b><span class="muted">${T('us_text')}</span>${list.slice(0, 15).map(t => `<div class="xrow"><button class="grow-l arow" data-act="tour" data-id="${t.id}">${emblem(t)}<span><b class="num">${esc(fmt(t.date, { weekday: 'short', day: 'numeric', month: 'short' }))} ${esc(t.start_time || '')}</b> ${esc(aliasOf(t.title))}${langTags(t)}</span></button><span class="tag t-warn">${T(!t.guide_id && !t.driver_id && kmOf(t.title) > 0 ? 'us_both' : !t.guide_id ? 'us_guide' : 'us_driver')}</span></div>`).join('')}${list.length > 15 ? `<span class="muted small">+ ${list.length - 15}</span>` : ''}</div>`;
+    return `<div class="card f xcard"><b>${T('us_title', { n: list.length })}</b><span class="muted">${T('us_text')}</span>${list.slice(0, 15).map(t => { const who = pendingTakes().filter(q => q.tour_id === t.id); return `<div class="xrow"><button class="grow-l arow" data-act="tour" data-id="${t.id}">${emblem(t)}<span><b class="num">${esc(fmt(t.date, { weekday: 'short', day: 'numeric', month: 'short' }))} ${esc(t.start_time || '')}</b> ${esc(aliasOf(t.title))}${langTags(t)}${who.length ? `<span class="xwho">${who.map(q => `<span class="xw">${avatar(q.user_id)}${esc(pname(q.user_id))}</span>`).join('')}</span>` : ''}</span></button><span class="tag t-warn">${T(!t.guide_id && !t.driver_id && kmOf(t.title) > 0 ? 'us_both' : !t.guide_id ? 'us_guide' : 'us_driver')}</span></div>`; }).join('')}${list.length > 15 ? `<span class="muted small">+ ${list.length - 15}</span>` : ''}</div>`;
   }
   function exchangeHtml() {
-    const list = openTours(); if (!list.length) return '';
-    return `<div class="card f xcard"><b>${T('xc_title', { n: list.length })}</b><ol class="xhow muted"><li>${T('xc_h1')}</li><li>${T('xc_h2')}</li><li>${T('xc_h3')}</li></ol>${list.slice(0, 40).map(({ t, role, mine }) => `<div class="xrow"><button class="grow-l arow" data-act="tour" data-id="${t.id}">${emblem(t)}<span><b class="num">${esc(fmt(t.date, { weekday: 'short', day: 'numeric', month: 'short' }))} ${esc(t.start_time || '')}</b> ${esc(aliasOf(t.title))}${langTags(t)}</span></button>${mine ? `<span class="xasked"><span class="tag t-off">${T('xc_asked')}</span><button class="lnk" data-act="xcback" data-id="${mine.id}">${T('xc_back')}</button></span>` : `<button class="btn sm primary" data-act="xctake" data-id="${t.id}" data-role="${role}">${T('xc_can')}</button>`}</div>`).join('')}</div>`;
+    const list = openTours(true); if (!list.length) return '';
+    return `<div class="card f xcard"><b>${T('xc_title', { n: list.filter(x => !x.busy.length).length })}</b><ol class="xhow muted"><li>${T('xc_h1')}</li><li>${T('xc_h2')}</li><li>${T('xc_h3')}</li></ol>${list.slice(0, 40).map(({ t, role, mine, busy }) => `<div class="xrow"><button class="grow-l arow" data-act="tour" data-id="${t.id}">${emblem(t)}<span><b class="num">${esc(fmt(t.date, { weekday: 'short', day: 'numeric', month: 'short' }))} ${esc(t.start_time || '')}</b> ${esc(aliasOf(t.title))}${langTags(t)}</span></button>${mine ? `<span class="xasked"><span class="tag t-off">${T('xc_asked')}</span><button class="btn sm" data-act="xcback" data-id="${mine.id}">${msi('undo')}${T('xc_back')}</button></span>` : busy.length ? `<span class="tag t-warn">${T('xc_busy_tag')}</span>` : `<button class="btn sm primary" data-act="xctake" data-id="${t.id}" data-role="${role}">${T('xc_can')}</button>`}${busy.length ? `<div class="warnline soft xbusy">${msi('warning')}<span>${esc(T('xc_busy', { what: workText(busy) }))}</span></div>` : ''}</div>`).join('')}</div>`;
   }
   function tasksHtml() {
     const f = state.taskFilter, admin = isAdmin();
     const list = db.tasks.filter(k => (admin && !state.mine) || (k.assignees || []).includes(me().id)).filter(k => f === 'all' || k.status === f).sort((a, b) => (a.due_date || '9').localeCompare(b.due_date || '9'));
     // Two sections: real tasks, and tours that still need someone. They are different jobs, so they do not share a list or a number.
-    const nOpen = admin ? unstaffed().length : openTours().length, sec = state.taskSec === 'tours' && nOpen ? 'tours' : 'tasks', nTasks = tasksBadge();
+    const nOpen = admin ? adminOpenN() : openTours().length, sec = state.taskSec === 'tours' && nOpen ? 'tours' : 'tasks', nTasks = tasksBadge();
     const head = `<div class="bar thead"><h2>${T('tasks')}</h2><span class="spacer"></span>${admin ? `<button class="btn primary only-wide" data-act="tasknew">+ ${T('task')}</button>` : ''}${helpBtn()}</div>${helpBox('tasks')}
       ${nOpen ? `<div class="seg tsec"><button data-act="tasksec" data-v="tasks" aria-pressed="${sec === 'tasks'}">${T('tasks')}${nTasks ? ` <span class="segn num">${nTasks}</span>` : ''}</button><button data-act="tasksec" data-v="tours" aria-pressed="${sec === 'tours'}">${T(admin ? 'ts_tours' : 'ts_take')} <span class="segn num">${nOpen}</span></button></div>` : ''}`;
-    if (sec === 'tours') return head + exchangeHtml() + unstaffedHtml();
+    if (sec === 'tours') return head + takeReqHtml() + exchangeHtml() + unstaffedHtml();
     return head + `<div class="bar tfilt"><div class="seg">${['open', 'done', 'all'].map(x => `<button data-act="taskfilter" data-v="${x}" aria-pressed="${f === x}">${T('f_' + x)}</button>`).join('')}</div>
       ${admin ? `<div class="seg"><button data-act="mine" data-v="0" aria-pressed="${!state.mine}">${T('team')}</button><button data-act="mine" data-v="1" aria-pressed="${!!state.mine}">${T('mine')}</button></div>` : ''}</div>
       ${admin && !state.viewAs ? `<button class="btn primary fab xfab only-phone" data-act="tasknew">${msi('add_task')}${T('task_new')}</button>` : ''}
@@ -2292,7 +2331,7 @@
     }
     if (tab === 'requests') {
       const qs = db.change_requests.slice().sort((x, y) => (x.status === 'pending' ? 0 : 1) - (y.status === 'pending' ? 0 : 1) || (y.created_at || '').localeCompare(x.created_at || '')).slice(0, 60);
-      h += `<div class="list">${qs.map(q => { const t = db.tours.find(x => x.id === q.tour_id); return `<div class="card"><div class="row">${avatar(q.user_id)}<b>${esc(pname(q.user_id))}</b><span class="tag ${q.status === 'approved' ? 't-ok' : q.status === 'declined' ? 't-danger' : 't-warn'}">${T(q.status)}</span>${t ? `<button class="btn sm" data-act="tour" data-id="${t.id}">${esc(t.title)} · ${esc(dateText(t))}</button>` : ''}</div><div class="small">${esc(creqText(q))}</div>${q.status === 'pending' ? `<div class="actions"><button class="btn sm danger" data-act="creqdecide" data-id="${q.id}" data-s="0">${T('decline')}</button><button class="btn sm primary" data-act="creqdecide" data-id="${q.id}" data-s="1">${T('approve')}</button></div>` : ''}</div>`; }).join('') || `<div class="empty">${T('creq_none')}</div>`}</div>`;
+      h += `<div class="list">${qs.map(q => { const t = db.tours.find(x => x.id === q.tour_id); return `<div class="card"><div class="row">${avatar(q.user_id)}<b>${esc(pname(q.user_id))}</b><span class="tag ${q.status === 'approved' ? 't-ok' : q.status === 'declined' ? 't-danger' : 't-warn'}">${T(q.status)}</span>${t ? `<button class="btn sm" data-act="tour" data-id="${t.id}">${esc(t.title)} · ${esc(dateText(t))}</button>` : ''}</div><div class="small">${esc(creqText(q))}</div>${q.status === 'pending' ? `<div class="actions"><button class="btn sm danger" data-act="creqdecide" data-id="${q.id}" data-s="0">${msi('close')}${T('decline')}</button><button class="btn sm primary" data-act="creqdecide" data-id="${q.id}" data-s="1">${msi('check')}${T('approve')}</button></div>` : ''}</div>`; }).join('') || `<div class="empty">${T('creq_none')}</div>`}</div>`;
     }
     if (tab === 'usage') {
       // Who: everyone, or one role, or one age group (age only where the person put a birthday with a year in their profile).
@@ -2363,12 +2402,12 @@
   const MONTHS_FULL = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
   function parseOrderEmail(text) {
     const g = (re, i = 1) => { const m = text.match(re); return m ? String(m[i]).trim() : ''; };
-    const bm = text.match(/^\s*(\d+)\s*x\s*(.+?)\s*\((\d{1,2})\s+([A-Za-z]+),?\s+(\d{4}),?\s+(\d{1,2}:\d{2})\)\s*$/m);
+    const bm = text.match(/^\s*(\d{1,2})\s*x\s*(.+?)\s*\((\d{1,2})\s+([A-Za-z]+),?\s+(\d{4}),?\s+(\d{1,2}:\d{2})\)\s*$/m);
     const ref = g(/#\s*(\d{6,})/);
     if (!bm || !ref || MONTHS_FULL.indexOf(bm[4].toLowerCase()) < 0) throw new Error(T('mail_bad'));
     const date = `${bm[5]}-${p2(MONTHS_FULL.indexOf(bm[4].toLowerCase()) + 1)}-${p2(bm[3])}`, start = bm[6].padStart(5, '0'), title = bm[2].trim();
     const rest = text.slice(text.indexOf(bm[0]) + bm[0].length); let adults = 0, children = 0;
-    for (const m of rest.matchAll(/^\s*(\d+)\s*x\s+(.+)$/gm)) { if (/child|kid|infant/i.test(m[2])) children += Number(m[1]); else adults += Number(m[1]); }
+    for (const m of rest.matchAll(/^\s*(\d{1,2})\s*x\s+(.+)$/gm))   /* a head count has 1-2 digits: a long number is a code, and would not fit the database column */ { if (/child|kid|infant/i.test(m[2])) children += Number(m[1]); else adults += Number(m[1]); }
     if (!adults && !children) adults = Number(bm[1]) || 1;
     const first = g(/^\s*First name:\s*(.+)$/m), last = g(/^\s*Last name:\s*(.+)$/m), email = cleanEmail(g(/^\s*Email:\s*(\S+@\S+)/m));
     const price = Number(g(/Sales Price:\s*[A-Z]{3}\s*([\d.,]+)/).replace(/,/g, '')) || 0, paid = Number(g(/Payment:\s*[A-Z]{3}\s*([\d.,]+)/).replace(/,/g, '')) || 0, cur = g(/Sales Price:\s*([A-Z]{3})/) || '';
@@ -2525,12 +2564,12 @@
     const kind = /private/i.test(title) ? 'private' : /group|shared|small-group|join-in/i.test(title) ? 'group' : /private tour/i.test(t) ? 'private' : /join-in|small group/i.test(t) || src === 'FreeTour' ? 'group' : '';
     const res = { src, ref, title, date: when.date, time: when.time, guest, adults, children, phone, email: email.toLowerCase(), lang, pickup, marks, price, pnum, pcur, status, kind };
     // Website (TrekkSoft) order lines: "2 x Tour name (24 November, 2026, 10:30)", then "Guest 1 / First name / Last name / phone" blocks.
-    const tk = t.match(/^\s*(\d+)\s*x\s+(.+?)\s*\(([^()]*\d{4}[^()]*)\)\s*$/m);
+    const tk = t.match(/^\s*(\d{1,2})\s*x\s+(.+?)\s*\(([^()]*\d{4}[^()]*)\)\s*$/m);
     if (tk) {
       const w = parseWhen(tk[3]); res.title = tk[2].trim(); res.date = w.date || res.date; res.time = w.time || res.time; res.src = res.src || 'Website';
       res.kind = /private/i.test(res.title) ? 'private' : /group/i.test(res.title) ? 'group' : res.kind;
       const blocks = t.split(/\n\s*Guest\s+\d+\s*\n/i).slice(1), people = blocks.map(b => ({ name: [((b.match(/First name\s*:\s*([^\n]+)/i) || [])[1] || '').trim(), ((b.match(/Last name\s*:\s*([^\n]+)/i) || [])[1] || '').trim()].join(' ').trim(), phone: normPhone(((b.match(/Phone[^:\n]*:\s*(\+?[\d\s()-]{7,})/i) || [])[1] || '').replace(/[\s()-]/g, '')), email: ((b.match(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/) || [])[0] || '').toLowerCase(), child: /child|kid|infant/i.test(b) }));
-      const n = Number(tk[1]) || people.length || 1, kids = people.filter(x => x.child).length;
+      const n = (Number(tk[1]) >= 1 && Number(tk[1]) <= 99 ? Number(tk[1]) : 0) || people.length || 1, kids = people.filter(x => x.child).length;
       res.adults = n - kids; res.children = kids;
       if (people.length) { const lead = people.find(x => x.name) || people[0]; res.guest = lead.name || res.guest; res.phone = lead.phone || res.phone; res.email = lead.email || res.email; const others = people.filter(x => x !== lead && (x.name || x.phone)); if (others.length) res.others = others.map(x => [x.name, x.phone].filter(Boolean).join(' ')).join('; '); }
       const sums = [...t.matchAll(/\(\s*(USD|EUR|GEL)\s*([\d.,]+)\s*\)/gi)]; if (sums.length) { res.pnum = sums.reduce((s, m) => s + Number(m[2].replace(',', '')), 0); res.pcur = sums[0][1].toUpperCase(); res.price = `${res.pcur} ${res.pnum}`; }
@@ -2540,10 +2579,17 @@
   // Similar tour names: shared words count, ignoring small words.
   const words = s => new Set(String(s || '').toLowerCase().replace(/[^a-z0-9\u10a0-\u10ff\u0400-\u04ff ]+/g, ' ').split(/\s+/).filter(w => w.length > 3 && !/^(tour|tours|from|with|tbilisi|day|trip|private|group|small|guided|hours|full|half|georgia|the|and)$/.test(w)));
   const simil = (x, y) => { const A = words(x), B = words(y); if (!A.size || !B.size) return 0; let n = 0; A.forEach(w => { if (B.has(w)) n++; }); return n / Math.min(A.size, B.size); };
+  // Booking e-mail -> tour list: "walking" is in half of all names, so it alone never makes two tours the same tour ("Alternative Walking Tour New Tiflis" is not "Old Town walking tour").
+  const pbSim = (x, y) => {
+    if (tourKey(x) === tourKey(y)) return 1;
+    const A = [...words(x)], B = [...words(y)], a = A.filter(w => !/^(walking|walk|excursion|city)$/.test(w)), b = B.filter(w => !/^(walking|walk|excursion|city)$/.test(w));
+    if (!a.length || !b.length) return A.length <= 2 && B.length <= 2 ? simil(x, y) : 0;
+    return a.filter(w => b.includes(w)).length / Math.min(a.length, b.length);
+  };
   function pbMatch(pb) {
     const old = pb.ref ? db.bookings.find(b => (b.ref || '').toUpperCase() === pb.ref.toUpperCase()) : null;
-    const cat = catalog().map(x => ({ x, s: simil(pb.title, x.title) + (pb.kind && x.kind === pb.kind ? 0.2 : 0) })).sort((p, q) => q.s - p.s)[0];
-    const tours = pb.date ? db.tours.filter(x => x.date === pb.date && live(x)).map(x => ({ x, s: simil(pb.title, x.title) + (cat && cat.s >= 0.4 && x.title === cat.x.title ? 1 : 0) + (pb.time && x.start_time === pb.time ? 0.5 : 0) })).filter(y => y.s >= 0.5).sort((p, q) => q.s - p.s) : [];
+    const cat = catalog().map(x => ({ x, s: pbSim(pb.title, x.title) + (pb.kind && x.kind === pb.kind ? 0.2 : 0) })).sort((p, q) => q.s - p.s)[0];
+    const tours = pb.date ? db.tours.filter(x => x.date === pb.date && live(x)).map(x => ({ x, s: pbSim(pb.title, x.title) + (cat && cat.s >= 0.4 && x.title === cat.x.title ? 1 : 0) + (pb.time && x.start_time === pb.time ? 0.5 : 0) })).filter(y => y.s >= 0.5).sort((p, q) => q.s - p.s) : [];
     return { old, oldTour: old ? db.tours.find(x => x.id === old.tour_id) : null, cat: cat && cat.s >= 0.4 ? cat.x : null, tour: tours[0] ? tours[0].x : null };
   }
   function pasteHtml() {
@@ -2745,7 +2791,7 @@
     const text = [`${pname(id)} · ${mo}`, ...st.rows.map(x => `${x.t.date} ${x.t.title}: ${x.pay} ${cur}`), `${T('total')}: ${st.total} ${cur}`].join('\n');
     return `${modal ? `<div class="hdr"><h2>${esc(pname(id))} · ${esc(mo)}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>` : ''}
       <div class="stats"><div class="stat"><b>${st.rows.length}</b>${T('tours_n')}</div><div class="stat"><b>${st.total}</b>${esc(cur)}</div></div>
-      <div class="tablewrap"><table><tr><th>${T('date')}</th><th>${T('title')}</th><th class="n">${esc(cur)}</th></tr>${st.rows.map(x => `<tr><td class="num">${esc(dateText(x.t))}</td><td style="white-space:normal">${esc(x.t.title)} ${disputeTag(disputeOf(x.t.id, id))}${id === me().id && !isAdmin() ? ` <button class="lnk" data-act="dispute" data-id="${x.t.id}">${T('dp_btn')}</button>` : ''}</td><td class="n">${x.pay}</td></tr>`).join('') || `<tr><td colspan="3" class="muted">${T('no_tours')}</td></tr>`}${st.adj.map(x => `<tr><td><span class="tag t-warn">${T('correction')}</span></td><td style="white-space:normal">${esc(x.note || '')}${isAdmin() ? ` <button class="btn sm" data-act="adjdel" data-id="${x.id}">${T('remove')}</button>` : ''}</td><td class="n">${Number(x.amount) > 0 ? '+' : ''}${esc(x.amount)}</td></tr>`).join('')}${st.adj.length ? `<tr><td colspan="2"><b>${T('total')}</b></td><td class="n"><b>${st.total}</b></td></tr>` : ''}</table></div>
+      <div class="tablewrap"><table><tr><th>${T('date')}</th><th>${T('title')}</th><th class="n">${esc(cur)}</th></tr>${st.rows.map(x => `<tr><td class="num">${esc(dateText(x.t))}</td><td style="white-space:normal">${esc(x.t.title)} ${disputeTag(disputeOf(x.t.id, id))}${id === me().id && !isAdmin() ? ` <button class="btn sm dpbtn" data-act="dispute" data-id="${x.t.id}">${msi('flag')}${T('dp_btn')}</button>` : ''}</td><td class="n">${x.pay}</td></tr>`).join('') || `<tr><td colspan="3" class="muted">${T('no_tours')}</td></tr>`}${st.adj.map(x => `<tr><td><span class="tag t-warn">${T('correction')}</span></td><td style="white-space:normal">${esc(x.note || '')}${isAdmin() ? ` <button class="btn sm" data-act="adjdel" data-id="${x.id}">${T('remove')}</button>` : ''}</td><td class="n">${Number(x.amount) > 0 ? '+' : ''}${esc(x.amount)}</td></tr>`).join('')}${st.adj.length ? `<tr><td colspan="2"><b>${T('total')}</b></td><td class="n"><b>${st.total}</b></td></tr>` : ''}</table></div>
       ${rules().payNote ? `<p class="muted small">${esc(rules().payNote)}</p>` : ''}
       ${modal ? expensesHtml(id, mo + '-01', monthEnd(mo)) : ''}
       ${modal && isAdmin() ? `<form class="bar" data-form="adjust"><input type="hidden" name="user_id" value="${id}"><input type="hidden" name="month" value="${mo}"><input class="inp" id="adj-amount" name="amount" type="number" step="any" placeholder="${T('adj_amount')}" required style="max-width:130px"><input class="inp" id="adj-note" name="note" placeholder="${T('adj_note')}" required style="flex:1;min-width:140px"><button class="btn">+ ${T('correction')}</button></form>` : ''}
@@ -2977,7 +3023,7 @@
   function bellHtml() {
     const ns = myNotes().slice(0, 40);
     return `<div class="hdr"><h2>${T('notifications')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>
-      <div class="nlist">${ns.length ? ns.map(n => `<div class="nitem ${n.read ? '' : 'unread'}">${esc(noteText(n))}${tcBtns(n)}<div class="muted small">${esc(new Intl.DateTimeFormat(LOCALES[lang()], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(n.created_at)))}</div></div>`).join('') : `<div class="empty">${T('no_notifications')}</div>`}</div>`;
+      <div class="nlist">${ns.length ? ns.map(n => `<div class="nitem ${n.read ? '' : 'unread'}">${esc(noteText(n))}${tcBtns(n)}${noteActs(n)}<div class="muted small">${esc(new Intl.DateTimeFormat(LOCALES[lang()], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(n.created_at)))}</div></div>`).join('') : `<div class="empty">${T('no_notifications')}</div>`}</div>`;
   }
 
   // ---------- render ----------
@@ -3247,8 +3293,8 @@
     expnew(el) { state.modal = { type: 'exp', draft: { kind: 'meal', date: (el && el.dataset.date) || today(), tour_id: (el && el.dataset.tour) || '', currency: rules().currency || 'GEL' } }; renderModal(); },
     expdel(el) { return run(() => S.remove('expenses', el.dataset.id), T('saved')); },
     exppaid(el) { const x = (db.expenses || []).find(y => y.id === el.dataset.id); if (x) return run(() => S.save('expenses', { ...x, paid_back: true }), T('saved')); },
-    xctake(el) { const t = db.tours.find(x => x.id === el.dataset.id); if (!t) return; const role = el.dataset.role === 'driver' ? 'driver_id' : 'guide_id';
-      return run(async () => { await S.save('change_requests', { id: S.uid(), tour_id: t.id, user_id: me().id, patch: { [role]: me().id }, cant: false, swap_with: null, agreed: false, message: null, status: 'pending', created_at: new Date().toISOString(), decided_by: null }); await notify(admins(), 'creq_new', { name: me().name, title: t.title, date: t.date }); }, T('xc_sent')); },
+    xctake(el) { const t = db.tours.find(x => x.id === el.dataset.id); if (!t) return; { const busy = dayWork(me().id, t); if (busy.length) { toast(T('xc_busy', { what: workText(busy) })); return; } } const role = el.dataset.role === 'driver' ? 'driver_id' : 'guide_id';
+      return run(async () => { await S.save('change_requests', { id: S.uid(), tour_id: t.id, user_id: me().id, patch: { [role]: me().id }, cant: false, swap_with: null, agreed: false, message: null, status: 'pending', created_at: new Date().toISOString(), decided_by: null }); await notify(admins(), 'creq_new', { name: me().name, title: t.title, date: t.date, tour: t.id }); }, T('xc_sent')); },
     xcback(el) { const q = db.change_requests.find(x => x.id === el.dataset.id); if (q) return run(() => S.remove('change_requests', q.id), T('xc_backed')); },
     async install() { if (!installEvt) return; installEvt.prompt(); try { await installEvt.userChoice; } catch (e) { /* closed */ } installEvt = null; render(); },
     instlater() { try { localStorage.setItem('fs-install-later', String(Date.now() + 7 * 86400000)); } catch (e) { /* private mode */ } render(); },
@@ -3417,6 +3463,7 @@
     offcopynow() { const blob = new Blob([offlineJson()], { type: 'application/json' }), a2 = document.createElement('a'); a2.href = URL.createObjectURL(blob); a2.download = OFFNAME; document.body.appendChild(a2); a2.click(); a2.remove(); },
     demoreset() { confirmDo(T('demo_reset') + '?', T('demo_reset'), async () => { S.demoReset(); state.imp = null; }); },
     push() { enableNotifications(); },
+    pushlater() { try { localStorage.setItem('fs-push-later', String(Date.now())); } catch (e) { /* private mode */ } render(); },
     pushoff() { pushOff(); },
     pushtest() { run(pushTest); },
     auth(el) { state.auth = el.dataset.to; state.authMsg = ''; render(); },
@@ -3704,7 +3751,7 @@
     if (S.recall && window.showDirectoryPicker && isAdmin()) S.recall('offdir').then(async h => { if (h && h.queryPermission) { OFFDIR.handle = h; OFFDIR.ok = (await h.queryPermission({ mode: 'readwrite' })) === 'granted'; } }).catch(() => {});
     if (S.remember) S.remember('lang', lang()); if ((S.pending || 0) > 0) setTimeout(() => toast(T('st_waiting_open', { n: S.pending || 0 })), 600);
     if (S.warming) { let warm = true; S.onChange((t, r, type) => { if (warm && type === 'STATE' && !S.warming) { warm = false; PH.asked.clear(); displayFromAccount(); saveHello(); weekCheck(); setTimeout(xcNudge, 4000); } }); }
-    if (S.mode === 'demo') window.__test = { T: (k, v) => T(k, v), xcNudge, relayEmail, guestEmail, parseBooking, badgeNote: () => { const b = game(me().id).list.find(x => x.done); if (b) badgeNote([b]); }, checkBadges, newVersion: v => { state.newVersion = !!v; render(); }, pageFor: (title, kind) => { const u = pageFor({ title, kind }), m = /\/activity\/(\d+)/.exec(u); return m ? { id: Number(m[1]) } : null; } };          // for the automatic tests only
+    if (S.mode === 'demo') window.__test = { T: (k, v) => T(k, v), pushBanner, xcNudge, relayEmail, guestEmail, parseBooking, badgeNote: () => { const b = game(me().id).list.find(x => x.done); if (b) badgeNote([b]); }, checkBadges, newVersion: v => { state.newVersion = !!v; render(); }, pageFor: (title, kind) => { const u = pageFor({ title, kind }), m = /\/activity\/(\d+)/.exec(u); return m ? { id: Number(m[1]) } : null; } };          // for the automatic tests only
     if (me() && !isAdmin()) state.mine = true;
     displayFromAccount();
     try { history.scrollRestoration = 'manual'; } catch (e) { /* old browser */ }

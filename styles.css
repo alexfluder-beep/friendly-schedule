@@ -127,7 +127,7 @@ button.card{text-align:left;width:100%}
 .mgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:1px solid var(--line);border-radius:var(--r-l);overflow:hidden;background:var(--surface)}
 .mgrid .hd{background:var(--surface2);font-weight:700;font-size:var(--t-sm);padding:6px;text-align:center}
 .mgrid button{background:none;border:0;border-top:1px solid var(--line);border-right:1px solid var(--line);min-height:76px;padding:5px;text-align:left;display:flex;flex-direction:column;gap:3px;font-size:var(--t-cap);min-width:0}
-.mgrid button:nth-child(7n){border-right:0}
+.mgrid button.sun{border-right:0}
 .mgrid button.out{opacity:.45}
 .mgrid button.today b{background:var(--accent);color:var(--accent-ink);border-radius:var(--r-pill);padding:0 6px}
 .mgrid .m{color:var(--ink);font-weight:700}.mgrid .o{color:var(--off)}.mgrid .h{color:var(--holiday);font-weight:600;overflow-wrap:anywhere}
@@ -1414,3 +1414,62 @@ html[data-fs="xl"] .vabar .vapre,html[data-fs="l"] .vabar .vapre{display:none}
 /* 3.63: how-to above the open tours */
 .xhow{margin:0;padding-left:20px;display:grid;gap:4px;font-size:var(--t-body-s,14px)}
 .xhow li{padding-left:2px}
+
+/* 3.64: fixes from the iPhone screenshots of 12 Nov */
+/* the selected day in the week strip: dark number on a dark fill was invisible when that day is a day off */
+@media (max-width:760px){.strip button.myoff[aria-pressed="true"] b{background:var(--ink);color:var(--bg)}}
+/* time-off rows: type and status side by side (one line), dates on the right */
+@media (min-width:390px){.reqrow.nohead .lmain{flex-direction:row;flex-wrap:nowrap;align-items:center;gap:4px 8px}.reqrow.nohead .lmain .tag{white-space:nowrap}}
+.card.lrow.reqrow{min-height:56px}
+/* Month and Day summary: two real buttons, a clear space above them and above the photo card */
+.homelinks{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px}
+.homelinks .btn{min-height:44px}
+.phstrip{margin-top:16px}
+
+/* 3.64: open tours, requests, notices, free-tour guests */
+.xrow{flex-wrap:wrap}
+.xrow .xbusy{flex:1 1 100%;margin:0 0 4px 0}
+.xrow .xbusy{display:flex;gap:6px;align-items:flex-start}
+.xrow.xreq .xbtns{display:flex;gap:8px;flex:none}
+.xwho{display:flex;flex-wrap:wrap;gap:4px 8px;margin-top:4px}
+.xwho .xw{display:inline-flex;align-items:center;gap:6px;font-size:var(--t-sm);color:var(--muted)}
+.xwho .avatar,.xreq .avatar{width:28px;height:28px;flex:none}
+.xreq .arow>.avatar{margin-top:2px}
+.nitem .nacts{margin-top:8px;gap:8px;flex-wrap:wrap}
+.nitem .small{margin-top:6px}
+.gst.free{box-shadow:inset 4px 0 0 var(--warn);padding-left:8px}
+.avatar.ini.free{background:color-mix(in srgb,var(--warn) 24%,var(--surface));border-color:var(--warn);box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--warn)}
+.tsum .tag.t-free{margin-left:2px}
+
+/* 3.64: same button style for request actions; icon + word */
+.btn.sm .msi{width:20px;height:20px;flex:none;margin-right:6px}
+.xrow .btn.sm{min-width:9.5rem;justify-content:center}
+.dpbtn{display:flex;width:fit-content;min-width:0;margin-top:8px}
+.nacts .btn.sm{min-width:0}
+.btn.sm.dpbtn{white-space:nowrap;font-size:var(--t-sm);padding:4px 12px 4px 10px;min-height:40px}
+.btn.sm.dpbtn .msi{width:18px;height:18px;margin-right:4px}
+
+/* 3.64: phone month closer to the iPhone and Android calendar: one-letter weekdays, week numbers, big day numbers, a bar of tour colours under each day */
+.mgrid .wk,.mgrid .wkh{display:none}
+@media (max-width:760px){
+  .mgrid{grid-template-columns:22px repeat(7,minmax(0,1fr))}
+  .mgrid .hd{text-transform:none;font-weight:600;color:var(--ink);font-size:var(--t-cap);padding:4px 0 6px}
+  .mgrid .wk,.mgrid .wkh{display:block}
+  .mgrid .wk{align-self:start;padding-top:6px;font-size:var(--t-micro);font-weight:700;color:var(--muted);border-top:1px solid var(--line);text-align:left}
+  .mgrid button{min-height:62px;border-top:1px solid var(--line);justify-content:flex-start;gap:6px;padding:6px 0 4px;border-radius:0}
+  .mgrid button > b:first-child{font-size:1.3rem;font-weight:600;line-height:1;display:grid;place-items:center;min-width:34px;height:34px;padding:0;border-radius:50%}
+  .mgrid button.we > b:first-child{color:var(--muted)}
+  .mgrid button.today > b:first-child{background:var(--accent);color:var(--accent-ink);padding:0}
+  .mgrid button.sel{box-shadow:none}
+  .mgrid button.sel > b:first-child{box-shadow:0 0 0 2px var(--ink)}
+  .mgrid button.today.sel > b:first-child{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--ink)}
+  .mgrid .dots{flex-wrap:nowrap;gap:0;width:72%;max-width:56px;height:6px;min-height:6px;border-radius:3px;overflow:hidden;justify-content:stretch}
+  .mgrid .dots i{flex:1 1 0;width:auto;height:6px;border-radius:0}
+  .mgrid .dots span{display:none}
+  .mgrid button:has(.dots i:only-child) .dots{max-width:24px}
+}
+.lgrow{flex-wrap:wrap;gap:6px 16px}
+
+/* 3.64: one-tap notification banner */
+.pushban{display:flex;flex-direction:column;align-items:stretch;gap:10px;text-align:left}
+.pushban .pnacts{display:flex;flex-wrap:wrap;gap:8px}

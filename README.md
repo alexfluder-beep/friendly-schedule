@@ -566,3 +566,20 @@ A tidy-up round after the owner's phone recording of 3.57. Nothing new to learn;
 - **Short how-to above the list, in EN, RU and KA:** press "I can do it"; it is only a request and the office must approve it (until then the tour stays with its current person); the answer comes as a message. The tag on a pressed tour now says "Waiting for office".
 - **Soft notice about open tours.** The app makes one quiet notice for the person: only while the app is open, only inside their working hours (8:00-20:00 when none are set), never during one of their tours, only for tours they were not told about before, at most every 3 days. People who switched off reminders in Me do not get it. Nothing is sent by the server, so nothing is sent at night or to people who do not open the app. A phone push shows the general text "Something new for you" until the `push` function is updated (not done, needs OK).
 - No database change.
+
+## 3.64
+- **Freetour e-mail: right tour and time.** The app no longer joins an e-mail to an existing tour only because both names contain "walking". "Alternative Walking Tour New Tiflis & Backstreets, 10:00" now offers the Alternative walking tour at 10:00, not "Old Town walking tour 16:00". A mail for the Old Town tour still joins the Old Town tour.
+- **Week strip:** the selected day was an empty dark box when that day is a day off (dark number on a dark fill). The number shows again.
+- **Time-off rows:** the type ("Day off") and the status ("Approved") sit side by side, so the rows are lower.
+- **Home screen:** "Month" and "Day summary" are two buttons with more space above them and above the photo card.
+- **Tours to staff, for guides and drivers:** a tour on a day when you already work is not offered. It shows "Busy that day" and names the tour and time that are in the way ("You already work that day: Busy walk 09:00"). Pressing it anyway sends nothing.
+- **Tours to staff, for the office:** a new card "Asked to take a tour" shows who asked (avatar and name) with Decline and Approve. Tours without a guide show the avatars of the people who asked, and those tours come first.
+- **Notices:** a notice about a tour has an "Open tour" button. A notice from a person who asks to take a tour has Approve and Decline right in the notice.
+- **Same button style:** "Take back" and "Pay not right?" are real buttons with an icon, like "I can do it". Approve, Decline and Open tour also have icons.
+- **Free tour guests:** a free-tour guest has a ringed avatar, a coloured stripe and a filled "Free tour" tag in the guest list, and a filled "Free tour: N" tag in the tour summary.
+- **Turn on notifications, in one tap:** on the calendar, a person whose phone can show notifications but has them off sees a short banner with "Turn on notifications" and "Not now". "Not now" hides it for 7 days. It does not show on an iPhone browser tab (needs the Home Screen app), or when notifications are blocked.
+- **Import:** a head count in a booking e-mail must be 1 or 2 digits. A long number (a booking code) is no longer taken as a number of guests. This was the "out of range for type integer" error seen on 3.15.
+- **Problems list:** a wrong password is no longer written to the problems list as an app error.
+- **Database (done 12 Nov, with the owner's yes):** the helper function `rls_auto_enable` can no longer be called by the public or by signed-in users. It still runs as a database trigger.
+- **Month on phones:** closer to the iPhone and Android calendar. One-letter weekdays, week numbers on the left, bigger day numbers, grey weekends, a circle on today, and one bar of tour colours under each day instead of dots. Wide screens are unchanged.
+
