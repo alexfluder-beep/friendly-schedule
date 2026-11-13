@@ -835,11 +835,12 @@ html[data-os="ios"] input,html[data-os="ios"] select,html[data-os="ios"] textare
 
 /* 3.19 Tasks in two sections, labelled add button, special dates with suggestions and a date picker */
 .thead{margin-bottom:0}
-.tsec{display:flex;width:100%}
-.tsec button{flex:1;justify-content:center;display:inline-flex;align-items:center;gap:8px;min-height:44px}
+.tsec{display:inline-flex;width:fit-content;max-width:100%;margin:4px 0 8px}
+.tsec button{justify-content:center;display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:8px 16px}
 .segn{min-width:20px;height:20px;padding:0 6px;border-radius:var(--r-m);background:var(--surface2);color:var(--ink);font:700 12px/20px inherit;text-align:center}
 .seg button[aria-pressed="true"] .segn{background:rgba(255,255,255,.55)}
 .tfilt{gap:8px;flex-wrap:wrap}
+.tfilt .seg button{padding:8px 11px;min-height:38px}
 .fab.xfab{width:auto;height:56px;border-radius:var(--r-xl);padding:0 20px 0 16px;gap:8px;font-size:var(--t-body);font-weight:700}
 .fab.xfab .msi{width:24px;height:24px}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
@@ -1588,3 +1589,24 @@ a.phl{color:var(--accent);font-weight:600;text-decoration:underline;white-space:
 .teamblk .gibar{grid-template-columns:70px minmax(0,1fr) auto}.teamblk .gibar .num{white-space:nowrap}
 
 .bheart{display:inline-flex;align-items:center;gap:6px;margin-top:-4px}
+
+@media print{body:has(.overlay) main,body:has(.overlay) header.top,body:has(.overlay) .nav{display:none!important}.overlay{position:static!important;background:none!important;display:block!important;padding:0!important}.sheet{width:100%!important;max-height:none!important;overflow:visible!important;border-radius:0!important;padding:0!important}.sheet .actions,.sheet .iconbtn{display:none!important}.sheet .pre{white-space:pre-wrap}}
+
+.gicard{scroll-margin-top:72px}.totop{width:36px;height:36px;min-height:36px;padding:0;flex:none}.jumpbar{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}
+
+.busylist{display:grid;gap:6px}.busyrow{display:grid;grid-template-columns:58px minmax(0,1fr);gap:0 8px;align-items:center}.busyrow i{display:block;height:12px;border-radius:6px;min-width:2px}.busyrow .num{grid-column:2;white-space:normal}
+.lv-ok{background:linear-gradient(90deg,#2f6b48,#6fbf8a)}.lv-mid{background:linear-gradient(90deg,#c98a1b,#f0b03f)}.lv-hi{background:linear-gradient(90deg,#c42d49,#ef6f6c)}.lv-none{background:var(--line)}
+.busykey{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:6px}.busykey span{display:inline-flex;align-items:center;gap:6px}.busykey i{display:inline-block;width:14px;height:8px;border-radius:4px}
+.wkchart{display:grid;gap:4px;margin-top:10px}.wkbars{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px;height:120px;align-items:end}
+.wkcol{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;height:100%;min-width:0}.wkcol i{display:block;width:70%;min-height:2px;border-radius:6px 6px 0 0}.wkcol .small{font-size:10px;white-space:nowrap}
+.wkcol i.ok{background:linear-gradient(0deg,#2f6b48,#6fbf8a)}.wkcol i.mid{background:linear-gradient(0deg,#c98a1b,#f0b03f)}.wkcol i.hi{background:linear-gradient(0deg,#c42d49,#ef6f6c)}
+
+.daysbars .dcol{min-width:0}.dstack{display:flex;flex-direction:column;width:70%;border-radius:6px 6px 0 0;overflow:hidden;min-height:2px}.dstack i{display:block;min-height:0}
+.dtour{background:linear-gradient(0deg,#2f6b48,#6fbf8a)}.doff{background:#8fb6d9}.dfree{background:var(--line)}
+.cmp .up{color:#2f6b48}.cmp .down{color:#a05a1a}.motv{margin:6px 0}
+
+.dstack i{width:100%;border-radius:0;min-height:0}.dstack i.dtour{background:linear-gradient(0deg,#2f6b48,#6fbf8a)}.dstack i.doff{background:#8fb6d9}.dstack i.dfree{background:var(--line)}
+.busykey i.dtour,.busykey i.doff,.busykey i.dfree{display:inline-block;width:12px;height:12px;border-radius:4px;margin-right:4px;vertical-align:-1px}
+.cmprow{display:flex;flex-direction:column;gap:2px;padding:8px 0;border-bottom:1px solid var(--line)}.cmprow .cv{display:flex;align-items:baseline;gap:10px}.cmprow .cv b.num{font-size:1.25rem}
+
+.hllist{display:flex;flex-direction:column;gap:2px;margin-top:6px}.hlrow{display:flex;gap:10px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--line);font-size:1.05rem}.hlrow:last-child{border:0}.hlrow .up{color:#2f6b48;font-size:.8em}

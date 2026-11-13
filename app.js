@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.73';
+  const APP_VERSION = '3.74';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -20,7 +20,7 @@
   const trName = name => { const raw = String(name || ''), l = (typeof lang === 'function' ? lang() : 'en'); if (l === 'en') return raw; const base = raw.replace(/\s*\(.*$/, '').trim().toLowerCase(), hit = NAMES[base]; return hit ? hit[l === 'ru' ? 0 : 1] : raw; };
   const peaks = () => String(rules().peaks ?? DEFAULT_PEAKS).split('\n').map(l => l.trim().match(/^(\d{4}-\d\d-\d\d)\s*\.\.\s*(\d{4}-\d\d-\d\d)\s*(.*)$/)).filter(Boolean).map(x => ({ from: x[1], to: x[2], name: x[3] || '' }));
   const peakOn = d => peaks().find(p => p.from <= d && p.to >= d);
-  const DEFAULT_RULES = { maxStreak: 6, carSeats: 6, seasonFrom: 6, seasonTo: 10, maxSeasonBlock: 5, minNoticeDays: 14 };
+  const DEFAULT_RULES = { maxStreak: 6, carSeats: 6, seasonFrom: 6, seasonTo: 10, maxSeasonBlock: 5, minNoticeDays: 14, minGroup: 0 };
   const LOCALES = { en: 'en-GB', ru: 'ru-RU', ka: 'ka-GE' };
 
   // ---------- dates (Monday is the first day of the week) ----------
@@ -312,7 +312,9 @@
   const eventOn = date => db.holidays.find(h => h.kind === 'event' && h.date_from <= date && h.date_to >= date);
   const SOURCES = ['GetYourGuide', 'Viator', 'Website', 'Airbnb', 'Civitatis', 'Klook', 'Trip.com', 'TourRadar', 'FreeTour', 'Direct'];
   // Booking source from the booking code. Only patterns we are sure about; anything else is set by hand.
-  const sourceOf = b => b.source || (/free\s*tour/i.test((b.ref || '') + ' ' + (b.guest || '')) ? 'FreeTour' : /GYG/i.test(b.ref || '') ? 'GetYourGuide' : /^BR-/i.test(b.ref || '') ? 'Viator' : /sputnik|спутник/i.test((b.ref || '') + ' ' + (b.notes || '')) ? 'Sputnik8' : /tripster|трипстер/i.test((b.ref || '') + ' ' + (b.notes || '')) ? 'Tripster' : /^#?\d{7,9}$/.test((b.ref || '').trim()) ? 'Website' : '');
+  // The platform's own guest address tells the platform when the booking code is missing: Trip.com / Ctrip use @atguest.trip.com and @atguest.ctrip.com.
+  const srcFromMail = e => { const m = String(e || '').toLowerCase().match(/@([a-z0-9.-]+)\s*$/), d = m ? m[1] : ''; return /(^|\.)c?trip\.com$/.test(d) ? 'Trip.com' : /(^|\.)getyourguide\.com$/.test(d) ? 'GetYourGuide' : /(^|\.)(viator|tripadvisor)\.com$/.test(d) ? 'Viator' : /(^|\.)klook\.com$/.test(d) ? 'Klook' : /(^|\.)tourradar\.com$/.test(d) ? 'TourRadar' : /(^|\.)airbnb\.com$/.test(d) ? 'Airbnb' : ''; };
+  const sourceOf = b => b.source || (/free\s*tour/i.test((b.ref || '') + ' ' + (b.guest || '')) ? 'FreeTour' : /GYG/i.test(b.ref || '') ? 'GetYourGuide' : /^BR-/i.test(b.ref || '') ? 'Viator' : /sputnik|спутник/i.test((b.ref || '') + ' ' + (b.notes || '')) ? 'Sputnik8' : /tripster|трипстер/i.test((b.ref || '') + ' ' + (b.notes || '')) ? 'Tripster' : srcFromMail(b.email) || (/^#?\d{7,9}$/.test((b.ref || '').trim()) ? 'Website' : ''));
   // Where a guest can leave a review: the platform they booked on first (GetYourGuide, Viator), then Google Maps, TripAdvisor, Trustindex.
   const reviewPlaces = b => { const r = rules(), src = sourceOf(b), out = []; if (src === 'GetYourGuide' && r.reviewGyg) out.push(['GetYourGuide', r.reviewGyg]); if (src === 'Viator' && r.reviewViator) out.push(['Viator', r.reviewViator]); if (r.reviewGoogle) out.push(['Google Maps', r.reviewGoogle]); if (r.reviewTripadvisor) out.push(['TripAdvisor', r.reviewTripadvisor]); if (r.reviewTrustindex) out.push(['Trustindex', r.reviewTrustindex]); return out; };
   const reviewLink = b => { const r = rules(), src = sourceOf(b); return (src === 'GetYourGuide' && r.reviewGyg) || (src === 'Viator' && r.reviewViator) || r.reviewGoogle || ''; };
@@ -385,6 +387,10 @@
     if (t.capacity > 0 && t.pax > t.capacity) w.push({ lv: 'danger', tx: T('w_over', { pax: t.pax, cap: t.capacity }) });
     if (t.driver_id && t.pax > r.carSeats) w.push({ lv: 'danger', tx: T('w_car', { pax: t.pax, seats: r.carSeats }) });
     if (!t.guide_id && !t.driver_id) w.push({ lv: 'warn', tx: T('w_unassigned') });
+    { const left = daysBetween(today(), t.date); if (Number(r.minGroup) > 0 && t.kind === 'group' && left >= 0 && left <= 2 && (t.pax || 0) < r.minGroup) w.push({ lv: 'warn', tx: T('w_under', { pax: t.pax || 0, min: r.minGroup }) }); }
+    if (t.date.slice(5) === '12-31' && (t.start_time || '') >= '16:00') w.push({ lv: 'warn', tx: T('w_nye') });
+    if (D(t.date).getDay() === 1 && t.kind === 'group' && /walking|tiflis/i.test(t.title)) w.push({ lv: 'warn', tx: T('w_monday') });
+    if (t.date.slice(5, 7) === '03' && /armenia/i.test(t.title) && endOf(t) > t.date) w.push({ lv: 'warn', tx: T('w_march') });
     if (t.guide_id && !t.driver_id && kmOf(t.title) > 0 && !(person(t.guide_id) || {}).vehicle) w.push({ lv: 'warn', tx: T('w_nocar', { name: pname(t.guide_id) }) });
     const ce = catFind(t.title), mth = Number(t.date.slice(5, 7));
     if (ce && /summer only/i.test(ce.note || '') && (mth < 5 || mth > 10)) w.push({ lv: 'warn', tx: T('w_season') });
@@ -540,7 +546,7 @@
   let hiddenAt = 0; document.addEventListener('visibilitychange', () => { hiddenAt = Date.now(); });
   function logErr(kind, message, detail) {
     try {
-      const msg = String(message || '').slice(0, 500); if (!msg || /ResizeObserver loop|^Script error\.?$|Transition was (aborted|skipped)|Viewport size changed/i.test(msg)) return;
+      const msg = String(message || '').slice(0, 500); if (!msg || /ResizeObserver loop|^Script error\.?$|Transition was (aborted|skipped)|Viewport size changed|Invalid login credentials/i.test(msg)) return;
       if (/abort|load failed|failed to fetch|networkerror/i.test(msg) && (!navigator.onLine || document.hidden || Date.now() - hiddenAt < 15000)) return; // the phone paused the app or lost signal: not a real problem
       const q = JSON.parse(localStorage.getItem(ERRQ) || '[]');
       if (q.length && q[q.length - 1].message === msg && Date.now() - new Date(q[q.length - 1].at).getTime() < 60000) return; // same error again within a minute
@@ -1034,12 +1040,26 @@
     const ids = [...new Set(d.bookings.map(b => b.client_id).filter(Boolean))].filter(c => !(state.visits || {})[c]);
     if (t && ids.length) S.guestVisits(ids, me().id, t.date).then(rows => { state.visits = state.visits || {}; ids.forEach(c => { state.visits[c] = { total: 0, mine: 0 }; }); rows.forEach(r => { state.visits[r.client_id] = r; }); if (rows.length && state.modal && state.modal.type === 'tour' && !state.modal.edit) renderModal(); }).catch(() => {});
   }
+  // Draft message for the guests of one tour. Only facts the app holds; the admin copies it and sends it by hand.
+  function preTripText(t) {
+    const bk = t.bookings || tourBookings(t.id), g = person(t.guide_id) || {}, L = ['Hello, this is Friendly.ge.', `A reminder about your tour: ${t.title}.`, `${fmt(t.date, { weekday: 'long', day: 'numeric', month: 'long' })}${t.start_time ? ', ' + t.start_time : ''}.`];
+    if (t.pickup) L.push(`Meeting point: ${placeName(t.pickup)}${tourMap(t) ? '\n' + tourMap(t) : ''}`);
+    if (t.guide_id) L.push(`Your guide: ${pname(t.guide_id)}${g.phone ? ', ' + g.phone : ''}.`);
+    if (cashDue(bk)) L.push(`Please have ${cashText(bk)} in cash for the guide.`);
+    { const ti = String(t.title || ''), tips = [];
+      if (/gareji|kazbegi|truso|tusheti|rainbow|juta|svaneti/i.test(ti)) tips.push('Friendly tips: please bring warm layers, a windproof jacket, closed-toe walking shoes, water, and a little cash in GEL for roadside restrooms.');
+      if (/mtskheta|chronicle/i.test(ti) && (t.start_time || '') >= '12:00') tips.push('Friendly tip: afternoon traffic in Tbilisi can be heavy, so the tour may take a little longer.');
+      L.push(...tips); }
+    L.push('Please reply to confirm you received this. See you soon.');
+    return L.join('\n');
+  }
   function summaryHtml(m) {
     const d = m.date, ts = toursOnDay(d).filter(t => isAdmin() || involves(t, me().id)).sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
     const all = [fmt(d, { weekday: 'long', day: 'numeric', month: 'long' }), ...ts.map(tourText)].join('\n\n');
     const ppl = isAdmin() ? crew().filter(p => ts.some(t => involves(t, p.id))) : [];
     return `<div class="hdr"><h2>${T('day_summary')}: ${esc(fmtDay(d))}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>
-      ${ts.length ? `<pre class="pre">${esc(all)}</pre><div class="actions"><button class="btn" data-act="copy" data-v="${esc(all)}">${T('copy')}</button><a class="btn primary" href="${esc(waLink('', all))}" target="_blank" rel="noopener">WhatsApp</a></div>
+      ${ts.length ? `<pre class="pre">${esc(all)}</pre><div class="actions"><button class="btn" data-act="copy" data-v="${esc(all)}">${T('copy')}</button><button class="btn" data-act="print">${T('print')}</button><a class="btn primary" href="${esc(waLink('', all))}" target="_blank" rel="noopener">WhatsApp</a></div>
+      ${isAdmin() && ts.length ? `<b>${T('gr_title')}</b><span class="muted small">${T('gr_text')}</span><div class="list">${ts.map(t => `<div class="row"><span style="flex:1;min-width:0">${esc(t.start_time || '')} ${esc(t.title)}</span><button class="btn sm" data-act="copy" data-v="${esc(preTripText(t))}">${T('copy')}</button></div>`).join('')}</div>` : ''}
       ${ppl.length ? `<b>${T('send_each')}</b><div class="list">${ppl.map(p => { const tx = [fmt(d, { weekday: 'long', day: 'numeric', month: 'long' }), ...ts.filter(t => involves(t, p.id)).map(tourText)].join('\n\n'); return `<div class="row">${avatar(p.id)}<span style="flex:1">${esc(p.name)}</span><button class="btn sm" data-act="copy" data-v="${esc(tx)}">${T('copy')}</button>${p.phone ? `<a class="btn sm" href="${esc(waLink(p.phone, tx))}" target="_blank" rel="noopener">WhatsApp</a>` : ''}</div>`; }).join('')}</div>` : ''}` : `<div class="empty">${T('no_tours')}</div>`}`;
   }
   function guestSheetHtml(m) {
@@ -1525,14 +1545,14 @@
     { const ab = ts.filter(t => /tusheti|omalo/i.test(t.title)).length * 2; list.push(B('abano2', 'geo', 'mountain', ab, 2), B('abano10', 'geo', 'mountain', ab, 10), B('abano30', 'geo', 'mountain', ab, 30)); }
     { const mp = db.photos.filter(x => twin(x.user_id) === id), pl = mp.reduce((a, x) => a + likesN(x), 0), tk = db.thanks.filter(x => twin(x.to_id) === id).length; list.push(B('photo1', 'fun', 'camera', mp.length, 1), B('photo10', 'fun', 'camera', mp.length, 10), B('photo50', 'fun', 'camera', mp.length, 50), B('liked25', 'fun', 'heart', pl, 25), B('thanks10', 'fun', 'heart', tk, 10)); }
     const newToMe = Object.values(mineFirst).filter(d => d >= d90).length;
-    list.push(B('pioneer', 'new', 'star', pioneer, 1), B('pioneer5', 'new', 'star', pioneer, 5), B('newdest', 'new', 'map', newToMe, 3), B('armenia1', 'new', 'globe', armenia, 1), B('armenia10', 'new', 'globe', armenia, 10));
+    list.push(B('pioneer', 'new', 'star', pioneer, 1), B('pioneer5', 'new', 'star', pioneer, 5), B('newdest', 'new', 'map', newToMe, 5), B('armenia1', 'new', 'globe', armenia, 1), B('armenia10', 'new', 'globe', armenia, 10));
     const offs = db.time_off.filter(o => o.user_id === id && o.type !== 'sick'), notice = rules().minNoticeDays || 14;
     const planned = offs.filter(o => o.created_at && daysBetween(o.created_at.slice(0, 10), o.date_from) >= notice).length, restDays = offs.filter(o => o.status === 'approved').reduce((n, o) => n + daysBetween(o.date_from, o.date_to) + 1, 0);
     const dq = db.pay_disputes.filter(q => q.user_id === id);
     list.push(B('nights5', 'new', 'moon', nights, 5), B('nights30', 'new', 'moon', nights, 30));
     if (isG) list.push(B('kids50', 'guide', 'users', kids, 50), B('kids200', 'guide', 'users', kids, 200), B('noshow5', 'guide', 'pin', cn.noshow || 0, 5), B('diplomat', 'guide', 'heart', cn.trouble || 0, 1), B('steel', 'guide', 'bolt', cn.trouble || 0, 5));
     list.push(B('ritual', 'fun', 'check', db.tasks.filter(k => k.kind === 'week_check' && k.done_by === id).length, 10));
-    list.push(B('planner', 'fun', 'cal', planned, 5), B('rest10', 'fun', 'bed', restDays, 10), B('accountant', 'fun', 'coin', dq.length, 1), B('sharpeye', 'fun', 'coin', dq.filter(q => q.status === 'accepted').length, 3));
+    list.push(B('planner', 'fun', 'cal', planned, 5), B('rest10', 'fun', 'bed', restDays, 15), B('accountant', 'fun', 'coin', dq.length, 1), B('sharpeye', 'fun', 'coin', dq.filter(q => q.status === 'accepted').length, 3));
     list.push(B('khinkali', 'fun', 'heart', khink, 20), B('smart', 'fun', 'car', smart, 25), B('churchkhela', 'fun', 'glass', kakh, 10));
     list.push(B('week5', 'now', 'bolt', best(per.w), 5), B('month20', 'now', 'cal', best(per.m), 20), B('season80', 'now', 'sun', best(per.s), 80), B('year150', 'now', 'star', best(per.y), 150));
     // tour mastery: the three tours this person has done most, each on its own ladder up to 500
@@ -1542,19 +1562,20 @@
     // guests' countries (from the phone code), names, extras and places: counted from this person's own tours
     { const tids = new Set(ts.map(t => t.id)), bk = db.bookings.filter(b => tids.has(b.tour_id)), cty = {}, nm = {}, myFirst = String(firstName(p)).toLowerCase(); let wineN = 0, rare = 0, same = 0;
       for (const b of bk) { const pax = Number(b.pax) || 1, c = phoneIso(b.phone); if (c) cty[c] = (cty[c] || 0) + pax; if ((b.marks || []).includes('wine')) wineN++;
-        const f = (cleanName(b.guest).split(/\s+/)[0] || '').toLowerCase(); if (f.length > 1) { nm[f] = (nm[f] || 0) + 1; if (/^[qxz]/.test(f)) rare = 1; if (myFirst && f === myFirst) same = 1; } }
+        const f = (cleanName(b.guest).split(/\s+/)[0] || '').toLowerCase(); if (f.length > 1) { nm[f] = (nm[f] || 0) + 1; if (/^[qxz]/.test(f)) rare++; if (myFirst && f === myFirst) same = 1; } }
       const topC = Object.keys(cty).sort((x, y) => cty[y] - cty[x])[0], topN = Object.keys(nm).sort((x, y) => nm[y] - nm[x])[0], world = Object.keys(cty).length, cap = x => x ? x[0].toUpperCase() + x.slice(1) : '';
-      list.push(B('world10', 'geo', 'globe', world, 10), B('world25', 'geo', 'globe', world, 25), B('world40', 'geo', 'globe', world, 40));
+      list.push(B('world10', 'geo', 'globe', world, 15), B('world25', 'geo', 'globe', world, 30), B('world40', 'geo', 'globe', world, 50));
       [50, 200, 1000].forEach(g => { const b = B('country' + g, 'geo', 'globe', topC ? cty[topC] : 0, g); b.desc = topC ? T('bd_country', { n: g, c: countryName(topC) }) : T('bd_country0', { n: g }); list.push(b); });
       [5, 15].forEach(g => { const b = B('names' + g, 'fun', 'users', topN ? nm[topN] : 0, g); b.desc = topN && nm[topN] >= 2 ? T('bd_names', { n: g, name: cap(topN), have: nm[topN] }) : T('bd_names0', { n: g }); list.push(b); });
       // Legends: goals so far away that they are a joke and a dream at once. They show real progress all the same.
       { const b1 = B('legend_country', 'legend', 'globe', topC ? cty[topC] : 0, 100000); b1.desc = topC ? T('bd_legend_country', { c: countryName(topC) }) : T('bd_legend_country0'); const b2 = B('legend_names', 'legend', 'users', topN ? nm[topN] : 0, 2000); b2.desc = topN && nm[topN] >= 2 ? T('bd_legend_names', { name: cap(topN) }) : T('bd_legend_names0'); list.push(b1, b2, B('legend_guests', 'legend', 'users', s.guests, 100000), B('legend_mother', 'legend', 'pin', ts.filter(t => /walking|old tbilisi|old town/i.test(t.title)).length, 10000)); }
       if (isG) list.push(B('tamada5', 'guide', 'glass', wineN, 5), B('tamada25', 'guide', 'glass', wineN, 25), B('tamada100', 'guide', 'glass', wineN, 100), B('baker25', 'guide', 'glass', kakh, 25));
       const cnt = re => ts.filter(t => re.test(t.title + ' ' + (t.notes || ''))).length, mother = cnt(/walking|old tbilisi|old town/i);
-      if (isG) list.push(B('mother50', 'guide', 'pin', mother, 50), B('mother200', 'guide', 'pin', mother, 200));
-      UNLOCKS.forEach(([k, re]) => list.push(B('pl_' + k, 'geo', 'pin', cnt(re), 1)));
+      if (isG) list.push(B('mother50', 'guide', 'pin', mother, 75), B('mother200', 'guide', 'pin', mother, 250));
+      UNLOCKS.forEach(([k, re]) => { const b = B('pl_' + k, 'geo', 'pin', cnt(re), 3); b.desc = T('bd_pl_' + k) + ' · ' + T('pl_x3'); list.push(b); });
       const took = db.change_requests.filter(q => q.user_id === id && q.patch && (q.patch.guide_id === id || q.patch.driver_id === id)).length; list.push(B('enthusiast3', 'fun', 'bolt', took, 3), B('enthusiast10', 'fun', 'bolt', took, 10));
-      [['namesake', 'heart', same], ['rarename', 'star', rare]].forEach(([k, icon, v]) => { const b = B(k, 'secret', icon, v, 1); b.hidden = true; list.push(b); }); }
+      [['namesake', 'heart', same], ['rarename', 'star', rare >= 3 ? 1 : 0]].forEach(([k, icon, v]) => { const b = B(k, 'secret', icon, v, 1); b.hidden = true; list.push(b); }); }
+    { const at = (p.display && p.display.badgeAt) || {}; list.forEach(b => { if (at[b.k] && !b.done && !b.hidden && b.track !== 'master' && b.track !== 'titles') { b.done = true; b.have = b.goal; b.raw = b.goal; } }); }
     const done = list.filter(b => b.done).length, xp = n * 10 + s.guests + Math.round(km / 20) + Math.round(walk * 2) + done * 25;
     const level = Math.floor((1 + Math.sqrt(1 + 8 * xp / 100)) / 2), base = 100 * level * (level - 1) / 2, next = 100 * level * (level + 1) / 2;
     return memo['g' + id] = { list, done, xp, level, base, next, km, walk, regs, partners, cur, prev, isD, isG, rep, weekNow, yearNow: per.y[td.slice(0, 4)] || 0 };
@@ -1994,7 +2015,7 @@
   }
   function teamOffCounts(list) {
     const td = today(), m = me(), team = staff().filter(p => p.role !== 'admin'), n = team.length || 1, pg = Number(state.tcPage) || 0, start = addDays(monday(td), 28 * pg), r = rules(), pk = peaks();
-    const own = d => db.time_off.find(o => twin(o.user_id) === m.id && o.status !== 'declined' && o.date_from <= d && o.date_to >= d);
+    const own = d => db.time_off.find(o => (twin(o.user_id) === m.id || o.user_id === m.id) && o.status !== 'declined' && o.date_from <= d && o.date_to >= d);
     const wd = [...Array(7)].map((_, i) => `<div class="hd">${esc(fmt(addDays(start, i), { weekday: 'short' }))}</div>`).join('');
     const cells = [...Array(28)].map((_, i) => {
       const d = addDays(start, i), past = d < td, off = new Set(list.filter(o => o.date_from <= d && o.date_to >= d).map(o => twin(o.user_id))), others = [...off].filter(id => id !== m.id).length, ready = Math.round((n - off.size) / n * 100);
@@ -2148,7 +2169,7 @@
     return head + `<div class="bar tfilt"><div class="seg">${['open', 'done', 'all'].map(x => `<button data-act="taskfilter" data-v="${x}" aria-pressed="${f === x}">${T('f_' + x)}</button>`).join('')}</div>
       ${admin ? `<div class="seg"><button data-act="mine" data-v="0" aria-pressed="${!state.mine}">${T('team')}</button><button data-act="mine" data-v="1" aria-pressed="${!!state.mine}">${T('mine')}</button></div>` : ''}</div>
       ${admin && !state.viewAs ? `<button class="btn primary fab xfab only-phone" data-act="tasknew">${msi('add_task')}${T('task_new')}</button>` : ''}
-      ${nOpen ? `<button class="banner small setupban" data-act="tasksec" data-v="tours"><span>${admin ? T('us_title', { n: nOpen }) : T(nOpen === 1 ? 'xc_banner_1' : 'xc_banner', { n: nOpen })}</span><b>${T('xc_see')} ›</b></button>` : ''}<div class="list">${list.length ? list.map(taskCard).join('') : `<div class="empty">${T('no_tasks')}</div>`}</div>`;
+      <div class="list">${list.length ? list.map(taskCard).join('') : `<div class="empty">${T('no_tasks')}</div>`}</div>`;
   }
   function taskModalHtml(m) {
     const d = m.draft;
@@ -2309,6 +2330,16 @@
     return html ? `<div class="card f"><b>${T('yh_title', { y })}</b><div class="yh">${html}</div><span class="muted small">${T('yh_note')}</span></div>` : '';
   }
   // Guest analytics (office only): who the guests are, where they come from, who comes back and who causes trouble. Past tours only; cancelled tours are not counted as visits.
+  // Eight weeks of the team's mood and tour ratings as two small bar charts (plain HTML and CSS, light for old phones).
+  function moodWeeks(ids) {
+    const td = today(), w0 = addDays(monday(td), -49), weeks = Array.from({ length: 8 }, (_, i) => addDays(w0, i * 7)), wk = d => weeks.findIndex(s => d >= s && d <= addDays(s, 6));
+    const mood = weeks.map(() => ({})), rate = weeks.map(() => []);
+    db.usage.filter(u => u.day >= w0 && /^mood_[1-5]$/.test(u.action) && ids.has(twin(u.user_id))).forEach(u => { const i = wk(u.day); if (i < 0) return; const k = twin(u.user_id); if (!mood[i][k] || u.day >= mood[i][k].day) mood[i][k] = { day: u.day, m: Number(u.action.slice(5)) }; });
+    db.tour_ratings.forEach(r => { const t = db.tours.find(x => x.id === r.tour_id), i = t ? wk(t.date) : -1; if (i >= 0 && Number(r.score) > 0) rate[i].push(Number(r.score)); });
+    const mv = mood.map(o => { const v = Object.values(o); return v.length ? v.reduce((s, x) => s + x.m, 0) / v.length : 0; }), rv = rate.map(v => (v.length ? v.reduce((s, x) => s + x, 0) / v.length : 0));
+    const chart = (title, vals, max, cls) => (vals.some(Boolean) ? `<div class="wkchart"><b class="small">${title}</b><div class="wkbars">${vals.map((v, i) => `<div class="wkcol"><span class="num small">${v ? v.toFixed(1) : ''}</span><i class="${cls(v)}" style="height:${Math.round(v / max * 100)}%"></i><span class="small muted">${esc(fmt(weeks[i], { day: 'numeric', month: 'short' }))}</span></div>`).join('')}</div></div>` : '');
+    return chart(T('tm_mood_w'), mv, 5, v => (v >= 4 ? 'ok' : v >= 3 ? 'mid' : 'hi')) + chart(T('tm_rate_w'), rv, 10, v => (v >= 9 ? 'ok' : v >= 8 ? 'mid' : 'hi'));
+  }
   function guestInsightsHtml() {
     const td = today(), cur = esc(rules().currency || 'GEL'), tk = {}, cx = {};
     db.tours.forEach(t => { if (t.date > td) return; if (live(t)) tk[t.id] = t; else cx[t.id] = t; });
@@ -2339,20 +2370,21 @@
     const bucket = [['1', c => c.n === 1], ['2', c => c.n === 2], ['3–4', c => c.n >= 3 && c.n <= 4], ['5+', c => c.n >= 5]].map(([l, f]) => [l, all.filter(f).length]);
     const cs = Object.values(ctys).sort((a, b) => b.g - a.g).slice(0, 12), ss = Object.values(srcs).sort((a, b) => b.g - a.g);
     const mmax = Math.max(1, ...mon), ppl = {};
-    Object.values(tk).forEach(t => [t.guide_id, t.driver_id].forEach((id, i) => { if (!id) return; const x = ppl[id + i] = ppl[id + i] || { id, role: i, n: 0, g: 0 }; x.n++; x.g += Number(t.pax) || 0; }));
+    Object.values(tk).forEach(t => [t.guide_id, t.driver_id].forEach((id, i) => { if (!id) return; const x = ppl[id] = ppl[id] || { id, roles: new Set(), seen: new Set(), n: 0, g: 0 }; x.roles.add(i); if (!x.seen.has(t.id)) { x.seen.add(t.id); x.n++; x.g += Number(t.pax) || 0; } }));
     const pl = Object.values(ppl).sort((a, b) => b.n - a.n).slice(0, 14);
-    const card = (k, body) => `<div class="card f"><b>${T(k)}</b>${body}</div>`;
+    const card = (k, body) => `<div class="card f gicard" id="gi-${k}"><div class="row nw"><b style="flex:1">${T(k)}</b><button class="iconbtn totop" data-act="totop" aria-label="${T('to_top')}">${msi('keyboard_arrow_up')}</button></div>${body}</div>`;
     return `<p class="muted small">${T('gi_note')}</p>
+       <div class="chips jumpbar">${['gi_fav', 'gi_cty', 'gi_src', 'gi_lead', 'gi_mon', 'gi_grp', 'gi_top', 'gi_ppl', 'gi_bad'].map(k => `<button class="btn sm" data-act="jumpto" data-id="gi-${k}">${T(k)}</button>`).join('')}</div>
       <div class="stats"><div class="stat"><b>${nf(all.length)}</b>${T('gi_s_guests')}</div><div class="stat"><b>${all.length ? Math.round(back.length / all.length * 100) : 0}%</b>${T('gi_s_back')}</div><div class="stat"><b>${bn ? (pax / bn).toFixed(1) : 0}</b>${T('gi_s_avg')}</div></div>
       ${card('gi_fav', tbl([T('gi_c_tours'), T('gi_c_guests')], bucket) + `<span class="muted small">${T('gi_fav_note')}</span>`)}
-      ${card('gi_bad', tbl([T('name'), T('gi_c_noshow'), T('gi_c_cx'), T('gi_c_moved'), T('gi_c_bad')], bad.map(c => [btn(c.id), c.noshow, c.cx, c.moved, c.bad])) + `<span class="muted small">${T('gi_bad_note')}</span>`)}
       ${card('gi_cty', tbl([T('phone_country'), T('gi_c_guests'), T('gi_c_money'), T('gi_c_pg')], cs.map(c => [fl(c.iso), c.g, m(c.m), m(c.g ? c.m / c.g : 0)])))}
       ${card('gi_src', tbl([T('gi_c_src'), T('gi_c_bookings'), T('gi_c_guests'), T('gi_c_money'), T('gi_c_pg'), T('gi_c_pb'), T('gi_c_back'), T('gi_c_noshow')], ss.map(x => { const cc = [...x.cs].map(id => cl[id]).filter(Boolean); return [esc(x.s), x.b, x.g, m(x.m), m(x.g ? x.m / x.g : 0), m(x.b ? x.m / x.b : 0), cc.length ? Math.round(cc.filter(c => c.n >= 2).length / cc.length * 100) + '%' : '—', x.ns]; })))}
       ${card('gi_lead', (lead.length ? tbl([T('gi_c_days'), T('gi_c_bookings')], [['0', x => x === 0], ['1–3', x => x >= 1 && x <= 3], ['4–7', x => x >= 4 && x <= 7], ['8–30', x => x >= 8 && x <= 30], ['31+', x => x > 30]].map(([l, f]) => [l, lead.filter(y => f(y.dd)).length])) + `<span class="muted small">${T('gi_lead_avg', { n: (lead.reduce((a, y) => a + y.dd, 0) / lead.length).toFixed(1), k: lead.length, all: bn })}</span>` : '') + `<span class="muted small">${T('gi_lead_note')}</span>`)}
       ${card('gi_mon', mon.map((v, i) => `<div class="gibar"><span class="muted small">${esc(fmt(`2024-${String(i + 1).padStart(2, '0')}-01`, { month: 'long' }))}</span><i style="width:${Math.round(v / mmax * 100)}%"></i><span class="num small">${nf(v)}</span></div>`).join(''))}
       ${card('gi_grp', tbl([T('name'), T('gi_c_guests'), T('gi_c_money'), T('title'), T('date')], big.sort((a, b) => b.p - a.p).slice(0, 8).map(x => [esc(x.b.guest || ''), x.p, m(net(x.b)), esc(aliasOf(x.t.title)), esc(fmt(x.t.date, { day: 'numeric', month: 'short', year: 'numeric' }))])))}
       ${card('gi_top', tbl([T('name'), T('gi_c_tours'), T('gi_c_money'), T('gi_c_pg'), T('gi_c_last'), T('phone_country')], top.map(c => [btn(c.id) + ' ' + vipTag(c.id), c.n, m(c.money), m(c.pax ? c.money / c.pax : 0), esc(c.last ? fmtDay(c.last) : ''), fl(c.iso)])))}
-      ${card('gi_ppl', tbl([T('name'), T('role'), T('gi_c_tours'), T('gi_c_guests')], pl.map(x => [esc(pname(x.id)), T(x.role ? 'driver' : 'guide'), x.n, x.g])))}`;
+      ${card('gi_ppl', tbl([T('name'), T('role'), T('gi_c_tours'), T('gi_c_guests')], pl.map(x => [esc(pname(x.id)), [...x.roles].sort().map(r => T(r ? 'driver' : 'guide')).join(' + '), x.n, x.g])))}
+      ${card('gi_bad', tbl([T('name'), T('gi_c_noshow'), T('gi_c_cx'), T('gi_c_moved'), T('gi_c_bad')], bad.map(c => [btn(c.id), c.noshow, c.cx, c.moved, c.bad])) + `<span class="muted small">${T('gi_bad_note')}</span>`)}`;
   }
   // ---------- Duplicates (office): guests and tours that look like the same one. Merge, edit or delete. ----------
   const dupDigits = s => String(s || '').replace(/\D/g, '');
@@ -2541,7 +2573,8 @@
     }
     if (k === 'busy') {
       const ds = Array.from({ length: 14 }, (_, i) => addDays(td, i)), rows = ds.map(d => { const ts = toursOnDay(d).filter(live); return { d, n: ts.length, g: ts.reduce((s, t) => s + (Number(t.pax) || 0), 0), free: ppl.length - offCount(d) }; }), mx = Math.max(1, ...rows.map(r => r.g));
-      return box(T('tm_busy'), rows.map(r => `<div class="gibar"><span class="muted small">${esc(fmt(r.d, { weekday: 'short', day: 'numeric' }))}</span><i style="width:${Math.round(r.g / mx * 100)}%"></i><span class="num small">${r.n} · ${r.g} · ${r.free}${r.free && r.n / r.free >= 1.5 ? ' <span class="tag t-warn">!</span>' : ''}</span></div>`).join('') + `<span class="muted small">${T('tm_busy_note')}</span>`);
+      const lv = r => (!r.n ? 'none' : !r.free || r.n / r.free >= 1.5 ? 'hi' : r.n / r.free >= 0.75 ? 'mid' : 'ok');
+      return box(T('tm_busy'), `<div class="busylist">${rows.map(r => `<div class="busyrow"><span class="muted small">${esc(fmt(r.d, { weekday: 'short', day: 'numeric' }))}</span><i class="lv-${lv(r)}" style="width:${Math.max(2, Math.round(r.g / mx * 100))}%"></i><span class="num small">${T('tm_busy_row', { n: r.n, g: r.g, f: r.free })}</span></div>`).join('')}</div><div class="busykey small muted"><span><i class="lv-ok"></i>${T('tm_k_ok')}</span><span><i class="lv-mid"></i>${T('tm_k_mid')}</span><span><i class="lv-hi"></i>${T('tm_k_hi')}</span></div><span class="muted small">${T('tm_busy_note')}</span>`);
     }
     if (k === 'people') {
       const from = addDays(td, -29), rows = ppl.map(p => { const ts = db.tours.filter(t => live(t) && t.date >= from && t.date <= td && involves(t, p.id)); return { p, n: ts.length, g: ts.reduce((s, t) => s + (Number(t.pax) || 0), 0), pay: ts.reduce((s, t) => s + myPayOn(t, p.id), 0), st: streakOf(p.id) }; }).sort((x, y) => y.n - x.n);
@@ -2552,7 +2585,7 @@
       db.usage.filter(u => u.day >= from && /^mood_[1-5]$/.test(u.action) && ids.has(twin(u.user_id))).forEach(u => { const key = twin(u.user_id); if (!last[key] || u.day >= last[key].day) last[key] = u; });
       const v = Object.values(last).map(u => ({ id: twin(u.user_id), m: Number(u.action.slice(5)) })), avg = v.length ? v.reduce((s, x) => s + x.m, 0) / v.length : 0;
       const sc = db.tour_ratings.filter(r => { const t = db.tours.find(x => x.id === r.tour_id); return t && t.date >= from; }), sa = sc.length ? sc.reduce((s, r) => s + (Number(r.score) || 0), 0) / sc.length : 0;
-      return box(T('tm_mood'), v.length || sc.length ? `${v.length ? `<span class="small">${T('md_team', { m: T('md_' + Math.round(avg)), n: v.length })}</span><div class="row crew">${v.sort((x, y) => x.m - y.m).map(x => `<span class="p">${avatar(x.id)}${esc(pname(x.id))} ${moodFace(x.m)}</span>`).join('')}</div>` : ''}${sc.length ? `<span class="small">${T('tm_score', { s: sa.toFixed(1), n: sc.length })}</span>` : ''}` : `<span class="muted small">—</span>`);
+      return box(T('tm_mood'), v.length || sc.length ? `${v.length ? `<span class="small">${T('md_team', { m: T('md_' + Math.round(avg)), n: v.length })}</span><div class="row crew">${v.sort((x, y) => x.m - y.m).map(x => `<span class="p">${avatar(x.id)}${esc(pname(x.id))} ${moodFace(x.m)}</span>`).join('')}</div>` : ''}${sc.length ? `<span class="small">${T('tm_score', { s: sa.toFixed(1), n: sc.length })}</span>` : ''}${moodWeeks(ids)}` : `<span class="muted small">—</span>`);
     }
     if (k === 'requests') {
       const qs = db.change_requests.filter(q => q.status === 'pending').slice(0, 5);
@@ -2718,7 +2751,7 @@
     }
     if (tab === 'rules') {
       const f = (k, label) => `<label>${label}<input id="r-${k}" name="${k}" type="number" min="0" value="${esc(r[k])}"></label>`;
-      h += `<form class="f" data-form="rules" style="max-width:560px">${f('maxStreak', T('r_streak'))}${f('carSeats', T('r_car'))}<div class="two">${f('seasonFrom', T('r_season_from'))}${f('seasonTo', T('r_season_to'))}</div>${f('maxSeasonBlock', T('r_block'))}${f('minNoticeDays', T('r_notice'))}${['reviewGoogle', 'reviewTripadvisor', 'reviewTrustindex', 'reviewGyg', 'reviewViator'].map(k => `<label>${T('r_' + k)}<input id="r-${k}" name="${k}" type="url" value="${esc(r[k] || '')}"></label>`).join('')}<label>${T('r_tipUrl')}<input id="r-tipUrl" name="tipUrl" type="url" value="${esc(r.tipUrl || '')}" placeholder="https://"></label><label>${T('r_botUrl')}<input id="r-botUrl" name="botUrl" type="url" value="${esc(r.botUrl || '')}" placeholder="https://t.me/..."></label><label>${T('r_offerPromo')}<input id="r-offerPromo" name="offerPromo" value="${esc(r.offerPromo || '')}"></label><label>${T('r_guestcur')}<input id="r-guestCurrency" name="guestCurrency" value="${esc(r.guestCurrency || 'USD')}" style="max-width:120px"></label><div class="tsum">${fxData().upd ? T('r_fx_now', { date: fmtDay(fxData().upd), v: FX_CUR.map(c => `${c} ${fxOn(c, today()) || '—'}`).join(' · ') }) : T('r_fx_none')}</div><label>${T('r_rates_fb')}<input name="rates" value="${esc(rules().rates || 'USD 2.70, EUR 2.95')}"></label><span class="muted small">${T('r_rates_hint', { c: rules().currency || 'GEL' })}</span><label>${T('r_comm')}<input name="commission" value="${esc(rules().commission ?? 'GetYourGuide 25')}"></label><span class="muted small">${T('r_comm_hint')}</span><label class="row" style="gap:8px"><input type="checkbox" name="pubHol" style="width:auto" ${rules().pubHol === false ? '' : 'checked'}>${T('ph_switch')}</label><label>${T('r_marks')}<input id="r-customMarks" name="customMarks" value="${esc(r.customMarks || '')}"></label><label class="row" style="gap:8px"><input type="checkbox" name="mtOn" style="width:auto" ${maint().on && !CFG.maintenance ? 'checked' : ''}>${T('mt_switch')}</label><label>${T('mt_msg')}<input name="mtText" value="${esc((maint().text) || '')}" placeholder="${T('mt_text')}"></label><label>${T('peaks_title')}<textarea id="r-peaks" name="peaks" rows="6" spellcheck="false">${esc(r.peaks ?? DEFAULT_PEAKS)}</textarea></label><span class="muted small">${T('peaks_text')}</span><div class="actions"><button class="btn primary">${T('save')}</button></div></form>`;
+      h += `<form class="f" data-form="rules" style="max-width:560px">${f('maxStreak', T('r_streak'))}${f('carSeats', T('r_car'))}<div class="two">${f('seasonFrom', T('r_season_from'))}${f('seasonTo', T('r_season_to'))}</div>${f('maxSeasonBlock', T('r_block'))}${f('minNoticeDays', T('r_notice'))}${f('minGroup', T('r_mingroup'))}${['reviewGoogle', 'reviewTripadvisor', 'reviewTrustindex', 'reviewGyg', 'reviewViator'].map(k => `<label>${T('r_' + k)}<input id="r-${k}" name="${k}" type="url" value="${esc(r[k] || '')}"></label>`).join('')}<label>${T('r_tipUrl')}<input id="r-tipUrl" name="tipUrl" type="url" value="${esc(r.tipUrl || '')}" placeholder="https://"></label><label>${T('r_botUrl')}<input id="r-botUrl" name="botUrl" type="url" value="${esc(r.botUrl || '')}" placeholder="https://t.me/..."></label><label>${T('r_offerPromo')}<input id="r-offerPromo" name="offerPromo" value="${esc(r.offerPromo || '')}"></label><label>${T('r_guestcur')}<input id="r-guestCurrency" name="guestCurrency" value="${esc(r.guestCurrency || 'USD')}" style="max-width:120px"></label><div class="tsum">${fxData().upd ? T('r_fx_now', { date: fmtDay(fxData().upd), v: FX_CUR.map(c => `${c} ${fxOn(c, today()) || '—'}`).join(' · ') }) : T('r_fx_none')}</div><label>${T('r_rates_fb')}<input name="rates" value="${esc(rules().rates || 'USD 2.70, EUR 2.95')}"></label><span class="muted small">${T('r_rates_hint', { c: rules().currency || 'GEL' })}</span><label>${T('r_comm')}<input name="commission" value="${esc(rules().commission ?? 'GetYourGuide 25')}"></label><span class="muted small">${T('r_comm_hint')}</span><label class="row" style="gap:8px"><input type="checkbox" name="pubHol" style="width:auto" ${rules().pubHol === false ? '' : 'checked'}>${T('ph_switch')}</label><label>${T('r_marks')}<input id="r-customMarks" name="customMarks" value="${esc(r.customMarks || '')}"></label><label class="row" style="gap:8px"><input type="checkbox" name="mtOn" style="width:auto" ${maint().on && !CFG.maintenance ? 'checked' : ''}>${T('mt_switch')}</label><label>${T('mt_msg')}<input name="mtText" value="${esc((maint().text) || '')}" placeholder="${T('mt_text')}"></label><label>${T('peaks_title')}<textarea id="r-peaks" name="peaks" rows="6" spellcheck="false">${esc(r.peaks ?? DEFAULT_PEAKS)}</textarea></label><span class="muted small">${T('peaks_text')}</span><div class="actions"><button class="btn primary">${T('save')}</button></div></form>`;
     }
     if (tab === 'reports') {
       const rows = report(y);
@@ -2728,7 +2761,7 @@
     }
     if (tab === 'import') {
       const im = state.imp;
-      h += contactsImpHtml() + `<div class="card"><b>${T('imp_title')}</b><p class="muted small">${T('imp_text')}</p><input class="inp" type="file" id="imp-file" accept=".xlsx,.xls,.csv" multiple data-ch="impfile"></div>`;
+      h += contactsImpHtml() + klookHtml() + `<div class="card"><b>${T('imp_title')}</b><p class="muted small">${T('imp_text')}</p><input class="inp" type="file" id="imp-file" accept=".xlsx,.xls,.csv" multiple data-ch="impfile"></div>`;
       const pg = state.impProg, dn = state.impDone;
       if (pg) h += `<div class="card f" role="status" aria-live="polite"><b>${pg.k === 'check' ? T('imp_checking') : pg.k === 'read' ? T('imp_reading', { done: pg.done, total: pg.total }) : T('imp_saving', { what: pg.label || '', done: pg.done, total: pg.total })}</b><span class="meter"><i style="width:${pg.total ? Math.round(pg.done / pg.total * 100) : 0}%"></i></span><span class="muted small">${T('imp_wait')}</span></div>`;
       if (dn) h += `<div class="card f"><b>${T('imp_res_title')}</b><span class="small">${T('imp_res', dn)}</span></div>`;
@@ -2787,14 +2820,14 @@
   function to24(s) { const m = String(s || '').trim().match(/^(\d{1,2}):(\d{2})\s*([AP]M)?$/i); if (!m) return null; let h = Number(m[1]) % 12; if ((m[3] || '').toUpperCase() === 'PM') h += 12; if (!m[3]) h = Number(m[1]); return `${p2(h)}:${m[2]}`; }
   // Options written in names and comments ("+wine", "front seat", "non-refundable"...), and the platform a booking code belongs to.
   const MARK_RULES = [[/\+\s*wine|wine tasting/i, 'wine'], [/\+\s*front|front[\s-]?seat/i, 'front_seat'], [/\+\s*pick|pick[\s-]?up from (the )?hotel|hotel pick[\s-]?up/i, 'pickup'], [/\+\s*food|bear food/i, 'bear_food'], [/\+\s*drop|drop[\s-]?off/i, 'dropoff'], [/\+\s*stay|stays? (there|in kazbegi)/i, 'stays'], [/private room/i, 'private_room'], [/non[\s-]?refund|невозвра/i, 'nonref'], [/late[\s-]?cancel/i, 'cancellation']];
-  const srcFromCodes = txt => { const t = String(txt || ''); return /sputnik|спутник/i.test(t) ? 'Sputnik8' : /tripster|трипстер/i.test(t) ? 'Tripster' : /\bGYG[A-Z0-9]{6,}/i.test(t) ? 'GetYourGuide' : /\bBR-\d{6,}/i.test(t) ? 'Viator' : /\bKL[A-Z0-9]{6,}|klook/i.test(t) ? 'Klook' : /trip\.com|\bctrip/i.test(t) ? 'Trip.com' : /airbnb|\bHM[A-Z0-9]{8}\b/i.test(t) ? 'Airbnb' : /civitatis/i.test(t) ? 'Civitatis' : /free\s*tour/i.test(t) ? 'FreeTour' : ''; };
+  const srcFromCodes = txt => { const t = String(txt || ''); return /sputnik|спутник/i.test(t) ? 'Sputnik8' : /tripster|трипстер/i.test(t) ? 'Tripster' : /\bGYG[A-Z0-9]{6,}/i.test(t) ? 'GetYourGuide' : /\bBR-\d{6,}/i.test(t) ? 'Viator' : /\bKL[A-Z0-9]{6,}|klook/i.test(t) || /\b[A-Z]{3}\d{6}\b/.test(t) ? 'Klook' : /trip\.com|\bctrip|\b\d{16}\b/i.test(t) ? 'Trip.com' : /airbnb|\bHM[A-Z0-9]{8}\b/i.test(t) || /\bTA[A-Z0-9]{6}\b/.test(t) ? 'Airbnb' : /tourradar|\b\d{6,8}-[A-Z0-9]{5}\b/i.test(t) ? 'TourRadar' : /civitatis/i.test(t) ? 'Civitatis' : /free\s*tour|\b\d{5}-\d{14}-\d{3}\b/i.test(t) ? 'FreeTour' : ''; };
   const codesIn = txt => [...new Set((String(txt || '').match(/\b(GYG[A-Z0-9]{6,}|BR-\d{6,}|KL[A-Z0-9]{6,}|HM[A-Z0-9]{8}|#?\d{7,9})\b/gi) || []).map(x => x.toUpperCase()))];
   // Guest list check: one pass over all guests and bookings that suggests fixes (platform from booking codes, options from names and notes,
   // clean names, no platform relay emails, phone format). Nothing changes until the admin presses Apply; each fix is written in the booking history.
   function guestCheck() {
     const out = []; const add = (kind, table, row, patch, note) => out.push({ k: out.length, kind, table, row, patch, note });
     db.bookings.forEach(b => {
-      const txt = [b.guest, b.ref, b.notes].join(' '), src = srcFromCodes(txt);
+      const txt = [b.guest, b.ref, b.notes].join(' '), src = srcFromCodes(txt) || srcFromMail(b.email);
       if (src && !b.source) add('source', 'bookings', b, { source: src }, T('gc_n_source', { src, code: codesIn(txt)[0] || '' }));
       const ms = new Set(b.marks || []), found = MARK_RULES.filter(([re]) => re.test(txt)).map(x => x[1]).filter(m => !ms.has(m));
       if (found.length) add('marks', 'bookings', b, { marks: [...ms, ...found] }, T('gc_n_marks', { what: found.map(markLabel).join(', ') }));
@@ -2847,7 +2880,7 @@
       t.pax += pax; t.adults += adults; t.children += children;
       const bw = cBooked >= 0 ? parseWhen(r[cBooked]) : null, bookedAt = bw && bw.date ? `${bw.date}T${bw.time || '12:00'}:00+04:00` : null;   // Setmore gives no time zone: Tbilisi
       if (name) out.bookings.push({ id: S.uid(), tour_id: t.id, booked_at: bookedAt, client_id: cid, guest: name, adults, children, pax, phone, ref: String(r[cComments[1]] || pcode || r[cBid] || '').trim() || null, notes: null, marks, price: cCost >= 0 && Number(r[cCost]) > 0 ? Number(r[cCost]) : null, currency: 'USD', // Setmore prices are in US dollars (owner, 10 Nov)
-        email: cid && out.clients[cid] ? out.clients[cid].email : null, history: [{ at: new Date().toISOString(), w: 'created', from: 'Setmore' }], pickup_addr: addr, payment: /online|paid|prepaid/.test(label) ? 'prepaid' : /cash/.test(label) || cashDue ? 'cash' : null, amount_due: cashDue && guestCur() === 'USD' ? cashDue : null, notes: cashDue ? `Cash to pay: ${cashDue} USD` : null, source: srcFromCodes(txt) || null });
+        email: cid && out.clients[cid] ? out.clients[cid].email : null, history: [{ at: new Date().toISOString(), w: 'created', from: 'Setmore' }], pickup_addr: addr, payment: /online|paid|prepaid/.test(label) ? 'prepaid' : /cash/.test(label) || cashDue ? 'cash' : null, amount_due: cashDue && guestCur() === 'USD' ? cashDue : null, notes: cashDue ? `Cash to pay: ${cashDue} USD` : null, source: srcFromCodes(txt) || srcFromMail(cid && out.clients[cid] ? out.clients[cid].email : '') || null });
     }
     for (const mem of Object.keys(offDays)) {
       const ds = Object.keys(offDays[mem]).sort(); let cur = null;
@@ -3000,6 +3033,41 @@
     up.push(...touched.values());
     await S.saveMany('clients', [...add, ...up]); logAct(`Imported guest contacts: ${add.length} new, ${up.length} updated`); state.ct = null; toast(T('ct_done', { n: add.length, u: up.length }));
   }
+  // Klook statement check: reads the Klook booking report (Excel or CSV) and compares it with the bookings in the app. It changes nothing.
+  async function readKlook(file) {
+    let r;
+    if (/\.csv$/i.test(file.name)) r = csvRows(await file.text());
+    else { await loadXlsx(); const wb = window.XLSX.read(await file.arrayBuffer(), { type: 'array' }); r = window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: '' }); }
+    const h = (r[0] || []).map(x => String(x || '').trim().toLowerCase()), ix = n => h.indexOf(n), iR = ix('booking reference id'), iU = ix('num of units'), iT = ix('total');
+    if (iR < 0 || iU < 0 || iT < 0) throw new Error(T('kl_bad'));
+    const iV = ix('main voucher code'), iW = ix('settlement time'), iA = ix('activity name');
+    state.kl = { name: file.name, rows: r.slice(1).filter(x => String(x[iR] || '').trim()).map(x => ({ ref: String(x[iR]).trim().toUpperCase(), vch: iV >= 0 ? String(x[iV] || '').trim().toUpperCase() : '', units: Number(x[iU]) || 0, total: Number(String(x[iT]).replace(/[^0-9.\-]/g, '')) || 0, when: iW >= 0 ? String(x[iW] || '').slice(0, 10) : '', act: iA >= 0 ? String(x[iA] || '') : '' })) };
+    render();
+  }
+  function klookCheck(kl) {
+    const norm = s => String(s || '').trim().toUpperCase(), byRef = {}; db.bookings.forEach(b => { const k = norm(b.ref); if (k) byRef[k] = b; });
+    const tour = b => db.tours.find(t => t.id === b.tour_id) || {}, out = { ok: [], diff: [], miss: [], extra: [], total: 0 }, seen = new Set(), dates = kl.rows.map(x => x.when).filter(Boolean).sort();
+    for (const x of kl.rows) {
+      out.total += x.total; const b = byRef[x.ref] || byRef[x.vch]; if (b) seen.add(b.id);
+      if (!b) { out.miss.push(x); continue; }
+      const pax = Number(b.pax) || (Number(b.adults) || 0) + (Number(b.children) || 0), money = b.currency === 'USD' && Number(b.price) > 0, badP = pax !== x.units, badM = money && Math.abs(Number(b.price) - x.total) > 0.5;
+      (badP || badM ? out.diff : out.ok).push({ ...x, b, t: tour(b), pax, badP, badM });
+    }
+    if (dates.length) db.bookings.forEach(b => { const t = tour(b); if (!seen.has(b.id) && sourceOf(b) === 'Klook' && t.date >= dates[0] && t.date <= dates[dates.length - 1] && t.status !== 'cancelled') out.extra.push({ b, t }); });
+    return out;
+  }
+  function klookHtml() {
+    const kl = state.kl, line = (tag, tx) => `<div class="row small">${tag}<span class="grow-l">${tx}</span></div>`;
+    if (!kl) return `<div class="card f"><b>${T('kl_title')}</b><span class="muted small">${T('kl_text')}</span><input class="inp" type="file" id="kl-file" accept=".xlsx,.xls,.csv" data-ch="klfile"></div>`;
+    const c = klookCheck(kl), nm = x => `${esc(x.ref)} · ${esc(x.act)} · ${esc(x.when)}`;
+    return `<div class="card f"><b>${T('kl_title')}</b><span class="muted small">${esc(kl.name)}</span>
+      <b>${T('kl_sum', { n: kl.rows.length, t: nf(c.total), ok: c.ok.length, d: c.diff.length, m: c.miss.length })}</b>
+      ${c.diff.length ? `<h3>${T('kl_diff')}</h3>${c.diff.map(x => line(`<span class="tag t-warn">${T('kl_differs')}</span>`, `${nm(x)}<br>Klook: ${x.units} · ${nf(x.total)} USD<br>${T('kl_ours')}: ${x.pax} · ${x.b.price ? nf(x.b.price) + ' ' + esc(x.b.currency || '') : '—'}`)).join('')}` : ''}
+      ${c.miss.length ? `<h3>${T('kl_miss')}</h3>${c.miss.map(x => line(`<span class="tag t-danger">${T('kl_missing')}</span>`, `${nm(x)} · ${x.units} · ${nf(x.total)} USD`)).join('')}` : ''}
+      ${c.extra.length ? `<h3>${T('kl_extra', { n: c.extra.length })}</h3>${c.extra.map(x => line(`<span class="tag t-muted">?</span>`, `${esc(x.b.ref || '')} · ${esc(x.t.title || '')} · ${esc(x.t.date || '')} · ${Number(x.b.pax) || ''}`)).join('')}` : ''}
+      ${!c.diff.length && !c.miss.length && !c.extra.length ? `<div class="banner small"><span>${T('kl_allok')}</span></div>` : ''}
+      <div class="bar"><button class="btn" data-act="klclear">${T('kl_clear')}</button></div></div>`;
+  }
   function contactsImpHtml() {
     const ct = state.ct;
     return `<div class="card f"><b>${T('ct_title')}</b><span class="muted small">${T('ct_text')}</span><input class="inp" type="file" id="ct-file" accept=".xlsx,.xls,.csv" data-ch="ctfile">${ct ? `<b>${T('ct_found', { n: ct.fresh, u: ct.upd, s: ct.skipped })}</b>${ct.merged ? `<span class="muted small">${T('ct_merged', { n: ct.merged })}</span>` : ''}<div class="bar"><button class="btn primary" data-act="ctgo">${T('ct_go')}</button></div>` : ''}</div>`;
@@ -3053,7 +3121,15 @@
   // ---------- me ----------
   // ---------- pay over any period: this month, last month, a year, or any two dates ----------
   const monthEnd = mo => { const d = D(mo + '-01'); d.setMonth(d.getMonth() + 1); d.setDate(0); return iso(d); };
-  function payRange() {
+  // The phone keeps about 13 months of tours. Older dates (last year's pay, past years in Stats, an old month in the calendar) are fetched when someone asks for them.
+  function needOlder(date) {
+    if (!date || !S.loadedFrom || date >= S.loadedFrom) return;
+    if (state.olderBusy) { if (!state.olderWant || date < state.olderWant) state.olderWant = date; return; }
+    toast(T('loading_older')); state.olderBusy = 1;
+    S.loadOlder(date.slice(0, 7) + '-01').catch(() => {}).finally(() => { const w = state.olderWant; state.olderWant = ''; state.olderBusy = 0; if (w) needOlder(w); render(); });
+  }
+  function payRange() { const r = payRange0(); needOlder(r.from); return r; }
+  function payRange0() {
     const p = state.pay || (state.pay = { mode: 'month' }), td = today(), y = Number(td.slice(0, 4));
     if (p.mode === 'year') return { from: `${y}-01-01`, to: `${y}-12-31` };
     if (p.mode === 'lastyear') return { from: `${y - 1}-01-01`, to: `${y - 1}-12-31` };
@@ -3085,7 +3161,7 @@
       <div class="stats"><div class="stat"><b>${payCur() !== cur && d.all[payCur()] !== null ? '≈ ' + nf(d.all[payCur()]) : nf(d.total)}</b>${payCur() !== cur && d.all[payCur()] !== null ? esc(payCur()) : esc(cur)}</div><div class="stat"><b>${d.n}</b>${T('tours_n')}</div><div class="stat"><b>${d.n ? nf(d.base / d.n) : 0}</b>${T('pr_pertour')}</div><div class="stat"><b>${nf(d.total / nm)}</b>${T('pr_permonth')}</div></div>
       ${d.n ? `<div class="card f paycur"><span class="muted small">${T('pay_all')}</span><div class="row num">${CURRENCIES.map(c => `<b>${c === cur ? nf(d.total) : d.all[c] === null ? '—' : '≈ ' + nf(d.all[c])} ${c}</b>`).join(' · ')}</div><span class="muted small">${T('pay_all_note', { c: cur })}</span></div>` : ''}
       ${d.months.length > 1 ? `<div class="card"><div class="bars">${d.months.map(m => `<button class="barcol" data-act="paymonth" data-m="${m.mo}" aria-label="${esc(m.mo)}: ${m.total}"><span class="num small">${m.total >= 1000 ? (m.total / 1000).toFixed(1) + 'k' : nf(m.total)}</span><i style="height:${Math.round(Math.max(0, m.total) / max * 100)}%"></i><span class="small">${esc(fmt(m.mo + '-01', { month: 'short' }))}</span></button>`).join('')}</div><span class="muted small">${T('pr_tap')}</span></div>` : ''}
-      <div class="tablewrap"><table><tr><th>${T('month')}</th><th class="n">${T('tours_n')}</th><th class="n">${esc(cur)}</th><th class="n">${T('correction')}</th><th class="n">${T('total')}</th></tr>${d.months.map(m => `<tr><td><button class="btn sm" data-act="paymonth" data-m="${m.mo}">${esc(fmt(m.mo + '-01', { month: 'long', year: 'numeric' }))}</button></td><td class="n">${m.n}</td><td class="n">${nf(m.pay)}</td><td class="n">${m.adj ? (m.adj > 0 ? '+' : '') + nf(m.adj) : ''}</td><td class="n"><b>${nf(m.total)}</b></td></tr>`).join('') || `<tr><td colspan="5" class="muted">${T('no_tours')}</td></tr>`}${d.months.length > 1 ? `<tr><td><b>${T('total')}</b></td><td class="n">${d.n}</td><td class="n">${nf(d.base)}</td><td class="n">${d.adj ? nf(d.adj) : ''}</td><td class="n"><b>${nf(d.total)}</b></td></tr>` : ''}</table></div>
+      <div class="tablewrap"><table><tr><th>${T('month')}</th><th class="n">${T('tours_n')}</th><th class="n">${esc(cur)}</th><th class="n">${T('correction')}</th><th class="n">${T('total')}</th></tr>${d.months.map(m => `<tr><td><button class="btn sm" data-act="paymonth" data-m="${m.mo}">${esc(fmt(m.mo + '-01', { month: 'long', year: 'numeric' }))}</button></td><td class="n">${m.n}</td><td class="n">${nf(m.pay)}</td><td class="n">${m.adj ? (m.adj > 0 ? '+' : '') + nf(m.adj) : ''}</td><td class="n"><b>${nf(m.total)}</b></td></tr>`).join('') || `<tr><td colspan="5" class="muted">${T('no_tours_range')}</td></tr>`}${d.months.length > 1 ? `<tr><td><b>${T('total')}</b></td><td class="n">${d.n}</td><td class="n">${nf(d.base)}</td><td class="n">${d.adj ? nf(d.adj) : ''}</td><td class="n"><b>${nf(d.total)}</b></td></tr>` : ''}</table></div>
       ${d.titles.length ? `<div class="card"><b>${T('pr_bytour')}</b>${d.titles.map(([ti, v]) => `<div class="row"><span style="flex:1;min-width:0;overflow-wrap:anywhere">${esc(ti)} <span class="muted small num">×${v.n}</span></span><b class="num">${nf(v.pay)}</b></div>`).join('')}</div>` : ''}`;
   }
   // ---------- ideas to earn more: worked out from the schedule of the last 12 months ----------
@@ -3170,7 +3246,7 @@
     return `${modal ? `<div class="hdr"><h2>${esc(pname(id))} · ${esc(mo)}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>` : ''}
       <div class="stats"><div class="stat"><b>${st.rows.length}</b>${T('tours_n')}</div><div class="stat"><b>${st.total}</b>${esc(cur)}</div></div>
       ${(() => { if (!st.rows.length) return ''; const al = CURRENCIES.map(c => { if (c === cur) return [c, nf(st.total)]; let v = 0; for (const x of st.rows) { const y = fxTo(x.pay, cur, c, x.t.date); if (y === null) return [c, '—']; v += y; } for (const x of st.adj) { const y = fxTo(Number(x.amount) || 0, cur, c, mo + '-28'); if (y === null) return [c, '—']; v += y; } return [c, '≈ ' + nf(Math.round(v))]; }); return `<div class="card f paycur"><span class="muted small">${T('pay_all')}</span><div class="row num">${al.map(([c, v]) => `<b>${v} ${c}</b>`).join(' · ')}</div><span class="muted small">${T('pay_all_note', { c: cur })}</span></div>`; })()}
-      <div class="tablewrap"><table><tr><th>${T('date')}</th><th>${T('title')}</th><th class="n">${esc(cur)}</th></tr>${st.rows.map(x => `<tr><td class="num">${esc(dateText(x.t))}</td><td style="white-space:normal">${esc(x.t.title)} ${disputeTag(disputeOf(x.t.id, id))}${id === me().id && !isAdmin() ? ` <button class="btn sm dpbtn" data-act="dispute" data-id="${x.t.id}">${msi('flag')}${T('dp_btn')}</button>` : ''}</td><td class="n">${x.pay}</td></tr>`).join('') || `<tr><td colspan="3" class="muted">${T('no_tours')}</td></tr>`}${st.adj.map(x => `<tr><td><span class="tag t-warn">${T('correction')}</span></td><td style="white-space:normal">${esc(x.note || '')}${isAdmin() ? ` <button class="btn sm" data-act="adjdel" data-id="${x.id}">${T('remove')}</button>` : ''}</td><td class="n">${Number(x.amount) > 0 ? '+' : ''}${esc(x.amount)}</td></tr>`).join('')}${st.adj.length ? `<tr><td colspan="2"><b>${T('total')}</b></td><td class="n"><b>${st.total}</b></td></tr>` : ''}</table></div>
+      <div class="tablewrap"><table><tr><th>${T('date')}</th><th>${T('title')}</th><th class="n">${esc(cur)}</th></tr>${st.rows.map(x => `<tr><td class="num">${esc(dateText(x.t))}</td><td style="white-space:normal">${esc(x.t.title)} ${disputeTag(disputeOf(x.t.id, id))}${id === me().id && !isAdmin() ? ` <button class="btn sm dpbtn" data-act="dispute" data-id="${x.t.id}">${msi('flag')}${T('dp_btn')}</button>` : ''}</td><td class="n">${x.pay}</td></tr>`).join('') || `<tr><td colspan="3" class="muted">${T('no_tours_range')}</td></tr>`}${st.adj.map(x => `<tr><td><span class="tag t-warn">${T('correction')}</span></td><td style="white-space:normal">${esc(x.note || '')}${isAdmin() ? ` <button class="btn sm" data-act="adjdel" data-id="${x.id}">${T('remove')}</button>` : ''}</td><td class="n">${Number(x.amount) > 0 ? '+' : ''}${esc(x.amount)}</td></tr>`).join('')}${st.adj.length ? `<tr><td colspan="2"><b>${T('total')}</b></td><td class="n"><b>${st.total}</b></td></tr>` : ''}</table></div>
       ${rules().payNote ? `<p class="muted small">${esc(rules().payNote)}</p>` : ''}
       ${modal ? expensesHtml(id, mo + '-01', monthEnd(mo)) : ''}
       ${modal && isAdmin() ? `<form class="bar" data-form="adjust"><input type="hidden" name="user_id" value="${id}"><input type="hidden" name="month" value="${mo}"><input class="inp" id="adj-amount" name="amount" type="number" step="any" placeholder="${T('adj_amount')}" required style="max-width:130px"><input class="inp" id="adj-note" name="note" placeholder="${T('adj_note')}" required style="flex:1;min-width:140px"><button class="btn">+ ${T('correction')}</button></form>` : ''}
@@ -3196,6 +3272,36 @@
   }
   // Under the twelve narrow bars a month is one letter (the full month name is in the label read by screen readers and shown on a long press).
   const MON1 = { en: 'JFMAMJJASOND', ru: 'ЯФМАМИИАСОНД', ka: 'ითმამიიასონდ' };
+  // Personal stats extras: days worked per month, and how the person compares with their own earlier weeks and with the company. Everything is counted from data the app already has.
+  function daysChart(id, y) {
+    const td = today(), s = personStats(id), tourDays = new Set(); s.ts.forEach(t => { for (let d = t.date; d <= endOf(t); d = addDays(d, 1)) tourDays.add(d); });
+    const rows = Array.from({ length: 12 }, (_, i) => { const mo = p2(i + 1), n = new Date(y, i + 1, 0).getDate(); let tr = 0, off = 0, free = 0;
+      for (let k = 1; k <= n; k++) { const d = `${y}-${mo}-${p2(k)}`; if (d > td) break; if (tourDays.has(d)) tr++; else if (offOn(twin(id), d) || offOn(id, d)) off++; else free++; }
+      return { mo, tr, off, free, n }; });
+    if (!rows.some(r => r.tr)) return '';
+    return `<div class="card"><b>${T('st_days')}</b><div class="bars daysbars">${rows.map(r => `<div class="barcol dcol" aria-label="${esc(fmt(`2024-${r.mo}-01`, { month: 'long' }))}: ${r.tr}"><span class="num small">${r.tr || ''}</span><div class="dstack" style="height:${Math.round((r.tr + r.off + r.free) / 31 * 100)}%"><i class="dfree" style="flex:${r.free}"></i><i class="doff" style="flex:${r.off}"></i><i class="dtour" style="flex:${r.tr}"></i></div><span class="bm small muted" aria-hidden="true">${esc(fmt(`2024-${r.mo}-01`, { month: 'narrow' }))}</span></div>`).join('')}</div><div class="busykey small muted"><span><i class="dtour"></i>${T('st_d_tours')}</span><span><i class="doff"></i>${T('st_d_off')}</span><span><i class="dfree"></i>${T('st_d_free')}</span></div></div>`;
+  }
+  function compareHtml(id, y) {
+    const td = today(), all = db.tours.filter(t => live(t) && t.date <= td), gOf = ts => ts.reduce((n, t) => n + (Number(t.pax) || 0), 0), inR = (a, b) => all.filter(t => t.date >= a && t.date <= b);
+    const w1 = inR(addDays(td, -27), td), w0 = inR(addDays(td, -55), addDays(td, -28)), yAll = all.filter(t => t.date.startsWith(String(y)));
+    const by = (ts, f) => { const m = {}; ts.forEach(t => { const k = f(t); if (k) m[k] = (m[k] || 0) + (Number(t.pax) || 0); }); return m; };
+    const ctyOf = ts => { const ids = new Set(ts.map(t => t.id)), m = {}; db.bookings.filter(b => ids.has(b.tour_id)).forEach(b => { const c = phoneIso(b.phone); if (c) m[c] = (m[c] || 0) + (Number(b.pax) || 1); }); return m; };
+    const best = (n1, n0, k = 1) => Object.keys(n1).map(x => [x, n1[x] - (n0[x] || 0)]).filter(p => p[1] > 0).sort((p, q) => q[1] - p[1]).slice(0, k);
+    const L = [];
+    if (w1.length > w0.length) L.push(T('hl_tours', { n: w1.length - w0.length }));
+    if (gOf(w1) > gOf(w0)) L.push(T('hl_guests', { n: gOf(w1) - gOf(w0) }));
+    best(ctyOf(w1), ctyOf(w0), 2).forEach(([c, n]) => L.push(T('hl_cty', { c: esc(countryName(c)), n })));
+    best(by(w1, t => t.kind), by(w0, t => t.kind), 1).forEach(([k, n]) => L.push(T('hl_kind', { k: esc(T('kind_' + k).toLowerCase()), n })));
+    best(by(w1, t => t.title), by(w0, t => t.title), 1).forEach(([t, n]) => L.push(T('hl_tour', { t: esc(t), n })));
+    const wk = inR(addDays(td, -6), td), pm = addDays(td.slice(0, 7) + '-01', -1).slice(0, 7), lm = all.filter(t => t.date.startsWith(pm));
+    ['group', 'private'].forEach(k => { const g = by(wk.filter(t => t.kind === k), t => t.title), top = Object.entries(g).sort((p, q) => q[1] - p[1])[0]; if (top) L.push(T('hl_pop_' + k, { t: esc(top[0]), n: top[1] })); });
+    if (lm.length > 50) L.push(T('hl_month', { n: lm.length, g: gOf(lm) }));
+    const km = Math.round(lm.reduce((n, t) => n + (kmOf(t.title) || 0), 0) / 100) * 100; if (km > 0) L.push(T('hl_km', { n: km.toLocaleString('en-US') }));
+    const perDay = {}; yAll.forEach(t => { perDay[t.date] = (perDay[t.date] || 0) + 1; }); const bd = Object.entries(perDay).sort((p, q) => q[1] - p[1] || q[0].localeCompare(p[0]))[0];
+    if (bd && bd[1] > 1) L.push(T('hl_rec', { d: esc(fmtDay(bd[0])), n: bd[1] }));
+    if (!L.length) L.push(T('hl_none', { n: w1.length, g: gOf(w1) }));
+    return `<div class="card hl"><b>${T('hl_title')}</b><div class="hllist">${L.slice(0, 8).map(x => `<div class="hlrow"><span class="up">▲</span><span>${x}</span></div>`).join('')}</div></div>`;
+  }
   function statsHtml(id) {
     const y = state.year, s = personStats(id), inYear = s.ts.filter(t => t.date.startsWith(String(y)));
     const per = [...Array(12)].map((_, i) => inYear.filter(t => Number(t.date.slice(5, 7)) === i + 1).length), max = Math.max(1, ...per);
@@ -3204,11 +3310,12 @@
     const sm = state.statMonth, mlist = sm ? inYear.filter(t => t.date.slice(5, 7) === sm) : [];
     const tot = totals(id, y), none = !s.ts.length, kindsOn = kinds.filter(x => x[1] > 0);
     return `<div class="bar">${isAdmin() ? `<select class="inp" id="stat-user" data-ch="statuser" style="max-width:220px" aria-label="${T('person')}">${crew().map(p => opt(p.id, p.name, id)).join('')}</select>` : ''}<div class="seg"><button data-act="year" data-d="-1" aria-label="${T('prev')}">‹</button><button disabled>${y}</button><button data-act="year" data-d="1" aria-label="${T('next')}">›</button></div></div>
-      ${none ? `<div class="empty">${T('st_empty')}</div>` : !inYear.length ? `<div class="empty">${T('st_empty_y', { y })}</div>` : `<div class="stats"><div class="stat"><b>${inYear.length}</b>${T('tours_n')}</div><div class="stat"><b>${inYear.reduce((a, t) => a + (t.pax || 0), 0)}</b>${T('guests')}</div><div class="stat"><b>${tot.off}</b>${T('rp_off')}</div><div class="stat"><b>${game(id).level}</b>${T('level')}</div>${(person(id) || {}).role !== 'driver' ? `<div class="stat"><b>${db.offers.filter(o => o.user_id === id && (o.at || '').startsWith(String(y))).length}</b>${T('offers_sent')}</div>` : ''}</div>
+      ${none ? `<div class="empty">${T('st_empty')}</div>` : !inYear.length ? `<div class="empty">${state.olderBusy ? T('loading_older') : T('st_empty_y', { y })}</div>` : `<div class="stats"><div class="stat"><b>${inYear.length}</b>${T('tours_n')}</div><div class="stat"><b>${inYear.reduce((a, t) => a + (t.pax || 0), 0)}</b>${T('guests')}</div><div class="stat"><b>${tot.off}</b>${T('rp_off')}</div><div class="stat"><b>${game(id).level}</b>${T('level')}</div>${(person(id) || {}).role !== 'driver' ? `<div class="stat"><b>${db.offers.filter(o => o.user_id === id && (o.at || '').startsWith(String(y))).length}</b>${T('offers_sent')}</div>` : ''}</div>
       <div class="card"><b>${T('st_months')}</b><span class="muted small">${T('st_tap')}</span><div class="bars">${per.map((n, i) => `<button class="barcol ${sm === p2(i + 1) ? 'sel' : ''}" data-act="statmonth" data-m="${p2(i + 1)}" aria-label="${esc(fmt(`2024-${p2(i + 1)}-01`, { month: 'long' }))}: ${n}"><span class="num small">${n || ''}</span><i style="height:${Math.round(n / max * 100)}%"></i><span class="bm" aria-hidden="true">${(MON1[lang()] || MON1.en)[i]}</span></button>`).join('')}</div>
         ${sm ? `<div class="list">${mlist.map(t => `<button class="card" data-act="tour" data-id="${t.id}"><span class="row"><b class="num">${esc(dateText(t))}</b><span class="tag t-${esc(t.kind)}">${T('kind_' + t.kind)}</span><span class="tag t-muted num">${esc(acText(t))}</span></span><span class="ttl">${esc(t.title)}</span></button>`).join('') || `<div class="empty">${T('no_tours')}</div>`}</div>` : ''}</div>
+      ${daysChart(id, y)}
       <div class="cols">${kindsOn.length ? `<div class="card"><b>${T('st_kinds')}</b>${kindsOn.map(([k, n]) => `<div class="row"><span class="tag t-${k}">${T('kind_' + k)}</span><span class="meter"><i style="width:${inYear.length ? Math.round(n / inYear.length * 100) : 0}%"></i></span><b class="num">${n}</b></div>`).join('')}</div>` : ''}
-      ${top.length ? `<div class="card"><b>${T('st_top')}</b>${top.map(([t, n]) => `<div class="row"><span style="flex:1;min-width:0;overflow-wrap:anywhere">${esc(t)}</span><b class="num">${n}</b></div>`).join('')}</div>` : ''}</div>`}`;
+      ${top.length ? `<div class="card"><b>${T('st_top')}</b>${top.map(([t, n]) => `<div class="row"><span style="flex:1;min-width:0;overflow-wrap:anywhere">${esc(t)}</span><b class="num">${n}</b></div>`).join('')}</div>` : ''}</div>${(person(id) || {}).role !== 'driver' ? compareHtml(id, y) : ''}`}`;
   }
   // ---------- Photo of the day: one photo per person per day, likes from the team, the best one leads; older days are the archive ----------
   // Only the team sees the photos (private storage, opened with short-lived links).
@@ -3360,9 +3467,9 @@
     const tracks = [['titles', T('tr_titles')], ['all', ''], ['master', T('tr_master')], ['guide', T('tr_guide')], ['driver', T('tr_driver')], ['own', T('tr_own')], ['delica', 'Delica'], ['new', T('tr_new')], ['now', T('tr_now')], ['geo', T('tr_geo')], ['fun', T('tr_fun')], ['legend', T('tr_legend')], ['secret', T('tr_secret')]];
     const pals = Object.entries(g.partners).sort((x, y) => y[1] - x[1]).slice(0, 3), fresh = !personStats(id).ts.length;   // no tours yet: one plain line instead of empty blocks
     return `<div class="card lvl"><div class="row nw">${avatar(id, true)}<div class="grow-l" style="flex-direction:column;align-items:stretch;gap:4px;min-width:0"><b class="lvn">${T('level')} ${g.level}</b><details class="lvhelp"><summary class="lnk small">${T('lv_how')}</summary><p class="small">${T('lv_text')}</p><ul class="small"><li>${T('lv_tour')}</li><li>${T('lv_guest')}</li><li>${T('lv_km')}</li><li>${T('lv_badge')}</li></ul><p class="small muted">${T('lv_steps')}</p></details><span class="meter"><i style="width:${Math.round((g.xp - g.base) / (g.next - g.base) * 100)}%"></i></span><span class="muted small num">${T('g_xp', { xp: nf(g.xp), next: nf(g.next) })} · ${g.done}/${g.list.length} ${T('badges').toLowerCase()}</span></div></div></div>
+      ${teamGoalHtml()}${fresh ? '' : weeklyHtml(id)}
       ${next.length ? `<h3>${T('g_next')}</h3><div class="medals">${next.map(b => medal(b)).join('')}</div>` : ''}
       ${(() => { const mine = g.list.filter(b => b.done && b.track !== 'master'), rank = b => (b.track === 'titles' ? 0 : starsOf(b, tierOf(b, g.list)) === 3 ? 1 : 2); mine.sort((x, y) => rank(x) - rank(y)); if (fresh && !mine.length) return ''; return `<h3>${T('bp_mine')} <span class="muted small num">${mine.length}</span></h3>${mine.length ? `<div class="medals">${mine.map(b => medal(b)).join('')}</div>` : `<p class="muted small">${T('bp_none')}</p>`}`; })()}${fresh ? `<div class="empty">${T('bd_empty')}</div>` : ''}
-      ${teamGoalHtml()}${fresh ? '' : weeklyHtml(id)}
       ${roadHtml(id)}
       ${thanksHtml(id)}${id === me().id ? `<div class="bar"><button class="btn" data-act="totem">${msi('star')}${T('tt_btn')}</button><button class="btn" data-act="recap">${msi('star')}${T('rc_btn', { y: today().slice(0, 4) })}</button></div>` : ''}
       ${(() => { const todo = tracks.filter(([k]) => k !== 'master' && k !== 'titles').map(([k, label]) => { const bs = g.list.filter(b => b.track === k && !b.done); return bs.length ? `${label ? `<h3>${esc(label)}</h3>` : ''}<div class="medals">${bs.map(b => medal(b)).join('')}</div>` : ''; }).join(''), n = g.list.filter(b => !b.done && b.track !== 'master' && b.track !== 'titles').length; return todo ? `<details class="sect bpmore" data-keep="bp-todo" ${(state.keep || {})["bp-todo"] ? 'open' : ''}><summary data-s="${T('show')}" data-h="${T('hide')}"><span>${T('bp_todo')} <span class="tag t-muted num">${n}</span></span></summary>${todo}</details>` : ''; })()}
@@ -3403,9 +3510,9 @@
   // App settings, apart from the profile: how the app looks on this phone, language, notifications, install, privacy, sign out.
   function settingsHtml(m, perm) {
     return `<div class="cols"><div class="card f">
+      <label>${T('language')}<select id="me-lang" data-ch="lang">${opt('en', 'English', lang())}${opt('ru', 'Русский', lang())}${opt('ka', 'ქართული', lang())}</select></label>
       ${ticketCardHtml()}<div class="f" id="me-see"><b>${T('pf_title')}</b><div class="checks col"><label><input type="checkbox" data-ch="pref" data-k="game" ${gameOn() ? 'checked' : ''}>${T('pf_game')}</label>${gameOn() ? '' : `<span class="muted small" id="me-see-off">${T('pf_game_off')}</span>`}<label><input type="checkbox" data-ch="pref" data-k="photo" ${photoOn() ? 'checked' : ''}>${T('pf_photo')}</label><label><input type="checkbox" data-ch="pref" data-k="mood" ${pref('mood') !== 'off' ? 'checked' : ''}>${T('pf_mood')}</label><label><input type="checkbox" data-ch="pref" data-k="rate" ${pref('rate') !== 'off' ? 'checked' : ''}>${T('pf_rate')}</label></div><span class="muted small">${T('pf_note')}</span></div>
       <div class="f"><b>${T('ds_title')}</b>${displayHtml()}</div>
-      <label>${T('language')}<select id="me-lang" data-ch="lang">${opt('en', 'English', lang())}${opt('ru', 'Русский', lang())}${opt('ka', 'ქართული', lang())}</select></label>
       ${notifCardHtml(perm)}<div class="checks col">${Object.keys(NOTE_GROUPS).map(g => `<label><input type="checkbox" id="mute-${g}" data-ch="mutepref" data-g="${g}" ${(m.mute || []).includes(g) ? '' : 'checked'}>${T('note_' + g)}</label>`).join('')}</div></div>
       </div><div class="list">${installCardHtml(true)}<div class="card f">
       <button class="btn" data-act="welcome">${T('wl_again')}</button>
@@ -3419,7 +3526,7 @@
   }
 
   // ---------- render ----------
-  const NAV = () => [['calendar', T('nav_calendar')], isAdmin() ? ['team', T('nav_team')] : ['timeoff', T('nav_timeoff')], ['tasks', T('tasks')], ...(isAdmin() ? [['clients', T('nav_clients')], ['admin', T('nav_admin')]] : []), ['me', T('nav_me')]];
+  const NAV = () => (isAdmin() ? [['calendar', T('nav_calendar')], ['team', T('nav_team')], ['tasks', T('tasks')], ['clients', T('nav_clients')], ['admin', T('nav_admin')], ['me', T('nav_me')]] : [['calendar', T('nav_calendar')], ['tasks', T('tasks')], ['timeoff', T('nav_timeoff')], ['me', T('nav_me')]]);
   let rendering = false;
   // The screen is patched in place: only the parts that changed are touched, so nothing flashes,
   // scroll position and open fields are kept, and new items fade in.
@@ -3454,7 +3561,7 @@
   let quietMorph = false;   // during a screen change the whole screen slides, so single items do not fade in as well
   function morph(root, html) { const tpl = document.createElement('template'); tpl.innerHTML = html; morphKids(root, tpl.content, root.childNodes.length > 0 && !quietMorph); }
   // Moving between screens: a short slide, like a native app (left or right by the order of the tabs). Phones without View Transitions just switch.
-  const VIEW_ORDER = ['calendar', 'timeoff', 'team', 'tasks', 'clients', 'admin', 'me'];
+  const VIEW_ORDER = ['calendar', 'team', 'tasks', 'timeoff', 'clients', 'admin', 'me'];
   function slideTo(a, b, go) {   // a, b: positions of the old and new screen
     const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (!document.startViewTransition || reduce || a === b) { go(); return; }
@@ -3588,7 +3695,7 @@
     prelangb(el) { S.ls.set('fs-lang', el.dataset.v); render(); },
     view(el) { const from = state.view === 'admin' && state.adminTab === 'clients' ? 'clients' : state.view; slideTo(VIEW_ORDER.indexOf(from), VIEW_ORDER.indexOf(el.dataset.v), () => acts.viewNow(el)); },
     viewNow(el) { state.view = el.dataset.v; if (state.view === 'clients') { state.view = 'admin'; state.adminTab = 'clients'; state.q = ''; } else if (state.view === 'admin') state.adminTab = null; try { history.replaceState(null, '', '#' + state.view); } catch (e) { location.hash = state.view; } render(); window.scrollTo(0, 0); },
-    nav(el) { const n = Number(el.dataset.d); if (state.mode === 'week') state.date = addDays(state.date, 7 * n); else if (state.mode === 'day' || state.mode === 'time') state.date = addDays(state.date, n); else if (state.mode === 'agenda') state.date = addDays(state.date, 28 * n); else { const d = D(state.date); d.setDate(1); d.setMonth(d.getMonth() + n); state.date = iso(d); } render(); document.querySelectorAll('main .mgrid, main .gridwrap, main .list').forEach(e => { e.classList.remove('sl-n', 'sl-p'); void e.offsetWidth; e.classList.add(n > 0 ? 'sl-n' : 'sl-p'); }); },
+    nav(el) { const n = Number(el.dataset.d); if (state.mode === 'week') state.date = addDays(state.date, 7 * n); else if (state.mode === 'day' || state.mode === 'time') state.date = addDays(state.date, n); else if (state.mode === 'agenda') state.date = addDays(state.date, 28 * n); else { const d = D(state.date); d.setDate(1); d.setMonth(d.getMonth() + n); state.date = iso(d); } needOlder(state.date); render(); document.querySelectorAll('main .mgrid, main .gridwrap, main .list').forEach(e => { e.classList.remove('sl-n', 'sl-p'); void e.offsetWidth; e.classList.add(n > 0 ? 'sl-n' : 'sl-p'); }); },
     today() { state.date = today(); render(); toToday(); },
     wgrid() { state.wgrid = !state.wgrid; render(); },
     mode(el) { state.mode = el.dataset.m; render(); },
@@ -3815,7 +3922,7 @@
     dupdelt(el) { const t = db.tours.find(x => x.id === el.dataset.id); if (!t || db.bookings.some(b => b.tour_id === t.id)) return; confirmDo(T('confirm_remove'), T('remove'), () => run(async () => { await S.remove('tours', t.id); logAct(`Removed an empty duplicate tour ${t.title} ${t.date}`); }, T('dups_done'))); },
     pbclear() { state.pb = null; render(); },
     pbgo(el) {
-      const pb = state.pb, mt = pbMatch(pb); if (!pb) return;
+      const pb = state.pb; if (!pb) return; const mt = pbMatch(pb);
       if (el.dataset.m === 'cancel') { run(async () => { const b = mt.old; await S.remove('bookings', b.id); const t = mt.oldTour; if (t) { const rest = db.bookings.filter(x => x.tour_id === t.id); await S.save('tours', { ...t, adults: rest.reduce((n, x) => n + (+x.adults || 0), 0), children: rest.reduce((n, x) => n + (+x.children || 0), 0), pax: rest.reduce((n, x) => n + (+x.pax || 0), 0) }); } logAct(`Booking cancelled from email: ${pb.ref} (${b.guest})`); state.pb = null; }, T('pb_cancelled')); return; }
       const bk = { id: mt.old ? mt.old.id : S.uid(), client_id: mt.old ? mt.old.client_id : null, guest: pb.guest || (mt.old || {}).guest || '', adults: pb.adults, children: pb.children, phone: pb.phone || (mt.old || {}).phone || '', email: pb.email || (mt.old || {}).email || '', ref: pb.ref, lang: pb.lang, source: pb.src || null, marks: [...new Set([...((mt.old || {}).marks || []), ...pb.marks])], pickup_addr: pb.marks.includes('pickup') ? pb.pickup : '', notes: [(mt.old || {}).notes, pb.others ? T('pb_others') + ': ' + pb.others : ''].filter(Boolean).join(' · '), payment: (mt.old || {}).payment || 'prepaid', currency: pb.pcur || (mt.old || {}).currency || guestCur(), price: pb.pnum ?? (mt.old || {}).price ?? null, history: (mt.old || {}).history || [] };
       const target = mt.old && mt.oldTour && (!pb.date || pb.date === mt.oldTour.date) && (!pb.time || pb.time === mt.oldTour.start_time) ? mt.oldTour : mt.tour;
@@ -3827,6 +3934,9 @@
       toast(T('pb_opened'));
     },
     ctgo() { run(importContacts); },
+    totop() { window.scrollTo({ top: 0, behavior: 'smooth' }); },
+    jumpto(el) { const x = document.getElementById(el.dataset.id); if (x) x.scrollIntoView({ behavior: 'smooth', block: 'start' }); },
+    klclear() { state.kl = null; render(); },
     fitpick(el) { const m = state.modal; if (!m || !m.draft) return; m.draft[el.dataset.f] = el.dataset.id; const s = $(el.dataset.f === 'guide_id' ? '#t-guide' : '#t-driver'); if (s) s.value = el.dataset.id; const b = $('#fitbox'); if (b) b.innerHTML = fitHtml(m.draft); refreshTourWarn(); },
     msdone(el) { const d = el.closest('details'); if (d) d.open = false; },
     msclear(el) { const m = state.modal, b = m && m.draft && m.draft.bookings[Number(el.dataset.i)]; if (!b) return; const had = needsAddr(b); b.marks = []; el.closest('.mspanel').querySelectorAll('input[type=checkbox]').forEach(x => { x.checked = false; }); const sm = $('#ms-' + el.dataset.i); if (sm) { sm.textContent = optSummary(b); sm.nextElementSibling.textContent = ''; } if (had) setTimeout(renderModal, 0); },
@@ -3869,7 +3979,7 @@
     paycsv() { const rows = [[T('name'), T('role'), T('tours_n'), T('rp_days'), T('pay_total')], ...(state.payRows || [])]; const csv = '\ufeff' + rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n'); const a2 = document.createElement('a'); a2.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a2.download = state.payFile || 'salary.csv'; document.body.appendChild(a2); a2.click(); a2.remove(); },
     errreload() { state.errs = null; flushErr().then(render); },
     errclear() { run(async () => { await S.clearErrors(); state.errs = []; }); },
-    year(el) { state.year += Number(el.dataset.d); render(); if (S.loadedFrom && String(state.year) < S.loadedFrom.slice(0, 4)) { toast(T('loading_older')); S.loadOlder(`${state.year}-01-01`).then(() => render()).catch(() => {}); } },
+    year(el) { state.year += Number(el.dataset.d); needOlder(`${state.year}-01-01`); render(); },
     pactive(el) { const p = person(el.dataset.id); logAct(`${p.active === false ? 'Gave access to' : 'Removed access from'} ${p.name}`); if (state.modal && state.modal.type === 'person') state.modal = null; run(() => S.save('profiles', { ...stripEmail(p), active: p.active === false })).then(renderModal); },
     holdel(el) { run(() => S.remove('holidays', el.dataset.id)); },
     holpreset(el) {
@@ -3901,7 +4011,7 @@
     errnooff(el) { state.errNoOff = el.checked; render(); },
     gckind(el) { const s2 = state.gcOff || (state.gcOff = new Set()); el.checked ? s2.delete(el.dataset.v) : s2.add(el.dataset.v); render(); },
     mytour(el) { const m = me(), list = catalog().filter(c => c.id), base = (m.skills || []).length ? m.skills : list.map(c => String(c.id)), st = state.myTours || new Set(base); el.checked ? st.add(el.dataset.v) : st.delete(el.dataset.v); state.myTours = st; render(); },
-    jump(el) { if (el.value) { state.date = el.value; render(); } },
+    jump(el) { if (el.value) { state.date = el.value; needOlder(state.date); render(); } },
     who(el) { state.who = el.value || ''; render(); },
     cattitle(el) {
       const m = state.modal, c = catFind(el.value); if (!m || !m.draft || !c || m.catApplied === c.title) return; m.catApplied = c.title;
@@ -3931,6 +4041,7 @@
     taskdone(el) { track('taskdone'); const k = db.tasks.find(x => x.id === el.dataset.id), done = el.checked; run(async () => { await S.save('tasks', { ...k, status: done ? 'done' : 'open', done_by: done ? me().id : null, done_at: done ? new Date().toISOString() : null }); if (done) await notify([k.created_by], 'task_done', { name: me().name, title: k.title }); }); },
     restorefile(el) { const f = el.files && el.files[0]; if (f) run(() => readRestore(f)); },
     impfile(el) { const f = el.files && el.files.length ? el.files : null; if (f) run(() => readImport(f)); },
+    klfile(el) { const f = el.files && el.files[0]; if (f) run(async () => { try { await readKlook(f); } finally { el.value = ''; } }); },
     ctfile(el) { const f = el.files && el.files[0]; if (f) run(async () => { try { await readContacts(f); } finally { el.value = ''; } }); },
     impmap(el) { state.imp.map[el.dataset.name] = el.value; },
     rpfrom(el) { if (el.value) { const f = rpState(); f.from = el.value; if (f.to < f.from) f.to = f.from; render(); } },
@@ -4049,6 +4160,7 @@
     else if (el.dataset.msq !== undefined) { const q2 = el.value.trim().toLowerCase(); el.closest('.mspanel').querySelectorAll('label[data-mk]').forEach(l => { l.hidden = !!q2 && !l.dataset.mk.includes(q2); }); return; }
     else if (el.dataset.bm) { const b = m.draft.bookings[Number(el.dataset.bi)], st = new Set(b.marks || []); el.checked ? st.add(el.dataset.bm) : st.delete(el.dataset.bm); b.marks = [...st]; const sm = $('#ms-' + el.dataset.bi); if (sm) { sm.textContent = optSummary(b); const cn = sm.nextElementSibling; if (cn) cn.textContent = b.marks.length || ''; } if (el.dataset.bm === 'pickup' || el.dataset.bm === 'dropoff' || el.dataset.bm === 'stays') setTimeout(renderModal, 0); }
     else if (el.dataset.bi) { const bi = Number(el.dataset.bi), b = m.draft.bookings[bi]; b[el.dataset.bf] = el.dataset.bf === 'email' && /mailto:/i.test(el.value) ? (el.value = cleanEmail(el.value)) : el.value;
+      if (el.dataset.bf === 'ref' || el.dataset.bf === 'email') { const g = srcFromCodes(b.ref) || (/^#?\d{7,9}$/.test(String(b.ref || '').trim()) ? 'Website' : '') || srcFromMail(b.email); if (g && (!b.source || (state.autoSrc || {})[bi] === b.source)) { b.source = g; state.autoSrc = { ...(state.autoSrc || {}), [bi]: g }; const sel = document.querySelector(`select[data-bi="${bi}"][data-bf="source"]`); if (sel) sel.value = g; } }
       if (['guest', 'phone', 'email', 'ref'].includes(el.dataset.bf)) { const box = $('#gsug-' + bi); if (box) box.innerHTML = suggHtml(b, bi); }
       if (el.dataset.bf === 'phone') { const f = $('#pflag-' + bi); if (f) f.textContent = phoneFlag(normPhone(el.value)); } }
     else if (el.dataset.cq) m.draft[el.dataset.cq] = el.checked;
@@ -4223,7 +4335,7 @@
     return `<span class="muted small">${T('ds_size')}</span>${seg('fs', [['s', T('ds_small')], ['', T('ds_normal')], ['l', T('ds_big')], ['xl', T('ds_xl')]])}
       <span class="muted small">${T('ds_theme')}</span>${seg('theme', [['', T('ds_system')], ['light', T('ds_light')], ['dark', T('ds_dark')]])}
       <span class="muted small">${T('ds_contrast')}</span>${seg('contrast', [['', T('ds_c_normal')], ['high', T('ds_c_high')]])}
-      <span class="muted small">${T('ds_accent')}</span><div class="accents">${ACCENTS.map(([v, c]) => `<button class="acc" data-act="dset" data-k="accent" data-v="${v}" style="background:${c}" aria-pressed="${dget('accent') === v}" aria-label="${T('ds_acc_' + (v || 'orange'))}" title="${T('ds_acc_' + (v || 'orange'))}"></button>`).join('')}</div><span class="muted small">${T('ds_paycur')}</span>${seg('cur', [['', T('ds_paycur_same')], ...CURRENCIES.map(c => [c, c])])}<span class="muted small">${T('ds_sound')}</span><div class="seg wrap"><button data-act="soundset" data-v="" aria-pressed="${sndOn()}">${T('ds_on')}</button><button data-act="soundset" data-v="off" aria-pressed="${!sndOn()}">${T('ds_off')}</button></div><span class="muted small">${T('ds_hint')}</span>`;
+      <span class="muted small">${T('ds_accent')}</span><div class="accents">${ACCENTS.map(([v, c]) => `<button class="acc" data-act="dset" data-k="accent" data-v="${v}" style="background:${c}" aria-pressed="${dget('accent') === v}" aria-label="${T('ds_acc_' + (v || 'orange'))}" title="${T('ds_acc_' + (v || 'orange'))}"></button>`).join('')}</div><span class="muted small">${T('ds_paycur')}</span>${seg('cur', [['', T('ds_paycur_same')], ...CURRENCIES.map(c => [c, c])])}<span class="muted small">${T('ds_paycur_hint')}</span><span class="muted small">${T('ds_sound')}</span><div class="seg wrap"><button data-act="soundset" data-v="" aria-pressed="${sndOn()}">${T('ds_on')}</button><button data-act="soundset" data-v="off" aria-pressed="${!sndOn()}">${T('ds_off')}</button></div><span class="muted small">${T('ds_hint')}</span>`;
   }
   applyDisplay();
   (async () => {
