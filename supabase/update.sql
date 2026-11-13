@@ -490,3 +490,23 @@ begin
 end $$;
 
 revoke execute on function public.agent_board(int, int), public.agent_find_refs(text[]), public.agent_changes(timestamptz), public.agent_conflicts(int), public.agent_notify(text), public.agent_run_done(text, text) from public, anon, authenticated;
+
+-- 3.69  Bank details typed by the office (the person confirms or edits) and likes on badges. Safe to run again.
+alter table public.payout_details add column if not exists entered_by uuid references public.profiles(id) on delete set null;
+alter table public.payout_details add column if not exists confirmed_at timestamptz;
+drop policy if exists payout_admin on public.payout_details;
+create policy payout_admin on public.payout_details for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
+create table if not exists public.badge_likes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  badge text not null, created_at timestamptz not null default now(),
+  unique (user_id, badge)
+);
+create index if not exists badge_likes_badge_idx on public.badge_likes(badge);
+alter table public.badge_likes enable row level security;
+drop policy if exists badge_likes_read on public.badge_likes;
+create policy badge_likes_read on public.badge_likes for select to authenticated using ((select public.app_role()) is not null);
+drop policy if exists badge_likes_add on public.badge_likes;
+create policy badge_likes_add on public.badge_likes for insert to authenticated with check (user_id = (select auth.uid()) and (select public.app_role()) is not null);
+drop policy if exists badge_likes_del on public.badge_likes;
+create policy badge_likes_del on public.badge_likes for delete to authenticated using (user_id = (select auth.uid()));

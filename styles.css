@@ -1517,3 +1517,59 @@ a.phl{color:var(--accent);font-weight:600;text-decoration:underline;white-space:
 /* one calendar frame for Day, Week, Month and Agenda (guides and office) */
 .calframe{display:flex;flex-direction:column;gap:16px;width:100%}
 @media (min-width:761px){.calframe{max-width:980px;margin:0 auto}.calframe.calwide{max-width:none}}
+.gibar{display:grid;grid-template-columns:110px minmax(0,1fr) 48px;gap:8px;align-items:center}.gibar i{display:block;height:10px;border-radius:5px;background:var(--green,#314b3c);min-width:2px}
+
+/* 3.69 calendar polish: agenda time under the tour name, wider gaps; day cards show guide and driver top right; month arrows around the title */
+.agr{grid-template-columns:12px minmax(0,1fr) 350px;gap:10px 28px;padding:8px 10px}
+.agb{white-space:normal;overflow:visible}
+.agtt{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.agt{display:block;text-align:left;font-size:var(--t-sm);margin-top:1px}
+@media (max-width:760px){.agr{grid-template-columns:12px minmax(0,1fr)}.agw{grid-column:2}}
+.ttlbar{flex-wrap:nowrap;gap:10px}.ttlbar h2{margin:0 4px}.ttlbar .spacer{flex:1}
+.ttlbar .jump{width:44px;height:44px}
+@media (min-width:761px){
+  .acard:not(.mycard):not(.off){position:relative}
+  .acard:not(.mycard):not(.off) .ttl{padding-right:200px}
+  .acard:not(.mycard):not(.off) .kindrow .crew{position:absolute;top:10px;right:14px;flex-direction:column;align-items:flex-end;flex-wrap:nowrap;gap:2px}
+}
+/* 3.69 usage insight bars, badge like, bank check card */
+.hrbars{display:flex;align-items:flex-end;gap:3px;height:84px;margin:6px 0 18px}
+.hrbars span{flex:1;min-width:0;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:2px}
+.hrbars i{display:block;width:100%;min-height:2px;background:var(--accent);border-radius:3px 3px 0 0}
+.hrbars em{font-style:normal;font-size:11px;color:var(--muted);height:14px;line-height:14px}
+.blike .msi{width:20px;height:20px}
+.blike[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent)}
+.blike[aria-pressed="true"] .msi{color:var(--accent)}
+.bkcheck{border-color:var(--accent)}
+/* Time off on a computer: team off soon on the left, my requests on the right (phones keep my requests first) */
+@media (min-width:761px){.tocols>.list:first-child{order:2}}
+
+/* Timeline (3.70): one day, a column per guide or driver. Grey = not working, black line = now, seat counter on group tours. */
+.tlfilter{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px}
+.tlp{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:4px 14px 4px 6px;border:2px solid var(--line);border-radius:var(--r-pill);background:var(--surface);font-size:var(--t-sm)}
+.tlp .avatar{width:32px;height:32px;flex:none}
+.tlp[aria-pressed="true"]{border-color:var(--ink);background:var(--accent-soft);font-weight:700}
+.tlp[aria-pressed="false"]{opacity:.6}
+.tlwrap{overflow:auto;border:1px solid var(--line);border-radius:var(--r-m);background:var(--surface);max-height:78vh}
+.tlhead,.tlbody{display:grid;min-width:fit-content}
+.tlhead{position:sticky;top:0;z-index:3;background:var(--surface2);border-bottom:1px solid var(--line)}
+.tlh{display:flex;align-items:center;gap:8px;padding:8px;border-left:1px solid var(--line);font-size:var(--t-sm);min-width:0}
+.tlh .avatar{width:36px;height:36px;flex:none}
+.tlh .r{display:block;color:var(--muted);font-size:var(--t-cap)}
+.tlbody{position:relative}
+.tlhours{position:relative;font-size:var(--t-cap);color:var(--muted)}
+.tlhours span{position:absolute;right:6px;transform:translateY(-50%);background:var(--surface)}
+.tlhours span:first-child{transform:none}
+.tlcol{position:relative;border-left:1px solid var(--line);background-image:linear-gradient(var(--line) 1px,transparent 1px);background-size:100% 52px}
+.tloff{position:absolute;left:0;right:0;background:rgba(120,120,120,.2);background-image:repeating-linear-gradient(135deg,rgba(120,120,120,.18) 0 6px,transparent 6px 12px);pointer-events:none;display:flex;align-items:flex-start;justify-content:center;padding-top:6px;font-size:var(--t-cap);color:var(--muted);font-weight:700}
+.tlb{position:absolute;z-index:1;display:flex;flex-direction:column;gap:2px;text-align:left;overflow:hidden;padding:4px 6px;border:1px solid color-mix(in srgb,var(--k) 55%,var(--line));border-left:5px solid var(--k);border-radius:var(--r-s);background:color-mix(in srgb,var(--k) 14%,var(--surface));font-size:var(--t-sm);line-height:1.2;box-shadow:0 0 0 1px var(--surface)}
+.tlb .tlt{overflow-wrap:anywhere}
+.seat{align-self:flex-start;border-radius:var(--r-pill);background:var(--ink);color:var(--bg);padding:0 8px;font-size:var(--t-cap);font-weight:700;font-variant-numeric:tabular-nums}
+.seat.full{background:var(--ok);color:var(--bg)}
+.seat.over{background:var(--warn);color:var(--bg)}
+.tlnow{position:absolute;left:0;right:0;z-index:2;height:0;border-top:2px solid var(--ink);pointer-events:none}
+.tlnow span{position:absolute;left:4px;top:-11px;background:var(--ink);color:var(--bg);border-radius:var(--r-pill);padding:0 8px;font-size:var(--t-cap);font-weight:700;font-variant-numeric:tabular-nums}
+[data-theme="dark"] .tloff{background-color:rgba(255,255,255,.08)}
+.rpbar{flex-wrap:wrap;align-items:flex-end;gap:8px}
+.rpf{display:flex;flex-direction:column;gap:2px;font-size:var(--t-cap);color:var(--muted)}
+.rpbar .inp{min-height:44px}

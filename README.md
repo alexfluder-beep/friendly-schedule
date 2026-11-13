@@ -567,6 +567,31 @@ A tidy-up round after the owner's phone recording of 3.57. Nothing new to learn;
 - **Soft notice about open tours.** The app makes one quiet notice for the person: only while the app is open, only inside their working hours (8:00-20:00 when none are set), never during one of their tours, only for tours they were not told about before, at most every 3 days. People who switched off reminders in Me do not get it. Nothing is sent by the server, so nothing is sent at night or to people who do not open the app. A phone push shows the general text "Something new for you" until the `push` function is updated (not done, needs OK).
 - No database change.
 
+## 3.70
+
+- First start: the "how should the app look" step now asks text size, contrast (strong = darker, clearer text), light or dark, and the accent colour, and applies each choice at once. Everything can be changed later in Me > Settings.
+- Calendar on a computer: new Timeline view (key L, office only). One day, a column per guide and driver with photo, hours down the side, grey where nobody works or on a day off, a black line with the time for now, and a seat counter such as 3/6 on group tours. Tick people at the top to show or hide them (remembered on this computer).
+- Back office > All tours is now the report: date range with This month, Last month and This year, guide or driver, tour, status and search. The CSV file follows the same filter.
+- Back office > Import: choose many Setmore files at once (a booking that is in two files counts once). The real booking date comes from "Booked on" (Tbilisi time). Guides who have no account in the app are moved to the Boss profile, with the old name kept in the tour notes. Guests of tours the app already has but that hold no guests are added to those tours. No number of guests means 1.
+- No database change.
+
+## 3.69
+
+- Calendar on a computer: the Print button is gone; Day summary is a small icon; the arrows now sit around the month or day title and the calendar icon sits next to Today; in the agenda the time is under the tour name and the columns have more room; on day cards the guide and driver are in the top right corner.
+- Time off: Team off soon is on the left, My requests on the right. Tasks: Tours to staff comes first, then Tasks.
+- Bank details: the office can type a person's bank details (Back office > Pay > the person's statement). The person gets a banner and a card in Me > Profile and confirms or edits them. Needs the database update below.
+- Back office > Numbers > Usage: who uses the app (people, opened today, 7 and 30 days, opens a day per person and per day), when people open it (before, during, after their tour, no tour that day), hour of the day, interface language and colour scheme. Counting starts with this version.
+- Badges: a Like button in each badge (Me > Badges); Numbers > Achievements shows the most liked badges.
+- Database update (supabase/update.sql, 3.69): two columns on payout_details (entered_by, confirmed_at), a rule that lets admins write bank details, and a new table badge_likes. Run it before releasing this version.
+
+## 3.68
+
+- New office tab Numbers > Guest analytics (for you only): most valuable guests, how many tours guests took (1, 2, 3-4, 5+) and the share who came back, guests with problems (no-shows, cancelled tours, moves, bad ratings), countries (from the phone number), sources with money, return rate and no-shows, busiest months, biggest bookings, and tours per guide and driver. Past tours only; cancelled tours are not counted as visits. Moves are shown only where the app recorded them.
+
+- Real booking dates: bookings have a new `booked_at` date (from the platform e-mail or the booking code) and a `moves` count. The booking line shows "Booked ..."; Guest analytics has a new section "How far ahead guests book" and counts real moves.
+- New office page Back office > Duplicates: guests with the same phone, email or name, and tours with the same name, date and time. Each card has Edit, Merge into this (moves bookings, ratings, notes, tasks and costs into the one you pick, fills empty phone and email, removes the others) and Delete (only when nothing is attached).
+- Booking e-mail reader: understands the GetYourGuide "Booking detail changed" mail. It takes the new date and time, shows what it was before ("Was"), finds the tour name even when it has a colon, and recognises GetYourGuide from the booking code.
+
 ## 3.67
 
 - One frame for the calendar on a computer: Day, Week, Month and Agenda (office and guides) now have the same width, the same centring and the same order: view switch, next-tour and day-off cards, date title with arrows, then the content. Nothing jumps when you switch views. The guide week is built in the same frame. Only the office team grid (behind its button) uses the full width.
