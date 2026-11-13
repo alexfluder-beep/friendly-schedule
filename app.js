@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.70';
+  const APP_VERSION = '3.71';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -312,7 +312,7 @@
   const eventOn = date => db.holidays.find(h => h.kind === 'event' && h.date_from <= date && h.date_to >= date);
   const SOURCES = ['GetYourGuide', 'Viator', 'Website', 'Airbnb', 'Civitatis', 'Klook', 'Trip.com', 'TourRadar', 'FreeTour', 'Direct'];
   // Booking source from the booking code. Only patterns we are sure about; anything else is set by hand.
-  const sourceOf = b => b.source || (/free\s*tour/i.test((b.ref || '') + ' ' + (b.guest || '')) ? 'FreeTour' : /GYG/i.test(b.ref || '') ? 'GetYourGuide' : /^BR-/i.test(b.ref || '') ? 'Viator' : /^#?\d{7,9}$/.test((b.ref || '').trim()) ? 'Website' : '');
+  const sourceOf = b => b.source || (/free\s*tour/i.test((b.ref || '') + ' ' + (b.guest || '')) ? 'FreeTour' : /GYG/i.test(b.ref || '') ? 'GetYourGuide' : /^BR-/i.test(b.ref || '') ? 'Viator' : /sputnik|спутник/i.test((b.ref || '') + ' ' + (b.notes || '')) ? 'Sputnik8' : /tripster|трипстер/i.test((b.ref || '') + ' ' + (b.notes || '')) ? 'Tripster' : /^#?\d{7,9}$/.test((b.ref || '').trim()) ? 'Website' : '');
   // Where a guest can leave a review: the platform they booked on first (GetYourGuide, Viator), then Google Maps, TripAdvisor, Trustindex.
   const reviewPlaces = b => { const r = rules(), src = sourceOf(b), out = []; if (src === 'GetYourGuide' && r.reviewGyg) out.push(['GetYourGuide', r.reviewGyg]); if (src === 'Viator' && r.reviewViator) out.push(['Viator', r.reviewViator]); if (r.reviewGoogle) out.push(['Google Maps', r.reviewGoogle]); if (r.reviewTripadvisor) out.push(['TripAdvisor', r.reviewTripadvisor]); if (r.reviewTrustindex) out.push(['Trustindex', r.reviewTrustindex]); return out; };
   const reviewLink = b => { const r = rules(), src = sourceOf(b); return (src === 'GetYourGuide' && r.reviewGyg) || (src === 'Viator' && r.reviewViator) || r.reviewGoogle || ''; };
@@ -373,6 +373,8 @@
     let n = 1; for (let d = addDays(date, -1); days.has(d); d = addDays(d, -1)) n++;
     for (let d = addDays(date, 1); days.has(d); d = addDays(d, 1)) n++; return n;
   }
+  // A tour is over once its last day is past, or today and its end time (start + 3 h when none) has passed.
+  const tourOver = t => { const td = today(), e = endOf(t); if (e < td) return true; if (e > td) return false; const nw = new Date(), now = nw.getHours() * 60 + nw.getMinutes(), end = t.end_time ? mins(t.end_time) : t.start_time ? mins(t.start_time) + 180 : 1440; return now >= end; };
   const hhmm = n => { n = Math.max(0, Math.min(1439, Math.round(n))); return `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`; };
   const durOf = d => (d.start_time && d.end_time && d.end_time > d.start_time ? Math.round((mins(d.end_time) - mins(d.start_time)) / 15) / 4 : '');
   const mins = s => { const [h, m] = String(s || '0:0').split(':').map(Number); return h * 60 + (m || 0); };
@@ -753,7 +755,7 @@
   function nextHtml() {
     const td = today(), id = me().id;
     const asks = db.change_requests.filter(q => q.swap_with === id && q.status === 'pending' && !q.agreed);
-    const nt = db.tours.filter(t => live(t) && involves(t, id) && endOf(t) >= td).sort((x, y) => (x.date + (x.start_time || '')).localeCompare(y.date + (y.start_time || '')))[0];
+    const nt = db.tours.filter(t => live(t) && involves(t, id) && !tourOver(t)).sort((x, y) => (x.date + (x.start_time || '')).localeCompare(y.date + (y.start_time || '')))[0];
     const off = db.time_off.filter(o => o.user_id === id && o.status !== 'declined' && o.date_to >= td).sort((x, y) => x.date_from.localeCompare(y.date_from))[0];
     if (!nt && !asks.length && isAdmin()) return '';
     const bk = nt ? tourBookings(nt.id) : [];
@@ -1996,9 +1998,11 @@
   function moodLineHtml() { const v = moodToday(); return v && v.v ? `<span class="wrline moodline">${moodFace(v.v)}<span>${T('md_today', { m: T('md_' + v.v) })} <button class="lnk small" data-act="moodredo">${T('md_change')}</button></span></span>` : ''; }
   // ---------- after a tour: one tap to say how it went ----------
   const rateSkip = () => { try { return JSON.parse(localStorage.getItem('fs-rate-skip') || '[]'); } catch (e) { return []; } };
+  // The same tour can exist twice (same day, title and start): answering one answers both.
+  const twinsOf = x => db.tours.filter(y => y.date === x.date && y.title === x.title && (y.start_time || '') === (x.start_time || ''));
   function rateCardHtml() {
     const m = me(); if (!m || !m.active || state.viewAs || pref('rate') === 'off') return ''; const td = today(), now = hm(new Date().toISOString()), skip = rateSkip();
-    const t = db.tours.filter(x => live(x) && involves(x, m.id) && x.date <= td && x.date >= addDays(td, -2) && (endOf(x) < td || !x.end_time || x.end_time <= now) && !myScore(x.id, m.id) && !skip.includes(x.id)).sort((a, b) => (b.date + (b.start_time || '')).localeCompare(a.date + (a.start_time || '')))[0];
+    const t = db.tours.filter(x => live(x) && involves(x, m.id) && x.date <= td && x.date >= addDays(td, -1) && (endOf(x) < td || !x.end_time || x.end_time <= now) && !twinsOf(x).some(y => myScore(y.id, m.id) || skip.includes(y.id))).sort((a, b) => (b.date + (b.start_time || '')).localeCompare(a.date + (a.start_time || '')))[0];
     if (!t) return ''; return `<div class="card f ratecard"><div class="row nw"><b class="grow-l">${T('rt_q', { tour: aliasOf(t.title), day: t.date === td ? T('today').toLowerCase() : fmtDay(t.date) })}</b><button class="lnk small" data-act="rateskip" data-id="${t.id}">${T('md_skip')}</button></div><div class="moods">${[[10, 5, 'rt_great'], [7, 4, 'rt_good'], [5, 3, 'rt_ok'], [3, 2, 'rt_hard']].map(([sc, f, k]) => `<button class="moodb" data-act="ratequick" data-id="${t.id}" data-s="${sc}">${moodFace(f)}<span>${T(k)}</span></button>`).join('')}</div><button class="lnk small askoff" data-act="askoff" data-k="rate">${T('ask_never')}</button></div>`;
   }
   // One question at a time at the top of the home page: the tour that just ended first, otherwise today's mood.
@@ -2274,7 +2278,7 @@
     db.tours.forEach(t => { if (t.date > td) return; if (live(t)) tk[t.id] = t; else cx[t.id] = t; });
     const cl = {}, srcs = {}, ctys = {}, mon = Array(12).fill(0), big = [];
     const net = b => (Number(b.price) ? netOf(b) * (rateOf(b.currency || guestCur(), (tk[b.tour_id] || {}).date) || 0) : 0);
-    const cget = id => (cl[id] = cl[id] || { id, n: 0, money: 0, last: '', ys: new Set(), noshow: 0, cx: 0, moved: 0, good: 0, bad: 0, iso: '' });
+    const cget = id => (cl[id] = cl[id] || { id, n: 0, pax: 0, money: 0, last: '', ys: new Set(), noshow: 0, cx: 0, moved: 0, good: 0, bad: 0, iso: '' });
     let pax = 0, bn = 0; const lead = [];
     for (const b of db.bookings) {
       const t = tk[b.tour_id], c = b.client_id ? cget(b.client_id) : null, hist = Array.isArray(b.history) ? b.history : [];
@@ -2284,7 +2288,7 @@
       if (b.booked_at) { const dd = Math.round((new Date(t.date + 'T00:00:00') - new Date(String(b.booked_at).slice(0, 10) + 'T00:00:00')) / 864e5); if (dd >= 0) lead.push({ dd, s: srcName(sourceOf(b) || b.source) || T('ts_unknown') }); }
       pax += p; bn++; mon[Number(t.date.slice(5, 7)) - 1] += p;
       const so = srcs[s] = srcs[s] || { s, b: 0, g: 0, m: 0, ns: 0, cs: new Set() }; so.b++; so.g += p; so.m += m; if (b.attendance === 'noshow') so.ns++; if (b.client_id) so.cs.add(b.client_id);
-      if (c) { c.n++; c.money += m; c.ys.add(t.date.slice(0, 4)); if (t.date > c.last) c.last = t.date; if (b.attendance === 'noshow') c.noshow++; if (!c.iso) c.iso = phoneIso(b.phone); }
+      if (c) { c.n++; c.money += m; c.pax += p; c.ys.add(t.date.slice(0, 4)); if (t.date > c.last) c.last = t.date; if (b.attendance === 'noshow') c.noshow++; if (!c.iso) c.iso = phoneIso(b.phone); }
       const iso = phoneIso(b.phone) || (b.client_id && (db.clients.find(x => x.id === b.client_id) || {}).phone ? phoneIso(db.clients.find(x => x.id === b.client_id).phone) : '') || '?';
       const co = ctys[iso] = ctys[iso] || { iso, g: 0, m: 0, cs: new Set() }; co.g += p; co.m += m; if (b.client_id) co.cs.add(b.client_id);
       big.push({ b, t, p });
@@ -2304,14 +2308,14 @@
     const card = (k, body) => `<div class="card f"><b>${T(k)}</b>${body}</div>`;
     return `<p class="muted small">${T('gi_note')}</p>
       <div class="stats"><div class="stat"><b>${nf(all.length)}</b>${T('gi_s_guests')}</div><div class="stat"><b>${all.length ? Math.round(back.length / all.length * 100) : 0}%</b>${T('gi_s_back')}</div><div class="stat"><b>${bn ? (pax / bn).toFixed(1) : 0}</b>${T('gi_s_avg')}</div></div>
-      ${card('gi_top', tbl([T('name'), T('gi_c_tours'), T('gi_c_money'), T('gi_c_last'), T('phone_country')], top.map(c => [btn(c.id) + ' ' + vipTag(c.id), c.n, m(c.money), esc(c.last ? fmtDay(c.last) : ''), fl(c.iso)])))}
       ${card('gi_fav', tbl([T('gi_c_tours'), T('gi_c_guests')], bucket) + `<span class="muted small">${T('gi_fav_note')}</span>`)}
       ${card('gi_bad', tbl([T('name'), T('gi_c_noshow'), T('gi_c_cx'), T('gi_c_moved'), T('gi_c_bad')], bad.map(c => [btn(c.id), c.noshow, c.cx, c.moved, c.bad])) + `<span class="muted small">${T('gi_bad_note')}</span>`)}
-      ${card('gi_cty', tbl([T('phone_country'), T('gi_c_guests'), T('gi_c_money')], cs.map(c => [fl(c.iso), c.g, m(c.m)])))}
-      ${card('gi_src', tbl([T('gi_c_src'), T('gi_c_guests'), T('gi_c_money'), T('gi_c_back'), T('gi_c_noshow')], ss.map(x => { const cc = [...x.cs].map(id => cl[id]).filter(Boolean); return [esc(x.s), x.g, m(x.m), cc.length ? Math.round(cc.filter(c => c.n >= 2).length / cc.length * 100) + '%' : '—', x.ns]; })))}
+      ${card('gi_cty', tbl([T('phone_country'), T('gi_c_guests'), T('gi_c_money'), T('gi_c_pg')], cs.map(c => [fl(c.iso), c.g, m(c.m), m(c.g ? c.m / c.g : 0)])))}
+      ${card('gi_src', tbl([T('gi_c_src'), T('gi_c_bookings'), T('gi_c_guests'), T('gi_c_money'), T('gi_c_pg'), T('gi_c_pb'), T('gi_c_back'), T('gi_c_noshow')], ss.map(x => { const cc = [...x.cs].map(id => cl[id]).filter(Boolean); return [esc(x.s), x.b, x.g, m(x.m), m(x.g ? x.m / x.g : 0), m(x.b ? x.m / x.b : 0), cc.length ? Math.round(cc.filter(c => c.n >= 2).length / cc.length * 100) + '%' : '—', x.ns]; })))}
       ${card('gi_lead', (lead.length ? tbl([T('gi_c_days'), T('gi_c_bookings')], [['0', x => x === 0], ['1–3', x => x >= 1 && x <= 3], ['4–7', x => x >= 4 && x <= 7], ['8–30', x => x >= 8 && x <= 30], ['31+', x => x > 30]].map(([l, f]) => [l, lead.filter(y => f(y.dd)).length])) + `<span class="muted small">${T('gi_lead_avg', { n: (lead.reduce((a, y) => a + y.dd, 0) / lead.length).toFixed(1), k: lead.length, all: bn })}</span>` : '') + `<span class="muted small">${T('gi_lead_note')}</span>`)}
       ${card('gi_mon', mon.map((v, i) => `<div class="gibar"><span class="muted small">${esc(fmt(`2024-${String(i + 1).padStart(2, '0')}-01`, { month: 'long' }))}</span><i style="width:${Math.round(v / mmax * 100)}%"></i><span class="num small">${nf(v)}</span></div>`).join(''))}
-      ${card('gi_grp', tbl([T('name'), T('gi_c_guests'), T('title'), T('date')], big.sort((a, b) => b.p - a.p).slice(0, 8).map(x => [esc(x.b.guest || ''), x.p, esc(aliasOf(x.t.title)), esc(fmtDay(x.t.date))])))}
+      ${card('gi_grp', tbl([T('name'), T('gi_c_guests'), T('gi_c_money'), T('title'), T('date')], big.sort((a, b) => b.p - a.p).slice(0, 8).map(x => [esc(x.b.guest || ''), x.p, m(net(x.b)), esc(aliasOf(x.t.title)), esc(fmt(x.t.date, { day: 'numeric', month: 'short', year: 'numeric' }))])))}
+      ${card('gi_top', tbl([T('name'), T('gi_c_tours'), T('gi_c_money'), T('gi_c_pg'), T('gi_c_last'), T('phone_country')], top.map(c => [btn(c.id) + ' ' + vipTag(c.id), c.n, m(c.money), m(c.pax ? c.money / c.pax : 0), esc(c.last ? fmtDay(c.last) : ''), fl(c.iso)])))}
       ${card('gi_ppl', tbl([T('name'), T('role'), T('gi_c_tours'), T('gi_c_guests')], pl.map(x => [esc(pname(x.id)), T(x.role ? 'driver' : 'guide'), x.n, x.g])))}`;
   }
   // ---------- Duplicates (office): guests and tours that look like the same one. Merge, edit or delete. ----------
@@ -2590,7 +2594,10 @@
     if (tab === 'import') {
       const im = state.imp;
       h += contactsImpHtml() + `<div class="card"><b>${T('imp_title')}</b><p class="muted small">${T('imp_text')}</p><input class="inp" type="file" id="imp-file" accept=".xlsx,.xls,.csv" multiple data-ch="impfile"></div>`;
-      if (im) h += `<div class="card"><b>${T('imp_found', { tours: im.tours.length, guests: im.bookings.length, offs: im.offs.length, skipped: im.skipped })}</b>${im.cancelled ? `<span class="muted small">${T('imp_cancelled', { n: im.cancelled })}</span>` : ''}${(() => { const n = im.bookings.filter(b => impEmpty(im)[b.tour_id]).length; return n ? `<span class="muted small">${T('imp_empty', { n })}</span>` : ''; })()}${(() => { const m = {}; im.bookings.forEach(b => (b.marks || []).forEach(k => { m[k] = (m[k] || 0) + 1; })); const src = {}; im.bookings.forEach(b => { if (b.source) src[b.source] = (src[b.source] || 0) + 1; }); return Object.keys(m).length || Object.keys(src).length ? `<span class="muted small">${T('imp_found_extra')}: ${[...Object.entries(src).map(([k, v]) => `${k} ${v}`), ...Object.entries(m).map(([k, v]) => `${markLabel(k)} ${v}`)].join(' · ')}</span>` : ''; })()}
+      const pg = state.impProg, dn = state.impDone;
+      if (pg) h += `<div class="card f" role="status" aria-live="polite"><b>${pg.k === 'check' ? T('imp_checking') : pg.k === 'read' ? T('imp_reading', { done: pg.done, total: pg.total }) : T('imp_saving', { what: pg.label || '', done: pg.done, total: pg.total })}</b><span class="meter"><i style="width:${pg.total ? Math.round(pg.done / pg.total * 100) : 0}%"></i></span><span class="muted small">${T('imp_wait')}</span></div>`;
+      if (dn) h += `<div class="card f"><b>${T('imp_res_title')}</b><span class="small">${T('imp_res', dn)}</span></div>`;
+      if (im && !pg) h += `<div class="card"><b>${T('imp_found', { tours: im.tours.length, guests: im.bookings.length, offs: im.offs.length, skipped: im.skipped })}</b>${im.cancelled ? `<span class="muted small">${T('imp_cancelled', { n: im.cancelled })}</span>` : ''}${(() => { const n = im.bookings.filter(b => impEmpty(im)[b.tour_id]).length; return n ? `<span class="muted small">${T('imp_empty', { n })}</span>` : ''; })()}${(() => { const m = {}; im.bookings.forEach(b => (b.marks || []).forEach(k => { m[k] = (m[k] || 0) + 1; })); const src = {}; im.bookings.forEach(b => { if (b.source) src[b.source] = (src[b.source] || 0) + 1; }); return Object.keys(m).length || Object.keys(src).length ? `<span class="muted small">${T('imp_found_extra')}: ${[...Object.entries(src).map(([k, v]) => `${k} ${v}`), ...Object.entries(m).map(([k, v]) => `${markLabel(k)} ${v}`)].join(' · ')}</span>` : ''; })()}
         <div class="f">${im.members.map((n, i) => `<label>${esc(n)}<select id="im-${i}" data-ch="impmap" data-name="${esc(n)}">${opt('', T('imp_skip'), im.map[n])}${S.mode === 'demo' ? opt('new', T('imp_create'), im.map[n]) : ''}${staff().map(p => opt(p.id, p.name, im.map[n])).join('')}</select></label>`).join('')}</div>
         <div class="actions"><button class="btn primary" data-act="impgo">${T('imp_go')}</button></div></div>`;
     }
@@ -2645,7 +2652,7 @@
   function to24(s) { const m = String(s || '').trim().match(/^(\d{1,2}):(\d{2})\s*([AP]M)?$/i); if (!m) return null; let h = Number(m[1]) % 12; if ((m[3] || '').toUpperCase() === 'PM') h += 12; if (!m[3]) h = Number(m[1]); return `${p2(h)}:${m[2]}`; }
   // Options written in names and comments ("+wine", "front seat", "non-refundable"...), and the platform a booking code belongs to.
   const MARK_RULES = [[/\+\s*wine|wine tasting/i, 'wine'], [/\+\s*front|front[\s-]?seat/i, 'front_seat'], [/\+\s*pick|pick[\s-]?up from (the )?hotel|hotel pick[\s-]?up/i, 'pickup'], [/\+\s*food|bear food/i, 'bear_food'], [/\+\s*drop|drop[\s-]?off/i, 'dropoff'], [/\+\s*stay|stays? (there|in kazbegi)/i, 'stays'], [/private room/i, 'private_room'], [/non[\s-]?refund|невозвра/i, 'nonref'], [/late[\s-]?cancel/i, 'cancellation']];
-  const srcFromCodes = txt => { const t = String(txt || ''); return /\bGYG[A-Z0-9]{6,}/i.test(t) ? 'GetYourGuide' : /\bBR-\d{6,}/i.test(t) ? 'Viator' : /\bKL[A-Z0-9]{6,}|klook/i.test(t) ? 'Klook' : /trip\.com|\bctrip/i.test(t) ? 'Trip.com' : /airbnb|\bHM[A-Z0-9]{8}\b/i.test(t) ? 'Airbnb' : /civitatis/i.test(t) ? 'Civitatis' : /free\s*tour/i.test(t) ? 'FreeTour' : ''; };
+  const srcFromCodes = txt => { const t = String(txt || ''); return /sputnik|спутник/i.test(t) ? 'Sputnik8' : /tripster|трипстер/i.test(t) ? 'Tripster' : /\bGYG[A-Z0-9]{6,}/i.test(t) ? 'GetYourGuide' : /\bBR-\d{6,}/i.test(t) ? 'Viator' : /\bKL[A-Z0-9]{6,}|klook/i.test(t) ? 'Klook' : /trip\.com|\bctrip/i.test(t) ? 'Trip.com' : /airbnb|\bHM[A-Z0-9]{8}\b/i.test(t) ? 'Airbnb' : /civitatis/i.test(t) ? 'Civitatis' : /free\s*tour/i.test(t) ? 'FreeTour' : ''; };
   const codesIn = txt => [...new Set((String(txt || '').match(/\b(GYG[A-Z0-9]{6,}|BR-\d{6,}|KL[A-Z0-9]{6,}|HM[A-Z0-9]{8}|#?\d{7,9})\b/gi) || []).map(x => x.toUpperCase()))];
   // Guest list check: one pass over all guests and bookings that suggests fixes (platform from booking codes, options from names and notes,
   // clean names, no platform relay emails, phone format). Nothing changes until the admin presses Apply; each fix is written in the booking history.
@@ -2692,7 +2699,7 @@
       const name = String(r[cName] || '').trim(), xn = name.match(/x\s*(\d{1,2})(?!\d)/i);
       // "No of participants" is typed by hand in Setmore: "3", "2+2", "3 (2 adults + 1 child)", and sometimes a booking code by mistake.
       // A head count is 1-99; anything else (a long number, letters) is kept as the booking code, never as people.
-      const praw = String(r[cPax] || '').trim(), pm = praw.match(/(\d{1,2})\s*adults?\s*\+\s*(\d{1,2})\s*child/i) || praw.match(/^(\d{1,2})\s*\+\s*(\d{1,2})$/), xc = name.match(/x\s*(\d{1,2})\s*\+\s*(\d{1,2})(?!\d)/i);
+      const praw = String(r[cPax] || '').trim(), pm = praw.match(/(\d{1,2})\s*adults?\s*\+\s*(\d{1,2})\s*child/i) || praw.match(/^(\d{1,2})\s*\+\s*(\d)$/), xc = name.match(/x\s*(\d{1,2})\s*\+\s*(\d)(?!\d)/i);   /* 'X2 +50 CASH' is money, not 50 children */
       const pn = praw.match(/^x?\s*(\d{1,2})(\D|$)/i), pnum = pn ? Number(pn[1]) : 0, pcode = !pm && !pnum && /^#?[A-Za-z0-9-]{6,}$/.test(praw) ? praw.replace(/^#/, '') : '';
       const adults = pm ? Number(pm[1]) : xc ? Number(xc[1]) : (pnum || (xn ? Number(xn[1]) : 1)), children = pm ? Number(pm[2]) : xc ? Number(xc[2]) : 0, pax = adults + children;
       const txt = [name, svc, ...cComments.map(i => r[i])].map(x => String(x || '')).join(' '), marks = MK.filter(([re]) => re.test(txt)).map(x => x[1]);
@@ -2864,6 +2871,7 @@
   async function readImport(files) {
     files = [...files]; let head = null, rows = [], seen = new Set(), n = 0;
     for (const file of files) {
+      state.impProg = { k: 'read', done: n, total: files.length }; render(); await new Promise(res => setTimeout(res, 0));
       let r;
       if (/\.csv$/i.test(file.name)) r = csvRows(await file.text());
       else { await loadXlsx(); const wb = window.XLSX.read(await file.arrayBuffer(), { type: 'array' }); r = window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: '' }); }
@@ -2873,12 +2881,14 @@
       n++;
     }
     if (!head) throw new Error(T('imp_bad'));
-    state.imp = parseSetmore([head, ...rows]); state.imp.files = n; render();
+    state.impProg = null; state.impDone = null; state.imp = parseSetmore([head, ...rows]); state.imp.files = n; render();
   }
   // Tours already in the app (same Setmore id) that have no guests: the file's guests are added to them. Returns {file tour id: app tour id}.
+  // The app's own tours have no Setmore id: the same day, start time and title is the same tour.
+  const impKey = t => `${t.date}|${t.start_time || ''}|${String(t.title || '').trim().toLowerCase()}`;
   function impEmpty(im) {
-    const ext = {}; db.tours.forEach(t => { if (t.external_id) ext[t.external_id] = t; }); const withB = new Set(db.bookings.map(b => b.tour_id)), out = {};
-    im.tours.forEach(t => { const x = ext[t.external_id]; if (x && !withB.has(x.id)) out[t.id] = x.id; }); return out;
+    const ext = {}; db.tours.forEach(t => { if (t.external_id) ext[t.external_id] = t; else if (live(t)) ext[impKey(t)] = ext[impKey(t)] || t; }); const withB = new Set(db.bookings.map(b => b.tour_id)), out = {};
+    im.tours.forEach(t => { const x = ext[t.external_id] || ext[impKey(t)]; if (x && !withB.has(x.id)) out[t.id] = x.id; }); return out;
   }
   async function runImport() {
     const im = state.imp, palette = ['#6243bd', '#a8500c', '#1c7439', '#2f6f73', '#3b5bbd', '#7a5c00'];
@@ -2888,14 +2898,20 @@
       if (v === 'new') { const p = { id: S.uid(), name: n, role: 'guide', color: palette[db.profiles.length % palette.length], lang: 'en', active: true, phone: '' }; await S.save('profiles', p); v = p.id; }
       ids[n] = v || null;
     }
-    const have = new Set(db.tours.map(t => t.external_id).filter(Boolean)), keepT = new Set(), boss = bossId(), emptyOf = impEmpty(im);
-    const tours = im.tours.filter(t => ids[t.member] && !have.has(t.external_id)).map(t => { const { member, ...row } = t; const p = person(ids[member]); if (p && p.role === 'driver') row.driver_id = p.id; else row.guide_id = ids[member]; if (boss && ids[member] === boss && !/^boss|^alex/i.test(member)) row.notes = [row.notes, `Setmore guide: ${member}`].filter(Boolean).join(' · '); keepT.add(row.id); return row; });
+    // The app only keeps recent tours in memory: load every day the file covers first, or older tours look missing and get added twice.
+    const first = im.tours.map(t => t.date).sort()[0]; if (first) { state.impProg = { k: 'check', done: 0, total: 0 }; render(); try { await S.loadOlder(first); } catch (e) { /* offline: the check below still uses what is loaded */ } state.impProg = null; }
+    const have = new Set([...db.tours.map(t => t.external_id).filter(Boolean), ...db.tours.filter(t => !t.external_id && live(t)).map(impKey)]), keepT = new Set(), boss = bossId(), emptyOf = impEmpty(im);
+    const tours = im.tours.filter(t => ids[t.member] && !have.has(t.external_id) && !have.has(impKey(t))).map(t => { const { member, ...row } = t; const p = person(ids[member]); if (p && p.role === 'driver') row.driver_id = p.id; else row.guide_id = ids[member]; if (boss && ids[member] === boss && !/^boss|^alex/i.test(member)) row.notes = [row.notes, `Setmore guide: ${member}`].filter(Boolean).join(' · '); keepT.add(row.id); return row; });
     const newIds = new Set(keepT), moved = im.bookings.filter(b => emptyOf[b.tour_id]).map(b => ({ ...b, tour_id: emptyOf[b.tour_id] }));   // guests of tours the app already has but that hold no guests yet
     const bookings = [...im.bookings.filter(b => newIds.has(b.tour_id)), ...moved], cids = new Set(bookings.map(b => b.client_id).filter(Boolean));
-    await S.saveMany('clients', Object.values(im.clients).filter(c => cids.has(c.id) && !db.clients.some(x => x.id === c.id)));
+    state.impProg = { k: 'save', label: T('clients_n'), done: 0, total: 1 }; render(); await S.saveMany('clients', Object.values(im.clients).filter(c => cids.has(c.id) && !db.clients.some(x => x.id === c.id)));
     const offs = im.offs.filter(o => ids[o.member] && !db.time_off.some(x => x.user_id === ids[o.member] && x.date_from === o.date_from && x.date_to === o.date_to)).map(o => { const { member, ...row } = o; row.user_id = ids[member]; return row; });
-    await S.saveMany('tours', tours); await S.saveMany('bookings', bookings); await S.saveMany('time_off', offs);
-    state.imp = null; toast(T('imp_done', { tours: tours.length, offs: offs.length }));
+    const newClients = Object.values(im.clients).filter(c => cids.has(c.id) && !db.clients.some(x => x.id === c.id)), plan = [['tours', tours, T('tours_n')], ['bookings', bookings, T('bookings_n')], ['time_off', offs, T('imp_offs')]], total = plan.reduce((n, x) => n + x[1].length, 0);
+    let done = 0; state.impProg = { k: 'save', label: '', done, total }; render();
+    try {
+      for (const [table, rows, label] of plan) for (let i = 0; i < rows.length; i += 400) { state.impProg = { k: 'save', label, done, total }; render(); await new Promise(res => setTimeout(res, 0)); await S.saveMany(table, rows.slice(i, i + 400)); done += Math.min(400, rows.length - i); }
+    } finally { state.impProg = null; }
+    state.impDone = { tours: tours.length, bookings: bookings.length, clients: newClients.length, offs: offs.length, moved: moved.length, left: im.bookings.length - bookings.length }; state.imp = null; render(); toast(T('imp_done', { tours: tours.length, offs: offs.length }));
   }
 
   // ---------- me ----------

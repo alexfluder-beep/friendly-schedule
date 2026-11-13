@@ -567,6 +567,14 @@ A tidy-up round after the owner's phone recording of 3.57. Nothing new to learn;
 - **Soft notice about open tours.** The app makes one quiet notice for the person: only while the app is open, only inside their working hours (8:00-20:00 when none are set), never during one of their tours, only for tours they were not told about before, at most every 3 days. People who switched off reminders in Me do not get it. Nothing is sent by the server, so nothing is sent at night or to people who do not open the app. A phone push shows the general text "Something new for you" until the `push` function is updated (not done, needs OK).
 - No database change.
 
+## 3.71
+- After-tour question: asked for today and yesterday only (was 2 days), and answering or skipping one of two identical tours (same day, title, start) counts for both.
+- "My next tour" card disappears once the tour has ended today (end time, or start + 3 hours when none).
+- Import first loads every day the file covers and skips tours the app already has (also the app's own tours: same day, start and title). This was the cause of 289 twin tours.
+- Import shows a progress bar and a result card.
+- Guest numbers: "X2 +50 CASH" is now 2 guests (the +50 was money, not children). Sputnik8 and Tripster are recognised as booking sources.
+- Money per guest and per booking in Sources, Countries and Most valuable guests; Biggest bookings shows money and the year. Most valuable guests moved lower.
+
 ## 3.70
 
 - First start: the "how should the app look" step now asks text size, contrast (strong = darker, clearer text), light or dark, and the accent colour, and applies each choice at once. Everything can be changed later in Me > Settings.
