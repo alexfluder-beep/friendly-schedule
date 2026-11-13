@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.72';
+  const APP_VERSION = '3.73';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -750,8 +750,8 @@
       if (st.has('cash')) chips.push(`<span class="mchip">${msi('payments')}${T('pay_cash')}${due ? ' ' + esc(nf(due)) : ''}</span>`);
       if (st.has('unpaid')) chips.push(`<span class="mchip warn">${msi('schedule')}${T('pay_unpaid')}</span>`);
     }
-    const g = payFor(t, 'guide'), d = payFor(t, 'driver'), mine = me() ? myPayOn(t, me().id) : 0, pay = isAdmin() ? [g, d].filter(Boolean).map(nf).join(' + ') : mine ? nf(mine) : '';
-    if (pay) chips.push(`<span class="mchip pay" title="${esc(T('mc_pay'))}">${msi('wallet')}${esc(pay)} ${cur}</span>`);
+    const g = payFor(t, 'guide'), d = payFor(t, 'driver'), mine = me() ? myPayOn(t, me().id) : 0, pay = isAdmin() ? [g, d].filter(Boolean).map(nf).join(' + ') + ' ' + cur : mine ? payShow(mine, t.date, true) : '';
+    if (pay) chips.push(`<span class="mchip pay" title="${esc(T('mc_pay'))}">${msi('wallet')}${isAdmin() ? esc(pay) : pay}</span>`);
     return chips.length ? `<span class="metarow">${chips.join('')}</span>` : '';
   }
   function agendaCard(t) {
@@ -886,6 +886,18 @@
       }
       await S.save('settings', { id: 'fx', value: out }); memo = {}; render();
     } catch (e) { console.warn('exchange rates not loaded', e); } finally { fxBusy = false; }
+  }
+  // Pay in the currency each person prefers (Me > Settings): amounts stay stored in the agreed currency (Rules > pay currency); only the display is converted,
+  // with the rate of the tour date, and marked with "≈". Original amount stays visible.
+  const payCur = () => { const c = dget('cur'); return CURRENCIES.includes(c) ? c : (rules().currency || 'GEL'); };
+  function fxTo(v, from, to, date) {
+    if (!v || from === to) return v; const a = rateOf(from, date), b = rateOf(to, date); return a && b ? v * a / b : null;
+  }
+  // "≈ 30 USD (80 GEL)" for the person's own pay; plain "80 GEL" when no conversion is needed or no rate is known.
+  function payShow(v, date, short) {
+    const base = rules().currency || 'GEL', to = payCur(), conv = to === base ? v : fxTo(v, base, to, date);
+    if (conv === null || to === base) return `${nf(v)} ${esc(base)}`;
+    const main = `≈ ${nf(Math.round(conv))} ${esc(to)}`; return short ? main : `${main} <span class="muted small">(${nf(v)} ${esc(base)})</span>`;
   }
   // Platform commission: the price in a GetYourGuide or Viator email is what the guest paid; the platform keeps its share.
   // Back office > Rules > Platform commission, e.g. "GetYourGuide 25, Viator 20".
@@ -1128,7 +1140,7 @@
         <details class="sect"><summary>${T('more')}</summary><div class="f">
           <div class="bar"><button class="btn sm" data-act="share" data-title="${esc(d.title)}" data-v="${esc(tourText(d))}">${ico('share')}${T('share')}</button><a class="btn sm" href="${esc(gcalLink(d))}" target="_blank" rel="noopener">${ico('cal')}${T('cal_short')}</a><button class="btn sm" data-act="copy" data-v="${esc(tourText(d))}">${ico('copy')}${T('copy')}</button>${tipUrl(d) && (mine || isAdmin()) ? `<button class="btn sm" data-act="tipqr" data-id="${d.id}">${T('tip_btn')}</button>` : ''}</div>
           <div class="muted small num">${esc([T('kind_' + d.kind), paxText(d), d.language, cn.duration, cn.note, endOf(d) !== d.date ? T('multiday', { n: tourDays(d).length }) : ''].filter(Boolean).join(' · '))}</div>
-          ${mine && !isAdmin() ? `<div class="row small"><span class="muted">${T('my_pay')}: <b class="num">${myPay} ${esc(cur)}</b>${myPay ? ` <span class="muted small">(${esc(payHow(d, d.guide_id === me().id ? 'guide' : 'driver'))})</span>` : ''}</span>${disputeTag(disputeOf(d.id, me().id))}<button class="btn sm dpbtn" data-act="dispute" data-id="${d.id}">${msi('flag')}${T('dp_btn')}</button></div>` : (mine && myPay ? `<div class="muted small">${T('my_pay')}: <b class="num">${myPay} ${esc(cur)}</b>${myPay ? ` <span class="muted small">(${esc(payHow(d, d.guide_id === me().id ? 'guide' : 'driver'))})</span>` : ''}</div>` : '')}${isAdmin() ? `<div class="muted small num">${T('a_pay')}: ${payFor(d, 'guide')} + ${payFor(d, 'driver')} ${esc(cur)}</div>` : ''}
+          ${mine && !isAdmin() ? `<div class="row small"><span class="muted">${T('my_pay')}: <b class="num">${payShow(myPay, d.date)}</b>${myPay ? ` <span class="muted small">(${esc(payHow(d, d.guide_id === me().id ? 'guide' : 'driver'))})</span>` : ''}</span>${disputeTag(disputeOf(d.id, me().id))}<button class="btn sm dpbtn" data-act="dispute" data-id="${d.id}">${msi('flag')}${T('dp_btn')}</button></div>` : (mine && myPay ? `<div class="muted small">${T('my_pay')}: <b class="num">${payShow(myPay, d.date)}</b>${myPay ? ` <span class="muted small">(${esc(payHow(d, d.guide_id === me().id ? 'guide' : 'driver'))})</span>` : ''}</div>` : '')}${isAdmin() ? `<div class="muted small num">${T('a_pay')}: ${payFor(d, 'guide')} + ${payFor(d, 'driver')} ${esc(cur)}</div>` : ''}
           ${isAdmin() ? '' : warnHtml}${reqs}
           ${scoreHtml(d)}
           ${tasks.length ? `<div class="list"><b>${T('tasks')}</b>${tasks.map(taskCard).join('')}</div>` : ''}
@@ -3056,21 +3068,22 @@
       ${p.mode === 'custom' ? `<div class="f"><div class="two"><label>${T('pr_from')}<input id="pr-from" type="date" data-ch="payfrom" value="${esc(r.from)}"></label><label>${T('pr_to')}<input id="pr-to" type="date" data-ch="payto" value="${esc(r.to)}"></label></div></div>` : ''}`;
   }
   function payData(id, from, to) {
-    const months = {}, titles = {}; let base = 0, n = 0;
+    const months = {}, titles = {}, all = { GEL: 0, USD: 0, EUR: 0 }, bc = rules().currency || 'GEL'; let base = 0, n = 0;
     for (const t of db.tours) {
       if (!live(t) || !involves(t, id) || t.date < from || t.date > to) continue;
       const pay = (t.guide_id === id ? payFor(t, 'guide') : 0) + (t.driver_id === id ? payFor(t, 'driver') : 0), mo = t.date.slice(0, 7);
-      const m = months[mo] = months[mo] || { n: 0, pay: 0, adj: 0 }; m.n++; m.pay += pay; base += pay; n++;
+      const m = months[mo] = months[mo] || { n: 0, pay: 0, adj: 0 }; m.n++; m.pay += pay; base += pay; n++; CURRENCIES.forEach(c => { const x = fxTo(pay, bc, c, t.date); all[c] = all[c] === null || x === null ? null : all[c] + x; });
       const ti = titles[t.title] = titles[t.title] || { n: 0, pay: 0 }; ti.n++; ti.pay += pay;
     }
-    let adj = 0; db.pay_adjustments.forEach(x => { if (x.user_id === id && x.month >= from.slice(0, 7) && x.month <= to.slice(0, 7)) { const m = months[x.month] = months[x.month] || { n: 0, pay: 0, adj: 0 }; m.adj += Number(x.amount) || 0; adj += Number(x.amount) || 0; } });
+    let adj = 0; db.pay_adjustments.forEach(x => { if (x.user_id === id && x.month >= from.slice(0, 7) && x.month <= to.slice(0, 7)) { const m = months[x.month] = months[x.month] || { n: 0, pay: 0, adj: 0 }; m.adj += Number(x.amount) || 0; adj += Number(x.amount) || 0; CURRENCIES.forEach(c => { const y = fxTo(Number(x.amount) || 0, bc, c, x.month + '-28'); all[c] = all[c] === null || y === null ? null : all[c] + y; }); } });
     const r2 = v => Math.round(v * 100) / 100;
-    return { n, base: r2(base), adj: r2(adj), total: r2(base + adj), months: Object.keys(months).sort().map(mo => ({ mo, ...months[mo], total: r2(months[mo].pay + months[mo].adj) })), titles: Object.entries(titles).sort((x, y) => y[1].pay - x[1].pay).slice(0, 6) };
+    return { n, all: Object.fromEntries(CURRENCIES.map(c => [c, all[c] === null ? null : Math.round(all[c])])), base: r2(base), adj: r2(adj), total: r2(base + adj), months: Object.keys(months).sort().map(mo => ({ mo, ...months[mo], total: r2(months[mo].pay + months[mo].adj) })), titles: Object.entries(titles).sort((x, y) => y[1].pay - x[1].pay).slice(0, 6) };
   }
   function payRangeHtml(id, from, to, modal) {
     const d = payData(id, from, to), cur = rules().currency || 'GEL', max = Math.max(1, ...d.months.map(m => m.total)), nm = Math.max(1, d.months.length);
     return `${modal ? `<div class="hdr"><h2>${esc(pname(id))}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>` : ''}<p class="muted small num">${esc(fmtRange(from, to))}</p>
-      <div class="stats"><div class="stat"><b>${nf(d.total)}</b>${esc(cur)}</div><div class="stat"><b>${d.n}</b>${T('tours_n')}</div><div class="stat"><b>${d.n ? nf(d.base / d.n) : 0}</b>${T('pr_pertour')}</div><div class="stat"><b>${nf(d.total / nm)}</b>${T('pr_permonth')}</div></div>
+      <div class="stats"><div class="stat"><b>${payCur() !== cur && d.all[payCur()] !== null ? '≈ ' + nf(d.all[payCur()]) : nf(d.total)}</b>${payCur() !== cur && d.all[payCur()] !== null ? esc(payCur()) : esc(cur)}</div><div class="stat"><b>${d.n}</b>${T('tours_n')}</div><div class="stat"><b>${d.n ? nf(d.base / d.n) : 0}</b>${T('pr_pertour')}</div><div class="stat"><b>${nf(d.total / nm)}</b>${T('pr_permonth')}</div></div>
+      ${d.n ? `<div class="card f paycur"><span class="muted small">${T('pay_all')}</span><div class="row num">${CURRENCIES.map(c => `<b>${c === cur ? nf(d.total) : d.all[c] === null ? '—' : '≈ ' + nf(d.all[c])} ${c}</b>`).join(' · ')}</div><span class="muted small">${T('pay_all_note', { c: cur })}</span></div>` : ''}
       ${d.months.length > 1 ? `<div class="card"><div class="bars">${d.months.map(m => `<button class="barcol" data-act="paymonth" data-m="${m.mo}" aria-label="${esc(m.mo)}: ${m.total}"><span class="num small">${m.total >= 1000 ? (m.total / 1000).toFixed(1) + 'k' : nf(m.total)}</span><i style="height:${Math.round(Math.max(0, m.total) / max * 100)}%"></i><span class="small">${esc(fmt(m.mo + '-01', { month: 'short' }))}</span></button>`).join('')}</div><span class="muted small">${T('pr_tap')}</span></div>` : ''}
       <div class="tablewrap"><table><tr><th>${T('month')}</th><th class="n">${T('tours_n')}</th><th class="n">${esc(cur)}</th><th class="n">${T('correction')}</th><th class="n">${T('total')}</th></tr>${d.months.map(m => `<tr><td><button class="btn sm" data-act="paymonth" data-m="${m.mo}">${esc(fmt(m.mo + '-01', { month: 'long', year: 'numeric' }))}</button></td><td class="n">${m.n}</td><td class="n">${nf(m.pay)}</td><td class="n">${m.adj ? (m.adj > 0 ? '+' : '') + nf(m.adj) : ''}</td><td class="n"><b>${nf(m.total)}</b></td></tr>`).join('') || `<tr><td colspan="5" class="muted">${T('no_tours')}</td></tr>`}${d.months.length > 1 ? `<tr><td><b>${T('total')}</b></td><td class="n">${d.n}</td><td class="n">${nf(d.base)}</td><td class="n">${d.adj ? nf(d.adj) : ''}</td><td class="n"><b>${nf(d.total)}</b></td></tr>` : ''}</table></div>
       ${d.titles.length ? `<div class="card"><b>${T('pr_bytour')}</b>${d.titles.map(([ti, v]) => `<div class="row"><span style="flex:1;min-width:0;overflow-wrap:anywhere">${esc(ti)} <span class="muted small num">×${v.n}</span></span><b class="num">${nf(v.pay)}</b></div>`).join('')}</div>` : ''}`;
@@ -3156,6 +3169,7 @@
     const text = [`${pname(id)} · ${mo}`, ...st.rows.map(x => `${x.t.date} ${x.t.title}: ${x.pay} ${cur}`), `${T('total')}: ${st.total} ${cur}`].join('\n');
     return `${modal ? `<div class="hdr"><h2>${esc(pname(id))} · ${esc(mo)}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>` : ''}
       <div class="stats"><div class="stat"><b>${st.rows.length}</b>${T('tours_n')}</div><div class="stat"><b>${st.total}</b>${esc(cur)}</div></div>
+      ${(() => { if (!st.rows.length) return ''; const al = CURRENCIES.map(c => { if (c === cur) return [c, nf(st.total)]; let v = 0; for (const x of st.rows) { const y = fxTo(x.pay, cur, c, x.t.date); if (y === null) return [c, '—']; v += y; } for (const x of st.adj) { const y = fxTo(Number(x.amount) || 0, cur, c, mo + '-28'); if (y === null) return [c, '—']; v += y; } return [c, '≈ ' + nf(Math.round(v))]; }); return `<div class="card f paycur"><span class="muted small">${T('pay_all')}</span><div class="row num">${al.map(([c, v]) => `<b>${v} ${c}</b>`).join(' · ')}</div><span class="muted small">${T('pay_all_note', { c: cur })}</span></div>`; })()}
       <div class="tablewrap"><table><tr><th>${T('date')}</th><th>${T('title')}</th><th class="n">${esc(cur)}</th></tr>${st.rows.map(x => `<tr><td class="num">${esc(dateText(x.t))}</td><td style="white-space:normal">${esc(x.t.title)} ${disputeTag(disputeOf(x.t.id, id))}${id === me().id && !isAdmin() ? ` <button class="btn sm dpbtn" data-act="dispute" data-id="${x.t.id}">${msi('flag')}${T('dp_btn')}</button>` : ''}</td><td class="n">${x.pay}</td></tr>`).join('') || `<tr><td colspan="3" class="muted">${T('no_tours')}</td></tr>`}${st.adj.map(x => `<tr><td><span class="tag t-warn">${T('correction')}</span></td><td style="white-space:normal">${esc(x.note || '')}${isAdmin() ? ` <button class="btn sm" data-act="adjdel" data-id="${x.id}">${T('remove')}</button>` : ''}</td><td class="n">${Number(x.amount) > 0 ? '+' : ''}${esc(x.amount)}</td></tr>`).join('')}${st.adj.length ? `<tr><td colspan="2"><b>${T('total')}</b></td><td class="n"><b>${st.total}</b></td></tr>` : ''}</table></div>
       ${rules().payNote ? `<p class="muted small">${esc(rules().payNote)}</p>` : ''}
       ${modal ? expensesHtml(id, mo + '-01', monthEnd(mo)) : ''}
@@ -4196,20 +4210,20 @@
   // Kept on the phone for speed and in the person's profile so it follows them to another phone.
   const pref = k => { try { const v = localStorage.getItem('fs-pref-' + k); if (v) return v; } catch (e) { /* private mode */ } const d = me() && me().display; return (d && typeof d === 'object' && d[k]) || 'on'; };
   const gameOn = () => pref('game') !== 'off', photoOn = () => pref('photo') !== 'off';
-  const DKEYS = { fs: 'fs-fsize', theme: 'fs-theme', contrast: 'fs-contrast', accent: 'fs-accent' };
+  const DKEYS = { fs: 'fs-fsize', theme: 'fs-theme', contrast: 'fs-contrast', accent: 'fs-accent', cur: 'fs-paycur' };
   const ACCENTS = [['', '#314b3c'], ['sea', '#1f5f7a'], ['plum', '#5b3f7a'], ['terra', '#b8441c'], ['sky', '#5aa9e6'], ['mint', '#45b88a'], ['lilac', '#b39ddb'], ['rose', '#f28fad'], ['sun', '#f2c94c'], ['amber', '#f0901e']];
   const dget = k => { try { return localStorage.getItem(DKEYS[k]) || ''; } catch (e) { return ''; } };
   if (/iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) { const vp = document.querySelector('meta[name=viewport]'); if (vp) vp.setAttribute('content', 'width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover'); }
   document.documentElement.dataset.os = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ? 'ios' : /Android/i.test(navigator.userAgent) ? 'android' : 'other';
   function applyDisplay() { const r = document.documentElement; Object.keys(DKEYS).forEach(k => { const v = dget(k); if (v) r.dataset[k] = v; else delete r.dataset[k]; }); }
-  function setDisplay(k, v, keepAccount) { try { localStorage.setItem(DKEYS[k], v); localStorage.setItem('fs-display-set', '1'); } catch (e) { /* private mode */ } applyDisplay(); if (!keepAccount && me() && S.mode === 'supabase') { const d = { ...((me().display && typeof me().display === 'object') ? me().display : {}), fs: dget('fs'), theme: dget('theme'), contrast: dget('contrast'), accent: dget('accent') }; S.save('profiles', { ...stripEmail(me()), display: d }).catch(() => { /* stays on this phone */ }); } }
+  function setDisplay(k, v, keepAccount) { try { localStorage.setItem(DKEYS[k], v); localStorage.setItem('fs-display-set', '1'); } catch (e) { /* private mode */ } applyDisplay(); if (!keepAccount && me() && S.mode === 'supabase') { const d = { ...((me().display && typeof me().display === 'object') ? me().display : {}), fs: dget('fs'), theme: dget('theme'), contrast: dget('contrast'), accent: dget('accent'), cur: dget('cur') }; S.save('profiles', { ...stripEmail(me()), display: d }).catch(() => { /* stays on this phone */ }); } }
   function displayFromAccount() { try { if (localStorage.getItem('fs-display-set')) return; } catch (e) { return; } const d = me() && me().display; if (d && typeof d === 'object') { Object.keys(DKEYS).forEach(k => { if (d[k]) setDisplay(k, d[k], true); }); } }
   function displayHtml() {
     const seg = (k, opts) => `<div class="seg wrap">${opts.map(([v, l]) => `<button data-act="dset" data-k="${k}" data-v="${v}" aria-pressed="${dget(k) === v}">${l}</button>`).join('')}</div>`;
     return `<span class="muted small">${T('ds_size')}</span>${seg('fs', [['s', T('ds_small')], ['', T('ds_normal')], ['l', T('ds_big')], ['xl', T('ds_xl')]])}
       <span class="muted small">${T('ds_theme')}</span>${seg('theme', [['', T('ds_system')], ['light', T('ds_light')], ['dark', T('ds_dark')]])}
       <span class="muted small">${T('ds_contrast')}</span>${seg('contrast', [['', T('ds_c_normal')], ['high', T('ds_c_high')]])}
-      <span class="muted small">${T('ds_accent')}</span><div class="accents">${ACCENTS.map(([v, c]) => `<button class="acc" data-act="dset" data-k="accent" data-v="${v}" style="background:${c}" aria-pressed="${dget('accent') === v}" aria-label="${T('ds_acc_' + (v || 'orange'))}" title="${T('ds_acc_' + (v || 'orange'))}"></button>`).join('')}</div><span class="muted small">${T('ds_sound')}</span><div class="seg wrap"><button data-act="soundset" data-v="" aria-pressed="${sndOn()}">${T('ds_on')}</button><button data-act="soundset" data-v="off" aria-pressed="${!sndOn()}">${T('ds_off')}</button></div><span class="muted small">${T('ds_hint')}</span>`;
+      <span class="muted small">${T('ds_accent')}</span><div class="accents">${ACCENTS.map(([v, c]) => `<button class="acc" data-act="dset" data-k="accent" data-v="${v}" style="background:${c}" aria-pressed="${dget('accent') === v}" aria-label="${T('ds_acc_' + (v || 'orange'))}" title="${T('ds_acc_' + (v || 'orange'))}"></button>`).join('')}</div><span class="muted small">${T('ds_paycur')}</span>${seg('cur', [['', T('ds_paycur_same')], ...CURRENCIES.map(c => [c, c])])}<span class="muted small">${T('ds_sound')}</span><div class="seg wrap"><button data-act="soundset" data-v="" aria-pressed="${sndOn()}">${T('ds_on')}</button><button data-act="soundset" data-v="off" aria-pressed="${!sndOn()}">${T('ds_off')}</button></div><span class="muted small">${T('ds_hint')}</span>`;
   }
   applyDisplay();
   (async () => {

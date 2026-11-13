@@ -7,6 +7,7 @@ Team scheduling for guides and drivers: tours (private, group, customised), days
 With `config.js` left empty the app runs in **demo mode**: sample data, stored only in that browser, no login.
 
 ## What is included
+- Pay in your own currency (3.73): Me > Settings > "Show my pay in" EUR, USD or GEL. Amounts stay stored in the agreed currency; the app converts with the National Bank rate of each tour day, shows "≈" and keeps the original amount. The monthly pay page shows all three currencies.
 - Calendar (week, month, day on phones), Monday first. Private, group, customised and multi-day tours.
 - Tour card: adults and children, guest list, guest marks (wine tasting, private room, front seat, food for bears, pick-up, drop-off elsewhere, your own marks), guide and driver on one card with their phone numbers.
 - Client cards with full booking history and guide marks: good, fine, bad, trouble maker.
