@@ -43,6 +43,12 @@ TEXT = {
         "n_tour_restored": "Tour is back on: {title}, {date}",
         "n_tour_tomorrow": "Tomorrow: {title}, {time}",
         "n_week_check": "Sunday check: look at your schedule for next week and confirm it in the app.",
+                "n_ticket_new": "New problem report: {title}",
+        "n_ticket_update": "Your report \"{title}\": {status}. {reason}",
+        "st_new": "new", "st_seen": "seen", "st_planned": "planned", "st_working": "in work", "st_done": "done", "st_wontdo": "not planned",
+        "bug_help": "Write /bug and what is wrong, for example: /bug the pay on my tour card is wrong. You can add a photo or a short video with the same text as the caption.",
+        "bug_ok": "Thank you. Report {num} is received. The answer comes here and in the app.",
+        "bug_fail": "Could not save the report. Please try again later or use the app.",
         "n_default": "New notice in Friendly Schedule.",
     },
     "ru": {
@@ -58,6 +64,12 @@ TEXT = {
         "n_tour_restored": "Тур снова в силе: {title}, {date}",
         "n_tour_tomorrow": "Завтра: {title}, {time}",
         "n_week_check": "Воскресная проверка: посмотрите расписание на следующую неделю и подтвердите в приложении.",
+                "n_ticket_new": "Новое сообщение о проблеме: {title}",
+        "n_ticket_update": "Ваше сообщение «{title}»: {status}. {reason}",
+        "st_new": "новое", "st_seen": "прочитано", "st_planned": "в планах", "st_working": "в работе", "st_done": "готово", "st_wontdo": "не планируем",
+        "bug_help": "Напишите /bug и что не так, например: /bug оплата в карточке моего тура неверная. Можно добавить фото или короткое видео с тем же текстом в подписи.",
+        "bug_ok": "Спасибо. Сообщение {num} принято. Ответ придёт сюда и в приложение.",
+        "bug_fail": "Не удалось сохранить сообщение. Попробуйте позже или через приложение.",
         "n_default": "Новое уведомление в Friendly Schedule.",
     },
     "ka": {
@@ -73,6 +85,12 @@ TEXT = {
         "n_tour_restored": "ტური აღდგა: {title}, {date}",
         "n_tour_tomorrow": "ხვალ: {title}, {time}",
         "n_week_check": "კვირის შემოწმება: ნახეთ მომდევნო კვირის განრიგი და დაადასტურეთ აპში.",
+                "n_ticket_new": "ახალი შეტყობინება პრობლემაზე: {title}",
+        "n_ticket_update": "თქვენი შეტყობინება «{title}»: {status}. {reason}",
+        "st_new": "ახალი", "st_seen": "ნანახია", "st_planned": "დაგეგმილია", "st_working": "მუშავდება", "st_done": "მზადაა", "st_wontdo": "არ ვგეგმავთ",
+        "bug_help": "დაწერეთ /bug და რა არის არასწორი, მაგალითად: /bug ჩემი ტურის ბარათზე ანაზღაურება არასწორია. შეგიძლიათ დაამატოთ ფოტო ან მოკლე ვიდეო იგივე ტექსტით წარწერაში.",
+        "bug_ok": "მადლობა. შეტყობინება {num} მიღებულია. პასუხი მოვა აქ და აპში.",
+        "bug_fail": "შეტყობინების შენახვა ვერ მოხერხდა. სცადეთ მოგვიანებით ან აპიდან.",
         "n_default": "ახალი შეტყობინება Friendly Schedule-ში.",
     },
 }
@@ -152,6 +170,24 @@ class ScheduleClient:
                                               "date_from": "lte." + date_to, "select": "date_from,date_to,type,status"})
         return [o for o in rows if o["date_to"] >= date_from]
 
+    # --- problem reports ---
+    def admins(self) -> list:
+        return [r["id"] for r in self._call("GET", "profiles", {"role": "eq.admin", "active": "is.true", "select": "id"})]
+
+    def add_ticket(self, profile_id: str, ticket_id: str, body: str, shots: list) -> dict:
+        row = {"id": ticket_id, "user_id": profile_id, "source": "telegram", "body": body[:2000], "shots": shots, "status": "new"}
+        return (self._call("POST", "tickets", body=row) or [row])[0]
+
+    def upload_shot(self, path: str, data: bytes) -> None:
+        """Store one small JPEG in the private tickets folder. Never a video."""
+        url = self.base.replace("/rest/v1/", "/storage/v1/object/tickets/") + urllib.parse.quote(path)
+        headers = {"apikey": self.key, "Authorization": "Bearer " + self.key, "Content-Type": "image/jpeg", "x-upsert": "true"}
+        self.http("POST", url, data, headers)
+
+    def notify(self, user_ids: list, kind: str, params: dict) -> None:
+        for uid in user_ids:
+            self._call("POST", "notifications", body={"user_id": uid, "kind": kind, "params": params, "read": False})
+
     # --- notices ---
     def pending_notices(self, limit: int = 40) -> list:
         """Schedule notices not yet sent to Telegram, each with the receiver's telegram_id and language."""
@@ -228,4 +264,5 @@ def notice_text(row: dict) -> str:
     table = TEXT.get(lang) or TEXT["en"]
     if key not in table and key not in TEXT["en"]:
         return tr(lang, "n_default")
-    return tr(lang, key, title=p.get("title", ""), date=p.get("date", ""), time=p.get("time", ""), reason=p.get("reason", "")).rstrip(". ")
+    status = tr(lang, "st_" + str(p.get("status"))) if p.get("status") else ""
+    return tr(lang, key, title=p.get("title", ""), date=p.get("date", ""), time=p.get("time", ""), reason=p.get("reason", ""), status=status).rstrip(". ")

@@ -1573,3 +1573,18 @@ a.phl{color:var(--accent);font-weight:600;text-decoration:underline;white-space:
 .rpbar{flex-wrap:wrap;align-items:flex-end;gap:8px}
 .rpf{display:flex;flex-direction:column;gap:2px;font-size:var(--t-cap);color:var(--muted)}
 .rpbar .inp{min-height:44px}
+
+/* tour card: type, guests and small facts sit under the tour name, in line with its text (emblem 34px + gap 10px) */
+.acard:not(.mycard) .kindrow,.acard:not(.mycard) .metarow{padding-left:44px}
+.acard .metarow{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center}
+.acard .mchip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink-soft,var(--ink));font-size:var(--t-sm);font-weight:600;white-space:nowrap}
+.acard .mchip .msi{width:16px;height:16px;color:var(--muted)}
+.acard .mchip.ok{border-color:color-mix(in srgb,var(--ok) 45%,var(--line))}.acard .mchip.warn{border-color:color-mix(in srgb,var(--warn) 55%,var(--line))}
+.acard .mchip.pay{background:var(--accent-soft)}
+
+/* Team tab */
+.teamblk .tmday{display:flex;flex-direction:column;gap:6px;padding:6px 0;border-top:1px solid var(--line)}.teamblk .tmday:first-of-type{border-top:0}
+.tmstat{text-align:left;cursor:pointer;border:1px solid var(--line);background:var(--surface)}.tmstat.hot{border-color:var(--warn);background:color-mix(in srgb,var(--warn) 10%,var(--surface))}
+.teamblk .gibar{grid-template-columns:70px minmax(0,1fr) auto}.teamblk .gibar .num{white-space:nowrap}
+
+.bheart{display:inline-flex;align-items:center;gap:6px;margin-top:-4px}

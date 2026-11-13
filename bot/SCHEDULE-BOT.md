@@ -6,13 +6,14 @@ These three files add the schedule to the existing bot (branch `telegram-bot`). 
 - `/link 123456`: connect Telegram to their person in the schedule. The code is shown in the app: **Me > Telegram bot**. It works once.
 - `/week`: their tours and days off for the next 7 days.
 - `/tomorrow`: their tours tomorrow.
+- `/bug text`: report a problem. A photo or a short video can be sent with the same text as its caption. A video is never stored: `ffmpeg` (if installed on the bot server) keeps up to 4 still pictures from it; photos are kept small (under 450 KB). The admin sees the report in the app (Back office > Problem reports) and the answer comes back to the person here.
 - Notices in Telegram: new tour, time change, cancellation with the reason, the evening reminder for tomorrow, the Sunday "check your week".
 - Every message has an **Open schedule** button that opens the app.
 
 No guest names or phones go through Telegram. Messages carry only the tour, time, meeting point, number of guests and the colleague on the tour. Guest lists stay in the app.
 
 ## Install (10 minutes)
-1. Copy `schedule.py`, `schedule_handlers.py` and `test_schedule.py` into the bot folder, next to `bot.py`.
+1. Copy `schedule.py`, `schedule_handlers.py`, `tickets_handlers.py` and the two test files into the bot folder, next to `bot.py`. For `/bug` run the 3.72 block of `supabase/update.sql` once in the Supabase SQL editor first.
 2. In `bot.py` add three lines:
    - at the top with the other imports: `import schedule_handlers`
    - in `build_app()`, after the other handlers: `schedule_handlers.register(app)`

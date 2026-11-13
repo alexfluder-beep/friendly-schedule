@@ -567,6 +567,14 @@ A tidy-up round after the owner's phone recording of 3.57. Nothing new to learn;
 - **Soft notice about open tours.** The app makes one quiet notice for the person: only while the app is open, only inside their working hours (8:00-20:00 when none are set), never during one of their tours, only for tours they were not told about before, at most every 3 days. People who switched off reminders in Me do not get it. Nothing is sent by the server, so nothing is sent at night or to people who do not open the app. A phone push shows the general text "Something new for you" until the `push` function is updated (not done, needs OK).
 - No database change.
 
+## 3.72
+- **Problem reports.** Me > Report a problem (text, pictures, or a short video): the app keeps up to 4 still pictures from a video, never the video. Back office > Problem reports: status (new, seen, planned, in work, done, not planned), an answer to the reporter (notice in the app and Telegram), a plain-text description of the pictures for planning, "Copy open reports". Telegram: `/bug text` (+ photo or video) with the updated bot files. Needs the 3.72 block of `supabase/update.sql` run once.
+- New **Team** tab for admins (replaces Time off in the bottom bar; Time off is a block inside it): what needs you (requests, time-off, pay questions, tours without a guide), today and tomorrow, how busy the next 14 days are, people over 30 days with days in a row, mood and tour ratings, open requests. "Choose blocks" hides what you do not need. Guides and drivers keep their own Time off tab.
+- Tour sheet shows how your pay was worked out (own amount, per-tour table, or standard rate).
+- Tour cards: type and guest count sit under the tour name in line with its text. Admin also sees where the booking came from (GYG, Viator, Web...) and how it is paid (Online, Cash with the amount, Not paid). Guides and drivers see their own pay on the card, never the payment.
+- Guest analytics moved from Back office to the Clients tab (and got its missing description). "X2 +50 CASH" in an old Setmore name now means 2 guests and 50 USD cash to pay.
+- Duplicates page rebuilt: every group gets a verdict. "Safe to merge" (same tour, day, time and guide; same guest) can be merged in one tap or all at once; "Please check" explains what is unclear; "Not duplicates" lists tours with different guides that both have guests (second car or guide). Newest first, 25 at a time.
+
 ## 3.71
 - After-tour question: asked for today and yesterday only (was 2 days), and answering or skipping one of two identical tours (same day, title, start) counts for both.
 - "My next tour" card disappears once the tour has ended today (end time, or start + 3 hours when none).

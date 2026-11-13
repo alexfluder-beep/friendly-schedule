@@ -2,7 +2,7 @@
 (() => {
   'use strict';
   const CFG = window.APP_CONFIG || {};
-  const TABLES = ['profiles', 'expenses', 'tours', 'bookings', 'clients', 'client_ratings', 'tour_ratings', 'payout_details', 'log', 'change_requests', 'pay_adjustments', 'personal_dates', 'usage', 'offers', 'time_off', 'holidays', 'tasks', 'notifications', 'settings', 'invites', 'pay_disputes', 'tour_costs', 'photos', 'thanks', 'badge_likes'];
+  const TABLES = ['profiles', 'expenses', 'tours', 'bookings', 'clients', 'client_ratings', 'tour_ratings', 'payout_details', 'log', 'change_requests', 'pay_adjustments', 'personal_dates', 'usage', 'offers', 'time_off', 'holidays', 'tasks', 'notifications', 'settings', 'invites', 'pay_disputes', 'tour_costs', 'photos', 'thanks', 'badge_likes', 'tickets'];
   const DEMO_KEY = 'fs-demo-v18';
   const db = {}; TABLES.forEach(t => db[t] = []);
   const listeners = [];
@@ -98,7 +98,7 @@
       { id: uid(), user_id: d2.id, date_from: day(mon + 2), date_to: day(mon + 3), type: 'sick', status: 'approved', note: '', created_at: new Date().toISOString(), decided_by: null }
     ];
     db.holidays = [{ id: uid(), name: 'Team dinner (sample)', date_from: day(mon + 4), date_to: day(mon + 4), kind: 'event', notes: '' }];
-    db.tour_ratings = []; db.payout_details = []; db.log = []; db.pay_adjustments = []; db.usage = []; db.offers = [];
+    db.tour_ratings = []; db.tickets = []; db.payout_details = []; db.log = []; db.pay_adjustments = []; db.usage = []; db.offers = [];
     db.personal_dates = [{ id: uid(), user_id: g1.id, title: 'Birthday (sample)', date: day(mon + 3), yearly: true }];
     db.change_requests = [{ id: uid(), tour_id: db.tours.find(t => t.title === 'David Gareji + Signagi').id, user_id: g2.id, patch: { start_time: '08:30' }, cant: false, message: 'Guests asked to start earlier', status: 'pending', created_at: new Date().toISOString(), decided_by: null }];
     const kz = db.tours.find(t => t.title === 'Kazbegi 4x4 group');
@@ -362,6 +362,20 @@
       r = await sb.storage.from('photos').upload(base + '-t.jpg', thumb, opt); if (r.error) throw r.error;
       const { error } = await sb.from('photos').upsert(row); if (error) throw error;
       applyLocal('photos', row, 'UPSERT'); emit('photos', row, 'UPSERT'); saveCache();
+    },
+    // ---- problem reports: the row holds the text and status; small still pictures live in the private "tickets" folder ----
+    async addTicket(row, blobs) {
+      if (mode === 'demo') { applyLocal('tickets', { ...row, shots: [] }, 'UPSERT'); emit('tickets', row, 'UPSERT'); persistDemo(); return; }
+      if (store.offline || !navigator.onLine) throw new Error('offline');
+      const paths = [];
+      for (let i = 0; i < blobs.length; i++) { const p = `${row.user_id}/${row.id}-${i}.jpg`, r = await sb.storage.from('tickets').upload(p, blobs[i], { upsert: true, contentType: 'image/jpeg' }); if (r.error) throw r.error; paths.push(p); }
+      const full = { ...row, shots: paths }; const { error } = await sb.from('tickets').insert(full); if (error) throw error;
+      applyLocal('tickets', full, 'UPSERT'); emit('tickets', full, 'UPSERT'); saveCache();
+    },
+    async ticketUrls(paths) {
+      if (mode === 'demo' || !paths.length) return {};
+      const { data, error } = await sb.storage.from('tickets').createSignedUrls(paths, 3600); if (error) throw error;
+      const out = {}; (data || []).forEach(x => { if (x.signedUrl && !x.error) out[x.path] = x.signedUrl; }); return out;
     },
     async photoUrls(paths) {
       if (mode === 'demo' || !paths.length) return {};

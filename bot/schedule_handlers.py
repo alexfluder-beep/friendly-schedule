@@ -65,6 +65,11 @@ def register(app: Application) -> None:
     app.add_handler(CommandHandler("link", cmd_link))
     app.add_handler(CommandHandler("week", cmd_week))
     app.add_handler(CommandHandler("tomorrow", cmd_tomorrow))
+    try:
+        import tickets_handlers
+        tickets_handlers.register(app)
+    except ImportError:      # tickets_handlers.py not copied: the rest keeps working
+        log.info("tickets_handlers.py not found: /bug is off")
 
 
 async def send_pending(app: Application) -> int:

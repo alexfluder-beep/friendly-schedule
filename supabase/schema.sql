@@ -889,3 +889,41 @@ drop policy if exists badge_likes_add on public.badge_likes;
 create policy badge_likes_add on public.badge_likes for insert to authenticated with check (user_id = (select auth.uid()) and (select public.app_role()) is not null);
 drop policy if exists badge_likes_del on public.badge_likes;
 create policy badge_likes_del on public.badge_likes for delete to authenticated using (user_id = (select auth.uid()));
+
+-- 3.72 problem reports (tickets): guides and drivers report a problem in the app or in Telegram; the admin sees them, sets a status and answers.
+create table if not exists public.tickets (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  source text not null default 'app' check (source in ('app','telegram')),
+  body text not null check (char_length(body) between 3 and 2000),
+  shots text[] not null default '{}',                      -- small still pictures in the private "tickets" folder (never a video)
+  status text not null default 'new' check (status in ('new','seen','planned','working','done','wontdo')),
+  reply text check (reply is null or char_length(reply) <= 1000),        -- the answer the reporter gets
+  summary text check (summary is null or char_length(summary) <= 2000),  -- plain-text description of the pictures or video, for planning
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  updated_by uuid references public.profiles(id) on delete set null
+);
+create index if not exists tickets_user_idx on public.tickets(user_id);
+create index if not exists tickets_status_idx on public.tickets(status, created_at desc);
+alter table public.tickets enable row level security;
+drop policy if exists tickets_read on public.tickets;
+drop policy if exists tickets_insert on public.tickets;
+drop policy if exists tickets_admin_update on public.tickets;
+drop policy if exists tickets_admin_delete on public.tickets;
+create policy tickets_read on public.tickets for select to authenticated using (user_id = (select auth.uid()) or (select public.is_admin()));
+create policy tickets_insert on public.tickets for insert to authenticated with check (user_id = (select auth.uid()) and status = 'new' and (select public.app_role()) is not null);
+create policy tickets_admin_update on public.tickets for update to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
+create policy tickets_admin_delete on public.tickets for delete to authenticated using ((select public.is_admin()));
+revoke all on public.tickets from anon;
+do $$ begin alter publication supabase_realtime add table public.tickets; exception when duplicate_object then null; when undefined_object then null; end $$;
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('tickets', 'tickets', false, 524288, array['image/jpeg'])
+on conflict (id) do update set public = false, file_size_limit = 524288, allowed_mime_types = array['image/jpeg'];
+drop policy if exists tickets_files_read on storage.objects;
+drop policy if exists tickets_files_insert on storage.objects;
+drop policy if exists tickets_files_delete on storage.objects;
+create policy tickets_files_read on storage.objects for select to authenticated using (bucket_id = 'tickets' and ((storage.foldername(name))[1] = (select auth.uid())::text or (select public.is_admin())));
+create policy tickets_files_insert on storage.objects for insert to authenticated with check (bucket_id = 'tickets' and (select public.app_role()) is not null and (storage.foldername(name))[1] = (select auth.uid())::text);
+create policy tickets_files_delete on storage.objects for delete to authenticated using (bucket_id = 'tickets' and (select public.is_admin()));
