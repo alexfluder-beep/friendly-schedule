@@ -1622,3 +1622,6 @@ a.phl{color:var(--accent);font-weight:600;text-decoration:underline;white-space:
 .xrow>.tag{flex:none;white-space:nowrap;font-size:var(--t-sm)}
 
 .hnh{display:block;margin-top:18px}.hlrow .hn{color:var(--muted,#70766d)}
+
+.tag.t-chg{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700;display:inline-flex;align-items:center;gap:4px}.tag.t-chg .msi{width:14px;height:14px}
+.syncrow .sage{font-size:var(--t-sm)}

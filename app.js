@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.79';
+  const APP_VERSION = '3.80';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -251,13 +251,18 @@
     if (memo.idx) return memo.idx;
     const byDate = {}, bk = {}, rat = {}, cx = {}, hid = {}, adm = isAdmin();
     for (const t of db.tours) { if (!adm && guestsHidden(t)) hid[t.id] = 1; if (t.status === 'cancelled') { if (adm || involves(t, me().id)) for (const d of tourDays(t)) (cx[d] = cx[d] || []).push(t); continue; } for (const d of tourDays(t)) (byDate[d] = byDate[d] || []).push(t); }
-    for (const b of db.bookings) { if (hid[b.tour_id]) continue; (bk[b.tour_id] = bk[b.tour_id] || []).push(b); }
+    const lim = {}; if (isDrv()) for (const t of db.tours) if (drvLimited(t)) lim[t.id] = 1;   // a driver next to a guide sees only the guests who need a pick-up or drop-off
+    for (const b of db.bookings) { if (hid[b.tour_id]) continue; if (lim[b.tour_id] && !(b.pickup_addr || needsAddr(b))) continue; (bk[b.tour_id] = bk[b.tour_id] || []).push(b); }
     for (const r of db.client_ratings) { if (!['good', 'fine', 'bad', 'trouble'].includes(r.rating)) continue; const c = rat[r.client_id]; if (!c || (r.created_at || '') > (c.created_at || '')) rat[r.client_id] = r; }
     return memo.idx = { byDate, bk, rat, cx };
   }
   const toursOnDay = d => idx().byDate[d] || [];
   const cancelledOnDay = d => idx().cx[d] || [];
   const tourBookings = id => idx().bk[id] || [];
+  // Drivers: the group size, time and meeting point are always shown. Names and phones only for guests who need a pick-up or drop-off
+  // (a transfer is only the guest, and a tour without a guide is run by the driver alone, so both show every guest).
+  const drvLimited = t => isDrv() && !!t.guide_id && twin(t.guide_id) !== twin(me().id) && t.kind !== 'transfer';
+  const drvNote = t => { if (!drvLimited(t)) return ''; const seen = tourBookings(t.id).reduce((n, b) => n + (Number(b.pax) || 1), 0), more = Math.max(0, (Number(t.pax) || 0) - seen); return `<div class="muted small">${esc(tourBookings(t.id).length ? (more ? T('drv_others', { n: more }) : '') : T('drv_none'))}</div>`; };
   const offCls = o => (o ? (o.type === 'sick' ? 'myoff mysick' : 'myoff') : ''); // sick days look different from days off
   const offOn = (id, date) => db.time_off.find(o => o.user_id === id && o.status !== 'declined' && o.date_from <= date && o.date_to >= date);
   const personalOn = (id, date) => db.personal_dates.find(x => x.user_id === id && (x.date === date || (x.yearly && x.date.slice(5) === date.slice(5))));
@@ -764,7 +769,7 @@
   }
   function agendaCard(t) {
     const off = !live(t), w = off ? [] : tourWarnings(t), ppl = [...new Set([t.guide_id, t.driver_id].filter(Boolean))];
-    return `<button class="acard ${off ? 'cancelled' : ''}" data-key="t${t.id}" style="--k:${esc(tourStyle(t.title).color)}" data-act="tour" data-id="${t.id}"${isAdmin() && !off ? ` data-drag="${t.id}"` : ''} data-drop="${t.date}"><span class="ttl">${emblem(t, true)}<span>${t.start_time ? `<span class="num st">${esc(t.start_time)}</span> ` : ''}<span class="tname">${esc(t.title)}</span></span></span><span class="kindrow"><span class="kind k-${esc(t.kind || 'private')}">${msi(t.kind === 'group' ? 'groups' : t.kind === 'transfer' ? 'airport_shuttle' : 'person')}${T('kind_' + (t.kind || 'private'))}</span><span class="num cnt">${paxText(t)}</span>${w.length ? ` <span class="chk">${T('chk')}</span>` : ''}${off ? ` <span class="tag t-danger">${T('cancelled')}</span>` : ''}${!off && staysN(tourBookings(t.id)) ? ` <span class="tag t-stay num">${T('stay_n', { n: staysN(tourBookings(t.id)) })}</span>` : ''}<span class="row crew">${ppl.length ? ppl.map(id => `<span class="p">${avatar(id)}${esc(pname(id))}</span>`).join('') : `<span class="tag t-warn">${T('unassigned')}</span>`}</span></span>${metaHtml(t)}${endOf(t) !== t.date ? `<span class="num muted small">${esc(fmtRange(t.date, endOf(t)))}</span>` : ''}${wxLine(t)}</button>`;
+    return `<button class="acard ${off ? 'cancelled' : ''}" data-key="t${t.id}" style="--k:${esc(tourStyle(t.title).color)}" data-act="tour" data-id="${t.id}"${isAdmin() && !off ? ` data-drag="${t.id}"` : ''} data-drop="${t.date}"><span class="ttl">${emblem(t, true)}<span>${t.start_time ? `<span class="num st">${esc(t.start_time)}</span> ` : ''}<span class="tname">${esc(t.title)}</span></span></span><span class="kindrow"><span class="kind k-${esc(t.kind || 'private')}">${msi(t.kind === 'group' ? 'groups' : t.kind === 'transfer' ? 'airport_shuttle' : 'person')}${T('kind_' + (t.kind || 'private'))}</span><span class="num cnt">${paxText(t)}</span>${w.length ? ` <span class="chk">${T('chk')}</span>` : ''}${off ? ` <span class="tag t-danger">${T('cancelled')}</span>` : ''}${chgTag(t)}${!off && staysN(tourBookings(t.id)) ? ` <span class="tag t-stay num">${T('stay_n', { n: staysN(tourBookings(t.id)) })}</span>` : ''}<span class="row crew">${ppl.length ? ppl.map(id => `<span class="p">${avatar(id)}${esc(pname(id))}</span>`).join('') : `<span class="tag t-warn">${T('unassigned')}</span>`}</span></span>${metaHtml(t)}${endOf(t) !== t.date ? `<span class="num muted small">${esc(fmtRange(t.date, endOf(t)))}</span>` : ''}${wxLine(t)}</button>`;
   }
   // ---------- Sunday evening: every guide and driver checks next week's schedule ----------
   const taskTitle = k => (k.kind === 'week_check' ? T('wk_title') : k.title);
@@ -793,7 +798,7 @@
     if (!nt && !asks.length && isAdmin()) return '';
     const bk = nt ? tourBookings(nt.id) : [];
     return `${!isAdmin() && state.mine && state.mode === 'week' ? '' : weekCardHtml()}${asks.map(q => { const t = db.tours.find(x => x.id === q.tour_id); return t ? `<div class="card"><b>${T('swap_ask_title', { name: pname(q.user_id) })}</b><span class="row nw">${emblem(t, true)}<span class="grow-l"><span class="ttl">${esc(t.title)}</span><span class="muted small num">${esc(dateText(t))} ${esc(t.start_time || '')}</span></span></span><div class="actions"><button class="btn sm" data-act="swapagree" data-id="${q.id}" data-s="0">${T('decline')}</button><button class="btn sm primary" data-act="swapagree" data-id="${q.id}" data-s="1">${T('swap_agree')}</button></div></div>` : ''; }).join('')}
-      <div class="nextrow">${nt ? `<button class="card nxt" data-act="tour" data-id="${nt.id}"><span class="nxwhen num">${(() => { const n = Math.round((D(nt.date) - D(td)) / 864e5); return n <= 0 ? T('today') : n === 1 ? T('tomorrow') : T('in_days', { n }); })()} ›</span><span class="muted small">${T('next_tour')}</span><span class="row nw">${emblem(nt, true)}<span class="grow-l"><span class="ttl">${esc(nt.title)}</span></span></span><span class="num"><b>${esc(nt.date === td ? T('today') : dateText(nt))} ${esc(nt.start_time || '')}</b> <span class="muted small">· ${esc(acText(nt))}${cashDue(bk) ? ' · ' + T('cash_collect') + ' ' + cashDue(bk) + ' ' + esc(guestCur()) : ''}</span></span>${nt.pickup ? `<span class="muted small only-wide">${esc(placeName(nt.pickup))}</span>` : ''}</button>` : `<div class="card"><span class="muted small">${T('next_tour')}</span><span>${T('next_none')}</span></div>`}
+      <div class="nextrow">${nt ? `<button class="card nxt" data-act="tour" data-id="${nt.id}"><span class="nxwhen num">${(() => { const n = Math.round((D(nt.date) - D(td)) / 864e5); return n <= 0 ? T('today') : n === 1 ? T('tomorrow') : T('in_days', { n }); })()} ›</span><span class="muted small">${T('next_tour')}${chgTag(nt)}</span><span class="row nw">${emblem(nt, true)}<span class="grow-l"><span class="ttl">${esc(nt.title)}</span></span></span><span class="num"><b>${esc(nt.date === td ? T('today') : dateText(nt))} ${esc(nt.start_time || '')}</b> <span class="muted small">· ${esc(acText(nt))}${cashDue(bk) ? ' · ' + T('cash_collect') + ' ' + cashDue(bk) + ' ' + esc(guestCur()) : ''}</span></span>${nt.pickup ? `<span class="muted small only-wide">${esc(placeName(nt.pickup))}</span>` : ''}</button>` : `<div class="card"><span class="muted small">${T('next_tour')}</span><span>${T('next_none')}</span></div>`}
       <button class="card offc" data-act="${off ? 'view' : 'offnew'}" data-v="timeoff"><span class="muted small">${T('next_off')}</span><span class="num"><b>${off ? esc(fmtRange(off.date_from, off.date_to)) : T('next_off_none')}</b></span>${off ? `<span>${offTag(off)}</span>` : `<span class="muted small">${T('request')}</span>`}</button></div>`;
   }
   // ---------- guide and driver home: only what matters, day by day ----------
@@ -815,16 +820,16 @@
     return `<div class="grow gst ${fr ? 'free' : ''}"><span class="grid"><button class="gbtn" data-act="guest" data-id="${b.id}"><span class="avatar ini ${fr ? 'free' : ''}">${esc(initials(cleanName(b.guest) || b.guest))}</span><span class="gtxt"><span class="gline"><span class="gname">${esc(cleanName(b.guest) || b.guest)}</span>${one ? '' : `<span class="gcnt num">${esc(acText(b))}</span>`}</span>${sum ? `<span class="gsum">${sum}</span>` : ''}</span></button>${b.attendance ? `<span class="tag ${b.attendance === 'arrived' ? 't-ok' : 't-danger'}">${T('att_' + b.attendance)}</span>` : '<span></span>'}${b.phone ? `<span class="cbtns">${ib('wa', 'WhatsApp', waLink(b.phone))}${ib('call', T('call'), 'tel:' + b.phone)}</span>` : '<span class="cbtns" aria-hidden="true"></span>'}</span>${needAddr && b.pickup_addr && !sameAddr ? `<span class="gaddr">${ico('pin')}<span>${esc(b.pickup_addr)}</span></span>` : ''}${trouble ? `<span class="row">${ratingTag(b.client_id)}</span>` : ''}</div>`;
   }
   function guestRowsHtml(t) {
-    const bks = tourBookings(t.id); if (!bks.length) return `<div class="empty">${guestsHidden(t) ? T('pv_hidden', { n: pv().guideDays }) : T('no_guests')}</div>`;
+    const bks = tourBookings(t.id); if (!bks.length) return drvLimited(t) ? drvNote(t) : `<div class="empty">${guestsHidden(t) ? T('pv_hidden', { n: pv().guideDays }) : T('no_guests')}</div>`;
     const pick = bks.some(b => b.pickup_addr);
-    return `<div class="glist">${bks.map(b => guestRow(b, pick, t)).join('')}</div>`;
+    return `<div class="glist">${bks.map(b => guestRow(b, pick, t)).join('')}</div>${drvNote(t)}`;
   }
   function nowCardHtml(t) {
     const bks = tourBookings(t.id), other = t.guide_id === me().id ? t.driver_id : t.guide_id, op = person(other);
     return `<div class="card f nowcard" data-key="now${t.id}"><div class="row"><span class="tag t-ok">${T('now_tag')}</span><b class="num">${esc(t.start_time || '')}${t.end_time ? '–' + esc(t.end_time) : ''}</b><span class="spacer"></span><button class="lnk" data-act="tour" data-id="${t.id}">${T('open_tour')} ›</button></div>
       <div class="row nw">${emblem(t, true)}<b class="ttl grow-l">${esc(t.title)}</b></div>
       ${t.pickup ? `<div class="meet">${ico('pin')}<span class="grow-l">${esc(placeName(t.pickup))}</span><a class="btn sm" href="${esc(tourMap(t))}" target="_blank" rel="noopener">${T('map')}</a></div>` : ''}
-      <div class="row"><b>${T('guests_title')} (${bks.length})</b><span class="muted small num">${esc(acText(t))}${bks.length ? ' · ' + T('att_sum', { a: bks.filter(b => b.attendance === 'arrived').length, n: bks.length, x: bks.filter(b => b.attendance === 'noshow').length }) : ''}</span></div>
+      <div class="row"><b>${T(drvLimited(t) ? 'pickups_title' : 'guests_title')} (${bks.length})</b><span class="muted small num">${esc(acText(t))}${bks.length ? ' · ' + T('att_sum', { a: bks.filter(b => b.attendance === 'arrived').length, n: bks.length, x: bks.filter(b => b.attendance === 'noshow').length }) : ''}</span></div>
       ${guestRowsHtml(t)}
       ${op ? `<div class="row nw">${avatar(other)}<span class="grow-l"><b>${esc(op.name)}</b>&nbsp;<span class="muted small">${T('role_' + (t.guide_id === other ? 'guide' : 'driver'))}</span></span>${staffBtns(op)}</div>` : ''}
       ${cashDue(bks) && !isDrv() ? `<div><span class="tag t-warn num">${T('cash_collect')}: ${esc(cashText(bks))}</span></div>` : ''}</div>`;
@@ -833,7 +838,7 @@
     const td = today(), id = me().id, ho = holidayOn(d), ev = eventOn(d), o = offOn(id, d);
     const ts = toursOnDay(d).filter(t => involves(t, id)).sort((x, y) => (x.start_time || '').localeCompare(y.start_time || '')), cxs = cancelledOnDay(d).filter(t => involves(t, id));
     const card = t => { const off = !live(t), other = t.guide_id === id ? t.driver_id : t.guide_id, fr = tourBookings(t.id).filter(isFree).reduce((n, b) => n + (Number(b.pax) || 1), 0), vip = tourBookings(t.id).some(b => isVip(b.client_id));
-      return `<button class="acard mycard ${off ? 'cancelled' : ''}" data-key="t${t.id}" style="--k:${esc(tourStyle(t.title).color)}" data-act="tour" data-id="${t.id}"><span class="ttl">${t.start_time ? `<span class="num st">${esc(t.start_time)}</span> ` : ''}<span class="tname">${esc(t.title)}</span> <span class="num cnt">(${paxText(t)})</span>${off ? ` <span class="tag t-danger">${T('cancelled')}</span>` : ''}${vip ? ` <span class="tag t-vip">${T('vip')}</span>` : ''}${!off && staysN(tourBookings(t.id)) ? ` <span class="tag t-stay num">${T('stay_n', { n: staysN(tourBookings(t.id)) })}</span>` : ''}${fr ? ` <span class="tag t-free num">${T('free_n', { n: fr })}</span>` : ''}</span>${off ? '' : metaHtml(t)}${endOf(t) !== t.date || other ? `<span class="num tm muted">${esc([endOf(t) !== t.date ? fmtRange(t.date, endOf(t)) : '', other ? pname(other) : ''].filter(Boolean).join(' · '))}</span>` : ''}${off ? '' : wxLine(t)}</button>`; };
+      return `<button class="acard mycard ${off ? 'cancelled' : ''}" data-key="t${t.id}" style="--k:${esc(tourStyle(t.title).color)}" data-act="tour" data-id="${t.id}"><span class="ttl">${t.start_time ? `<span class="num st">${esc(t.start_time)}</span> ` : ''}<span class="tname">${esc(t.title)}</span> <span class="num cnt">(${paxText(t)})</span>${off ? ` <span class="tag t-danger">${T('cancelled')}</span>` : ''}${chgTag(t)}${vip ? ` <span class="tag t-vip">${T('vip')}</span>` : ''}${!off && staysN(tourBookings(t.id)) ? ` <span class="tag t-stay num">${T('stay_n', { n: staysN(tourBookings(t.id)) })}</span>` : ''}${fr ? ` <span class="tag t-free num">${T('free_n', { n: fr })}</span>` : ''}</span>${off ? '' : metaHtml(t)}${endOf(t) !== t.date || other ? `<span class="num tm muted">${esc([endOf(t) !== t.date ? fmtRange(t.date, endOf(t)) : '', other ? pname(other) : ''].filter(Boolean).join(' · '))}</span>` : ''}${off ? '' : wxLine(t)}</button>`; };
     const quiet = !ts.length && !cxs.length && !o && !tasksOnDay(d).length;
     return `<section class="daycard ${d === td ? 'tdy' : ''} ${quiet ? 'quiet' : ''}"><div class="dayhd my ${d === td ? 'tdy' : ''}" id="day-${d}"><b>${d === td ? T('today') + ' · ' : ''}${esc(fmt(d, { weekday: 'long', day: 'numeric', month: 'long' }))}</b>${dayCountHtml(d, id)}${ho ? `<span class="tag t-hol">${esc(trName(ho.name))}</span>` : ''}${ev ? `<span class="tag t-group">${esc(trName(ev.name))}</span>` : ''}</div>
       ${ts.map(card).join('')}${cxs.map(card).join('')}${tasksOnDay(d).map(taskLineHtml).join('')}${o ? offLineHtml([o], d) : ''}
@@ -1040,6 +1045,7 @@
   // ---------- tour modal ----------
   function openTour(id, preset) {
     const t = id ? db.tours.find(x => x.id === id) : null;
+    if (t) seenMark(t);
     const d = t ? { ...t } : { id: S.uid(), date: state.date, date_to: null, start_time: '10:00', end_time: '14:00', title: '', kind: 'private', capacity: 0, pax: 1, adults: 1, children: 0, language: 'EN', pickup: '', pickup_url: null, notes: '', status: 'confirmed', guide_id: null, driver_id: null, guide_pay: null, driver_pay: null, external_id: null, ...(preset || {}) };
     d.bookings = t ? tourBookings(t.id).map(b => ({ ...b, marks: [...(b.marks || [])] })) : [];
     state.modal = { type: 'tour', isNew: !t, draft: d, edit: isAdmin() && !t };
@@ -1160,8 +1166,8 @@
         ${d.bookings.length ? `<div class="tsum num"><div>${esc(acText(d))}${d.bookings.some(isFree) ? ' · <span class="tag t-free">' + esc(T('free_n', { n: d.bookings.filter(isFree).reduce((n, b) => n + (Number(b.pax) || 1), 0) })) + '</span>' : ''}</div>${staysN(d.bookings) ? `<div>${T('stay_line', { n: staysN(d.bookings), back: Math.max(0, (d.pax || 0) - staysN(d.bookings)) })}</div>` : ''}${cashDue(d.bookings) ? `<div class="due">${T('cash_collect')}: ${esc(cashText(d.bookings))}</div>` : ''}</div>` : ''}
         ${isAdmin() ? warnHtml : ''}${isAdmin() && live(d) && (d.pax || 0) > (rules().carSeats || 6) && kmOf(d.title) > 0 ? `<div><button class="btn sm" data-act="car2" data-id="${d.id}">${ico('car')}${T('car2_btn')}</button></div>` : ''}${isAdmin() && costOf(d.id).total ? `<div class="muted small num">${T('cost_title')}: <b>${nf(costOf(d.id).total)} ${esc(rules().currency || 'GEL')}</b></div>` : ''}
         <div class="glist crew">${[['guide', d.guide_id], ['driver', d.driver_id]].filter(x => x[1]).map(([r, id]) => `<div class="grow" style="--k:${esc((person(id) || {}).color || '#66737f')}"><span class="row nw">${avatar(id)}<span class="grow-l" style="flex-direction:column;align-items:flex-start;gap:0"><b>${esc(pname(id))}</b><span class="muted small">${esc([T('role_' + r), ...titlesOf(id).slice(0, 1)].join(' · '))}</span></span>${staffBtns(person(id))}</span></div>`).join('') || `<div class="grow"><span class="tag t-warn">${T('unassigned')}</span></div>`}</div>
-        <h3>${T('guests_title')} (${d.bookings.length})</h3>${canCheck && d.bookings.some(b => b.attendance) ? `<div class="muted small num">${T('att_sum', { a: d.bookings.filter(b => b.attendance === 'arrived').length, n: d.bookings.length, x: d.bookings.filter(b => b.attendance === 'noshow').length })}</div>` : ''}
-        ${d.bookings.length ? `<div class="glist">${d.bookings.map(b => guestRow(b, d.bookings.some(x => x.pickup_addr), d)).join('')}</div>` : guestsHidden(d) ? `<div class="empty">${T('pv_hidden', { n: pv().guideDays })}</div>` : `<div class="empty">${T('no_guests')}${isAdmin() ? ` <button class="btn sm" data-act="touredit">${T('add_guests')}</button>` : ''}</div>`}
+        <h3>${T(drvLimited(d) ? 'pickups_title' : 'guests_title')} (${d.bookings.length})</h3>${drvNote(d)}${canCheck && d.bookings.some(b => b.attendance) ? `<div class="muted small num">${T('att_sum', { a: d.bookings.filter(b => b.attendance === 'arrived').length, n: d.bookings.length, x: d.bookings.filter(b => b.attendance === 'noshow').length })}</div>` : ''}
+        ${d.bookings.length ? `<div class="glist">${d.bookings.map(b => guestRow(b, d.bookings.some(x => x.pickup_addr), d)).join('')}</div>` : drvLimited(d) ? '' : guestsHidden(d) ? `<div class="empty">${T('pv_hidden', { n: pv().guideDays })}</div>` : `<div class="empty">${T('no_guests')}${isAdmin() ? ` <button class="btn sm" data-act="touredit">${T('add_guests')}</button>` : ''}</div>`}
         ${canCheck && d.bookings.length && d.bookings.every(b => b.attendance === 'noshow') ? `<div class="nhbox"><span>${msi('event_busy')}${T('nh_ask')}</span><button class="btn" data-act="nohappen" data-id="${d.id}">${T('nh_btn')}</button></div>` : ''}
         ${mine && d.date <= today() && live(d) ? `<button class="btn exptour" data-act="expnew" data-tour="${d.id}" data-date="${d.date}">${msi('receipt_long')} ${T('ex_tour')}</button>` : ''}
         <details class="sect"><summary>${T('more')}</summary><div class="f">
@@ -3269,6 +3275,7 @@
     const unread = myNotes().filter(n => !n.read).length;
     const cur = state.view === 'admin' && state.adminTab === 'clients' ? 'clients' : state.view;
     const tb = me() && me().active ? tasksBadge() : 0;
+    if (me() && me().active) seenLoad();   // the starting point for the New / Changed marks is taken as soon as fresh data is on screen
     const nav = NAV().map(([k, l]) => `<button data-act="view" data-v="${k}" ${cur === k ? 'aria-current="page"' : ''}><span class="tabic">${ico(NAVIC[k])}${k === 'tasks' && tb ? `<i class="tabn num">${tb > 9 ? '9+' : tb}</i>` : ''}</span><span>${esc(l)}</span></button>`).join('');
     const body = state.view === 'calendar' ? calendarHtml() : state.view === 'timeoff' ? timeoffHtml() : state.view === 'team' ? teamHtml() : state.view === 'tasks' ? tasksHtml() : state.view === 'admin' ? adminHtml() : meHtml();
     const demo = S.mode === 'demo' ? `<div class="banner slim"><b>${T('demo_title')}</b><span class="small only-wide">${T('demo_text')}</span><label class="small" for="demo-as">${T('demo_as')}</label><select id="demo-as" data-ch="demoas">${db.profiles.filter(p => p.active !== false).map(p => opt(p.id, `${p.name} · ${T('role_' + p.role)}`, me().id)).join('')}</select></div>` : '';
@@ -3285,11 +3292,41 @@
   }
   // ---------- one line that says how fresh the schedule is and whether my changes were delivered ----------
   const hm = iso => new Intl.DateTimeFormat(LOCALES[lang()], { hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
-  function syncState() { const n = S.pending || 0, at = S.syncedAt || S.cachedAt, old = at && Date.now() - new Date(at).getTime() > (S.live ? 20 : 10) * 60000; return S.warming ? 'warm' : S.offline ? 'off' : (n || S.syncing) ? 'send' : old ? 'old' : 'ok'; }   // warm: the saved copy is on screen, fresh data is on its way
+  const ageText = iso => { const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000)); return m < 1 ? T('age_now') : m < 60 ? T('age_min', { n: m }) : m < 1440 ? T('age_h', { n: Math.floor(m / 60) }) : T('age_d', { n: Math.floor(m / 1440) }); };
+  // "New" and "Changed" marks on my own tours: what changed since I last opened the tour. The last seen state is kept on this phone only.
+  // The first time on a phone nothing is marked (the current tours become the starting point).
+  const CHGF = t => ({ d: t.date, s: t.start_time || '', g: t.guide_id || '', r: t.driver_id || '', p: t.pickup || '', n: Number(t.pax) || 0, k: tourBookings(t.id).filter(b => b.pickup_addr || needsAddr(b)).map(b => b.id + ':' + (b.pickup_addr || '')).sort().join('|') });
+  let seenMap = null, seenFor = '';
+  const seenKey = () => 'fs-seen-' + (me() ? me().id : '');
+  function seenSave() { try { localStorage.setItem(seenKey(), JSON.stringify(seenMap)); } catch (e) { /* no storage: marks stay in memory only */ } }
+  function seenLoad() {
+    if (!me() || S.warming || !S.syncedAt) return null;   // wait for fresh data, so the starting point is complete
+    if (seenMap && seenFor === me().id) return seenMap;
+    seenFor = me().id; seenMap = null;
+    try { seenMap = JSON.parse(localStorage.getItem(seenKey()) || 'null'); } catch (e) { seenMap = null; }
+    if (!seenMap) { seenMap = {}; db.tours.filter(t => t.date >= today() && involves(t, me().id)).forEach(t => { seenMap[t.id] = CHGF(t); }); seenSave(); }
+    return seenMap;
+  }
+  function seenMark(t) { const m = seenLoad(); if (!m || !t || !involves(t, me().id)) return; m[t.id] = CHGF(t); Object.keys(m).forEach(id => { const x = db.tours.find(y => y.id === id); if (x && x.date < today()) delete m[id]; }); seenSave(); }
+  function chgTag(t) {
+    if (!me() || state.viewAs || t.date < today() || t.status === 'cancelled' || !involves(t, me().id)) return '';
+    const m = seenLoad(); if (!m) return '';
+    const w = m[t.id], isNew = !w, c = isNew ? null : CHGF(t), parts = [];
+    if (!isNew) {
+      if (w.d !== c.d) parts.push(T('chg_date', { v: fmt(w.d, { day: 'numeric', month: 'short' }) }));
+      if (w.s !== c.s) parts.push(T('chg_time', { v: w.s || '—' }));
+      if (w.g !== c.g || w.r !== c.r) parts.push(T('chg_crew'));
+      if (w.p !== c.p || (w.k || '') !== c.k) parts.push(T('chg_pick'));
+      if (w.n !== c.n) parts.push(T('chg_pax', { v: w.n }));
+      if (!parts.length) return '';
+    }
+    return ` <span class="tag t-chg num">${msi(isNew ? 'event_available' : 'swap_horiz')}${esc(isNew ? T('chg_new') : [T('chg_changed')].concat(parts).join(' · '))}</span>`;
+  }
+  function syncState() { const n = S.pending || 0, at = S.syncedAt || S.cachedAt, old = at && Date.now() - new Date(at).getTime() > (S.live ? 45 : 10) * 60000; return S.warming ? 'warm' : S.offline ? 'off' : (n || S.syncing) ? 'send' : old ? 'old' : 'ok'; }   // warm: the saved copy is on screen, fresh data is on its way
   // All fine: only the green dot before the app name. Offline, old data, sending or a failed save: a line under the header says so.
   function syncRow() {
     const n = S.pending || 0, at = S.syncedAt || S.cachedAt, st = syncState(); document.documentElement.classList.toggle('syncing', st === 'send' || st === 'warm');
-    if ((st === 'ok' || st === 'warm') && !S.failed) return '';
+    if ((st === 'ok' || st === 'warm') && !S.failed) return (isAdmin() || !at) ? '' : `<div class="subtop"><button class="syncrow s-${st === 'warm' ? 'old' : 'ok'}" data-act="refresh" aria-live="off"><i></i><span class="num sage" data-at="${esc(at)}">${esc(T('st_fresh', { age: ageText(at) }))}</span></button></div>`;   // guides and drivers always see how fresh the screen is
     const tx = st === 'off' ? T('st_off', { time: at ? hm(at) : '—' }) + (n ? ' ' + T('st_wait', { n }) : '') : st === 'send' ? T('sync_wait', { n }) : st === 'old' ? T('st_old', { time: hm(at) }) : T('st_ok', { time: at ? hm(at) : '—' });
     return `<div class="subtop"><button class="syncrow s-${st}" data-act="refresh" aria-live="polite"><i></i><span class="num">${esc(tx)}</span>${S.failed ? `<span class="tag t-warn num">${T('st_failed', { n: S.failed })}</span>` : ''}${st === 'ok' ? '' : `<span class="lnk">${T(st === 'send' ? 'st_sending' : 'st_retry')}</span>`}</button></div>`;
   }
@@ -3366,7 +3403,8 @@
     box.addEventListener('click', ev => { const a = ev.target.closest('[data-a]'); if (!a) return; ev.stopPropagation(); box.remove(); if (a.dataset.a === 'drop') { m.touched = false; go(); } });
     document.body.appendChild(box); box.querySelector('[data-a=keep]').focus();
   }
-  const closeModal = () => { state.modal = (state.modal && state.modal.back) || null; if (state.modal && state.modal.type === 'tour' && !state.modal.edit) { const fresh = db.tours.find(x => x.id === state.modal.draft.id); if (fresh) { state.modal.draft = { ...fresh, bookings: tourBookings(fresh.id).map(b => ({ ...b, marks: [...(b.marks || [])] })) }; } } renderModal(); };
+  const closeModal = () => { const was = state.modal; state.modal = (state.modal && state.modal.back) || null; if (state.modal && state.modal.type === 'tour' && !state.modal.edit) { const fresh = db.tours.find(x => x.id === state.modal.draft.id); if (fresh) { state.modal.draft = { ...fresh, bookings: tourBookings(fresh.id).map(b => ({ ...b, marks: [...(b.marks || [])] })) }; } } renderModal(); if (was && was.type === 'tour' && !was.isNew && !isAdmin()) render(); };   // my own tours: the New / Changed mark goes as soon as the tour sheet closes
+
 
   // ---------- events ----------
   const MONEY = window.FSMoney({ getMemo: () => memo, setMemo: v => { memo = v; }, db, state, S, T, me, isAdmin, run, toast, logAct, render, msi, esc, nf: (...a) => nf(...a), fmt, fmtDay, today, iso, opt, crew, pname, rules, rateOf, fxOn, manualRate, statKey, aliasOf, srcName, sourceOf, netOf, guestCur, live, statement, CURRENCIES, SOURCES });
@@ -4055,6 +4093,7 @@
     { let seen = null; const topH = () => { const e = document.querySelector('.top'); if (!e || e === seen || !window.ResizeObserver) return; seen = e; new ResizeObserver(() => document.documentElement.style.setProperty('--toph', e.offsetHeight + 'px')).observe(e); }; topH(); setTimeout(topH, 1500); }   // the sticky back row sits right under the header, whatever its height
     setTimeout(trackDevice, 3000); setTimeout(() => trackOpen(true), 3500); setTimeout(privacyAuto, 4000); checkBadges(); weekCheck(); setInterval(weekCheck, 30 * 60000); setTimeout(fxRefresh, 6000); setInterval(fxRefresh, 6 * 3600000);
     setInterval(() => { if (me() && me().active && !isAdmin() && state.view === 'calendar' && !state.modal && !document.hidden) render(); }, 5 * 60000);
+    setInterval(() => { if (!document.hidden) document.querySelectorAll('.sage').forEach(e => { e.textContent = T('st_fresh', { age: ageText(e.dataset.at) }); }); }, 30000);
     if ('serviceWorker' in navigator && location.protocol === 'https:' && S.mode === 'supabase') { try { swReg = await navigator.serviceWorker.register('sw.js'); const had = !!navigator.serviceWorker.controller; const openedAt = Date.now(); navigator.serviceWorker.addEventListener('controllerchange', () => { if (!had) return; if (Date.now() - openedAt < 15000 && !state.modal && !document.querySelector('form [data-dirty], .qsave.on') && !(S.pending > 0)) { try { location.reload(); return; } catch (e) { /* banner instead */ } } state.newVersion = true; render(); }); document.addEventListener('visibilitychange', () => { if (!document.hidden) { try { swReg.update(); } catch (e) { /* later */ } } }); setInterval(() => { try { swReg.update(); } catch (e) { /* later */ } }, 30 * 60000); } catch (e) { /* no service worker here */ } }
   })();
 })();

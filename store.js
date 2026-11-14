@@ -267,7 +267,7 @@
     store.loginNote = pe ? 'Profile could not be read: ' + (pe.message || pe.code || 'error') : !p ? 'No profile row for this account' : !p.active ? `Profile found: role ${p.role}, not active` : '';
     me = p || { id: user.id, name: user.email, role: 'guide', active: false, lang: null };
     me.email = user.email;
-    if (me.active) { let d = null; try { d = await delta(); } catch (e) { if (isNetErr(e)) throw e; } if (d === null) await loadAll(); else store.syncedAt = store.fullAt = new Date().toISOString(); me = { ...(db.profiles.find(x => x.id === user.id) || me), email: user.email }; subscribe(); saveCache(); }
+    if (me.active) { let d = null; const rescope = me.role === 'driver' && ls.get('fs-scope1') !== '1'; try { d = rescope ? null : await delta(); } catch (e) { if (isNetErr(e)) throw e; } if (d === null) { await loadAll(); if (rescope) ls.set('fs-scope1', '1'); } else store.syncedAt = store.fullAt = new Date().toISOString(); me = { ...(db.profiles.find(x => x.id === user.id) || me), email: user.email }; subscribe(); saveCache(); }
   }
 
   function demoStale(months) {

@@ -595,3 +595,31 @@ create policy tips_edit on public.tour_tips for update to authenticated using (u
 create policy tips_remove on public.tour_tips for delete to authenticated using (user_id = (select auth.uid()));
 create policy tips_admin on public.tour_tips for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
 grant select, insert, update, delete on public.tour_tips to authenticated;
+
+-- 3.80 timed notices (applied 14 Nov by Claude): evening reminder 19:00 Tbilisi (15:00 UTC) and the Sunday 18:00 schedule check
+select cron.unschedule(jobid) from cron.job where jobname in ('tour-reminders','week-check');
+select cron.schedule('tour-reminders', '0 15 * * *', 'select public.remind_tomorrow()');
+select cron.schedule('week-check', '0 14 * * 0', 'select public.weekly_check()');
+
+-- 3.80 drivers read only the guests who need a pick-up or drop-off (applied 14 Nov by Claude with the owner's approval; backup table bookings_drvbak_20261114).
+-- Guides and admins are unchanged. A transfer, and a tour with no guide, still show every guest to the driver.
+-- Written as "in (select ...)" lists so the database works them out once, not once per booking (a per-row function timed out on 14,000 bookings).
+create or replace function public.my_full_tour_ids() returns setof uuid
+language sql stable security definer set search_path = public as $$
+  select t.id from public.tours t
+  where t.id in (select public.my_tour_ids())
+    and (t.guide_id = auth.uid() or t.guide_id is null or t.kind = 'transfer')
+$$;
+revoke execute on function public.my_full_tour_ids() from public, anon;
+grant execute on function public.my_full_tour_ids() to authenticated;
+drop policy if exists bookings_read on public.bookings;
+create policy bookings_read on public.bookings for select to authenticated
+  using ((select public.is_admin()) or (
+    tour_id in (select public.my_tour_ids())
+    and (tour_id in (select public.my_full_tour_ids()) or coalesce(pickup_addr, '') <> '' or coalesce(marks, '{}') && array['pickup','dropoff','stays'])));
+create or replace function public.my_client_ids() returns setof uuid
+language sql stable security definer set search_path = public as $$
+  select distinct b.client_id from public.bookings b
+  where b.client_id is not null and b.tour_id in (select public.my_tour_ids())
+    and (b.tour_id in (select public.my_full_tour_ids()) or coalesce(b.pickup_addr, '') <> '' or coalesce(b.marks, '{}') && array['pickup','dropoff','stays'])
+$$;
