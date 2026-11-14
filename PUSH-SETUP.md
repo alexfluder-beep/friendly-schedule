@@ -4,7 +4,6 @@ The app already asks each phone for permission and stores where to send. These t
 You need the private file `push-secrets` that Claude sent you in the chat (it is not in this repository on purpose).
 
 ## 1. Add the sending function
-Done on 10 Nov 2026: the function `push` is deployed (JWT verification off). Skip to step 2. To update it later, repeat these steps:
 1. Supabase > **Edge Functions** > **Deploy a new function** > **Via Editor**.
 2. Name: `push`.
 3. Delete the sample code, paste all of `supabase/functions/push/index.ts` from this repository.

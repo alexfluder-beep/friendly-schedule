@@ -36,10 +36,30 @@
     async set(k, v) { try { const d = await idb.open(); await new Promise(res => { const tx = d.transaction('kv', 'readwrite'); tx.objectStore('kv').put(v, k); tx.oncomplete = res; tx.onerror = res; }); } catch (e) { /* no storage: the app still works online */ } }
   };
   let outbox = [], cacheTimer = null, subscribed = false;
-  const saveCache = () => { if (mode !== 'supabase' || !me || !me.active) return; clearTimeout(cacheTimer); cacheTimer = setTimeout(() => { idb.set('cache', { me, db, at: new Date().toISOString() }); idb.set('outbox', outbox); }, 800); };
+  const saveCache = () => { if (mode !== 'supabase' || !me || !me.active) return; clearTimeout(cacheTimer); cacheTimer = setTimeout(() => { idb.set('cache', { me, db, at: new Date().toISOString(), delCursor: store.delCursor || null, loadedFrom: store.loadedFrom || null }); idb.set('outbox', outbox); }, 800); };
   const isNetErr = e => !navigator.onLine || /fetch|network|load failed|abort|timed? ?out/i.test(String((e && e.message) || e) + ' ' + ((e && e.name) || ''));
   // Weak internet: a request that hangs is stopped after 15 seconds, and the change waits on the phone instead.
-  const slowFetch = (url, o) => { const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 30000); if (o && o.signal) o.signal.addEventListener('abort', () => ac.abort(), { once: true }); return fetch(url, { ...(o || {}), signal: ac.signal }).finally(() => clearTimeout(tm)); };
+  // Data counter (Me > Settings): requests and bytes received per day, kept on this phone only.
+  // Bytes are counted after the browser has unpacked the answer, so the real network use is lower (about a third).
+  const TR_KEY = 'fs-traffic', pad2 = n => String(n).padStart(2, '0');
+  function trafficAdd(requests, bytes) {
+    try {
+      const n = new Date(), d = n.getFullYear() + '-' + pad2(n.getMonth() + 1) + '-' + pad2(n.getDate());
+      const t = JSON.parse(localStorage.getItem(TR_KEY) || '{}'), x = t[d] || (t[d] = { n: 0, b: 0 });
+      x.n += requests; x.b += bytes;
+      const ks = Object.keys(t).sort(); while (ks.length > 40) delete t[ks.shift()];
+      localStorage.setItem(TR_KEY, JSON.stringify(t));
+    } catch (e) { /* private mode: no counter */ }
+  }
+  const slowFetch = (url, o) => {
+    const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 30000);
+    if (o && o.signal) o.signal.addEventListener('abort', () => ac.abort(), { once: true });
+    return fetch(url, { ...(o || {}), signal: ac.signal }).then(r => {
+      trafficAdd(1, 0);
+      try { r.clone().blob().then(b => trafficAdd(0, b.size)).catch(() => {}); } catch (e) { /* ignore */ }
+      return r;
+    }).finally(() => clearTimeout(tm));
+  };
   async function sendOp(o) {
     const q = o.op === 'remove' ? sb.from(o.table).delete().eq('id', o.id) : o.insert ? sb.from(o.table).insert(o.row) : sb.from(o.table).update(o.row).eq('id', o.row.id);
     const { error } = await q; if (error) throw error;
@@ -137,10 +157,29 @@
     return rows;
   }
   async function loadAll(since) {
+    const began = new Date(Date.now() - 60000).toISOString();   // a minute earlier, so nothing deleted during the load is missed
     since = since || windowStart(); store.loadedFrom = since;
     // All tables are asked for at the same time (one after another took many seconds on a slow phone); the screen changes only when all have arrived.
     const got = await Promise.all(TABLES.map(t => fetchTable(t, since))); TABLES.forEach((t, i) => { db[t] = got[i] || []; });
-    store.syncedAt = new Date().toISOString();
+    store.syncedAt = new Date().toISOString(); store.delCursor = began;
+  }
+  // "Only the changes": tours, bookings and guests carry an updated_at stamp (set by the database). After the first full load
+  // only rows changed since the newest stamp we hold are fetched, and deleted ids come from deleted_rows. Null = not possible, load everything.
+  const BIG = ['tours', 'bookings', 'clients'];
+  const newest = () => { let m = ''; for (const t of BIG) for (const r of db[t]) if (r.updated_at && r.updated_at > m) m = r.updated_at; return m; };
+  async function pageAll(q) { let from = 0, rows = []; for (;;) { const { data, error } = await q().range(from, from + 999); if (error) { if (isNetErr(error)) throw error; return null; } rows = rows.concat(data); if (data.length < 1000) return rows; from += 1000; } }
+  async function delta() {
+    const cur = newest(); if (!cur || !store.delCursor || !db.clients.length) return null;
+    const since = new Date(new Date(cur).getTime() - 5000).toISOString(), began = new Date(Date.now() - 60000).toISOString();
+    const [a, b, c, gone] = await Promise.all([...BIG.map(t => pageAll(() => sb.from(t).select('*').gte('updated_at', since).order('updated_at').order('id'))), pageAll(() => sb.from('deleted_rows').select('tbl,row_id').gt('at', store.delCursor).order('id'))]);
+    if (!a || !b || !c || !gone) return null;
+    let changed = false;
+    [a, b, c].forEach((rows, i) => {
+      if (!rows.length) return; const t = BIG[i], at = new Map(db[t].map((r, k) => [r.id, k]));
+      rows.forEach(r => { const k = at.get(r.id); if (k === undefined) { db[t].push(r); changed = true; } else if (db[t][k].updated_at !== r.updated_at) { db[t][k] = r; changed = true; } });
+    });
+    gone.forEach(g => { if (!BIG.includes(g.tbl)) return; const k = db[g.tbl].findIndex(r => String(r.id) === g.row_id); if (k >= 0) { db[g.tbl].splice(k, 1); changed = true; } });
+    store.delCursor = began; return changed;
   }
   function subscribe() {
     if (subscribed) return; subscribed = true;
@@ -161,7 +200,8 @@
     pulsing = true; let changed = false;
     try {
       const d = new Date(); d.setDate(d.getDate() - 2); const cut = iso(d);
-      const tours = await fetchTable('tours', cut), bookings = await fetchTable('bookings', cut);
+      const dl = await delta(); if (dl) changed = true;
+      const tours = dl === null ? await fetchTable('tours', cut) : null, bookings = dl === null ? await fetchTable('bookings', cut) : null;
       if (tours && bookings) {
         const oldT = db.tours.filter(t => t.date >= cut), hot = new Set([...oldT, ...tours].map(t => t.id)), oldB = db.bookings.filter(b => hot.has(b.tour_id));
         if (sig(oldT) !== sig(tours)) { db.tours = db.tours.filter(t => t.date < cut).concat(tours); changed = true; }
@@ -179,11 +219,13 @@
     return changed;
   }
   if (mode === 'supabase') {
-    setInterval(() => { if (!document.hidden) pulse(); }, 150000);
+    // While the live connection works, changes arrive by themselves, so the full check is only a safety net (every 10 minutes). Without it: every 2.5 minutes.
+    const age = () => store.syncedAt ? Date.now() - new Date(store.syncedAt).getTime() : 1e9;
+    setInterval(() => { if (!document.hidden && age() > (store.live ? 600000 : 140000)) pulse(); }, 150000);
     // The connection looked down: try again every 30 seconds and when the app is opened again.
     setInterval(() => { if (store.offline && navigator.onLine && !document.hidden && me) store.sync(); }, 30000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden && store.offline && navigator.onLine && me) store.sync(); });
-    document.addEventListener('visibilitychange', () => { if (!document.hidden && (!store.syncedAt || Date.now() - new Date(store.syncedAt).getTime() > 45000)) pulse(); });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && (!store.syncedAt || Date.now() - new Date(store.syncedAt).getTime() > (store.live ? 180000 : 45000))) pulse(); });
   }
   async function afterLogin(user) {
     const { data: p, error: pe } = await sb.from('profiles').select('*').eq('id', user.id).maybeSingle();
@@ -191,7 +233,7 @@
     store.loginNote = pe ? 'Profile could not be read: ' + (pe.message || pe.code || 'error') : !p ? 'No profile row for this account' : !p.active ? `Profile found: role ${p.role}, not active` : '';
     me = p || { id: user.id, name: user.email, role: 'guide', active: false, lang: null };
     me.email = user.email;
-    if (me.active) { await loadAll(); me = { ...(db.profiles.find(x => x.id === user.id) || me), email: user.email }; subscribe(); saveCache(); }
+    if (me.active) { let d = null; try { d = await delta(); } catch (e) { if (isNetErr(e)) throw e; } if (d === null) await loadAll(); else store.syncedAt = new Date().toISOString(); me = { ...(db.profiles.find(x => x.id === user.id) || me), email: user.email }; subscribe(); saveCache(); }
   }
 
   function demoStale(months) {
@@ -201,6 +243,7 @@
     return db.clients.filter(c => !c.anonymised_at && last[c.id] && last[c.id] < cut).map(c => c.id);
   }
   const store = {
+    trafficGet: () => { try { return JSON.parse(localStorage.getItem(TR_KEY) || '{}'); } catch (e) { return {}; } },
     mode, db, TABLES, uid, ls, offline: false, warming: false, pending: 0, failed: 0, cachedAt: null, loadedFrom: null, syncedAt: null, live: false, pulse,
     // Older years for reports and statistics.
     async loadOlder(since) { if (mode !== 'supabase' || store.offline || !store.loadedFrom || since >= store.loadedFrom) return; await loadAll(since); emit(null, null, 'BULK'); },
@@ -230,7 +273,7 @@
       sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseKey, { global: { fetch: slowFetch } });
       sb.auth.onAuthStateChange((ev) => { if (store.authEvent) store.authEvent(ev); });
       outbox = (await idb.get('outbox')) || []; store.pending = outbox.length;
-      const useCache = async () => { const c = await idb.get('cache'); if (!c || !c.me) return false; me = c.me; TABLES.forEach(t => db[t] = (c.db && c.db[t]) || []); store.offline = true; store.cachedAt = c.at; return true; };
+      const useCache = async () => { const c = await idb.get('cache'); if (!c || !c.me) return false; me = c.me; TABLES.forEach(t => db[t] = (c.db && c.db[t]) || []); store.offline = true; store.cachedAt = c.at; store.delCursor = c.delCursor || null; store.loadedFrom = c.loadedFrom || null; return true; };
       window.addEventListener('online', () => store.sync());
       window.addEventListener('pagehide', () => { if (outbox.length) idb.set('outbox', outbox); });
       try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) { /* older browser */ }   // ask the browser not to clear what is saved on this device

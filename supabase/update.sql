@@ -548,3 +548,32 @@ drop policy if exists tickets_files_delete on storage.objects;
 create policy tickets_files_read on storage.objects for select to authenticated using (bucket_id = 'tickets' and ((storage.foldername(name))[1] = (select auth.uid())::text or (select public.is_admin())));
 create policy tickets_files_insert on storage.objects for insert to authenticated with check (bucket_id = 'tickets' and (select public.app_role()) is not null and (storage.foldername(name))[1] = (select auth.uid())::text);
 create policy tickets_files_delete on storage.objects for delete to authenticated using (bucket_id = 'tickets' and (select public.is_admin()));
+
+-- ===== 3.77 (applied 14 Nov 2026): "only the changes" loading =====
+create table if not exists public.deleted_rows (id bigint generated always as identity primary key, tbl text not null, row_id text not null, at timestamptz not null default now());
+create index if not exists deleted_rows_at_idx on public.deleted_rows(at);
+alter table public.deleted_rows enable row level security;
+drop policy if exists deleted_rows_read on public.deleted_rows;
+create policy deleted_rows_read on public.deleted_rows for select to authenticated using (true);
+create or replace function public.fs_touch() returns trigger language plpgsql set search_path = public as $$ begin new.updated_at := now(); return new; end $$;
+create or replace function public.fs_note_delete() returns trigger language plpgsql security definer set search_path = public as $$ begin insert into public.deleted_rows(tbl, row_id) values (tg_table_name, old.id::text); return old; end $$;
+do $$ declare t text; begin foreach t in array array['tours','bookings','clients'] loop
+  execute format('alter table public.%I add column if not exists updated_at timestamptz not null default now()', t);
+  execute format('create index if not exists %I on public.%I(updated_at)', t||'_updated_at_idx', t);
+  execute format('drop trigger if exists fs_touch on public.%I', t);
+  execute format('create trigger fs_touch before insert or update on public.%I for each row execute function public.fs_touch()', t);
+  execute format('drop trigger if exists fs_note_delete on public.%I', t);
+  execute format('create trigger fs_note_delete after delete on public.%I for each row execute function public.fs_note_delete()', t);
+end loop; end $$;
+revoke execute on function public.fs_note_delete() from public, anon, authenticated;
+revoke execute on function public.fs_touch() from public, anon, authenticated;
+
+-- ===== 3.77 (applied 14 Nov 2026): accounting tables, admin only =====
+create table if not exists public.commission_rules (id uuid primary key default gen_random_uuid(), platform text not null, tour_key text, percent numeric not null check (percent >= 0 and percent <= 100), valid_from date not null default current_date, note text, created_by uuid, created_at timestamptz not null default now());
+create table if not exists public.payments (id uuid primary key default gen_random_uuid(), booking_id uuid references public.bookings(id) on delete set null, tour_id uuid references public.tours(id) on delete set null, kind text not null default 'tour' check (kind in ('tour','addon','tip','refund')), amount numeric not null, currency text not null default 'GEL', gel_rate numeric, gel_amount numeric, method text not null default 'cash' check (method in ('cash','card','online','platform')), bank text, tx_code text, received_by uuid, paid_at date not null default current_date, note text, created_by uuid, created_at timestamptz not null default now());
+create table if not exists public.staff_payments (id uuid primary key default gen_random_uuid(), user_id uuid not null, amount numeric not null, currency text not null default 'GEL', gel_rate numeric, gel_amount numeric, method text not null default 'cash' check (method in ('cash','card','bank')), bank text, tx_code text, paid_at date not null default current_date, for_month text, note text, created_by uuid, created_at timestamptz not null default now());
+do $$ declare t text; begin foreach t in array array['commission_rules','payments','staff_payments'] loop
+  execute format('alter table public.%I enable row level security', t);
+  execute format('drop policy if exists %I on public.%I', t||'_admin', t);
+  execute format('create policy %I on public.%I for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()))', t||'_admin', t);
+end loop; end $$;

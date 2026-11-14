@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.76';
+  const APP_VERSION = '3.77';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -59,6 +59,7 @@
   // ---------- state ----------
   const state = { meTab: 'profile', adminTab: null, view: 'calendar', mode: 'week', date: today(), mine: false, modal: null, year: new Date().getFullYear(), auth: 'signin', authMsg: '', taskFilter: 'open', imp: null, bell: false };
   let memo = {};
+  const firstName = m => String((m && m.name) || '').replace(/\(.*?\)/g, '').trim().split(/\s+/)[0] || '';
   // "Look as": the admin sees the app exactly as one guide or driver would. Nothing can be saved while looking.
   // Two logins of one person (Back office rules.sameAs { second account: main account }): the second login works as the main one,
   // so tours, badges, statistics, pay and settings are the same on both, and the person shows once in every list.
@@ -1481,238 +1482,6 @@
     await S.save('settings', { id: 'catalog', value: { items } }); state.modal = null; toast(T('saved'));
   }
 
-  // ---------- badges: what a person has done, counted from their tours ----------
-  const B_ICON = { star: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>', moon: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>', mountain: '<path d="M3 20l6-11 4 7 2-3 6 7z"/>', coin: '<circle cx="12" cy="12" r="8"/><path d="M12 8v8M9.5 10.2c0-1 1-1.7 2.5-1.7s2.5.7 2.5 1.7-1 1.5-2.5 1.8-2.5.8-2.5 1.8 1 1.7 2.5 1.7 2.5-.7 2.5-1.7"/>', boot: '<path d="M8 3v9l-3 3v4h14v-3l-6-3V3z"/>', bed: '<path d="M3 18V8M3 14h18v4M21 14v-2a3 3 0 0 0-3-3h-7v5"/><circle cx="7" cy="11" r="1.5"/>', clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', glass: '<path d="M7 3h10l-1 7a4 4 0 0 1-8 0z"/><path d="M12 14v6M9 21h6"/>', map: '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>', users: '<circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.5a5 5 0 0 1 5 5.5"/>', bolt: '<path d="M13 2 5 14h6l-1 8 8-12h-6z"/>', paw: '<circle cx="7" cy="9" r="1.6"/><circle cx="12" cy="6.5" r="1.6"/><circle cx="17" cy="9" r="1.6"/><path d="M8 17c0-2.5 2-4.5 4-4.5s4 2 4 4.5c0 1.5-1.5 2-4 2s-4-.5-4-2z"/>', car: '<path d="M4 16v-4l2-5h12l2 5v4"/><path d="M3 16h18v2H3z"/><circle cx="7.5" cy="18" r="1.5"/><circle cx="16.5" cy="18" r="1.5"/>', globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>', heart: '<path d="M12 20s-7-4.4-7-9.5A4 4 0 0 1 12 8a4 4 0 0 1 7 2.5C19 15.6 12 20 12 20z"/>' };
-  Object.assign(IC, B_ICON);
-  // Titles: for each kind of tour, the guide and the driver with the most such tours in the last 12 months hold a title.
-  // The ranking itself is never shown; a title simply moves when a colleague overtakes its holder.
-  const THEMES = [['desert', /gareji|rainbow/i, 'sun'], ['mountain', /kazbegi|truso|juta|gudauri|khevsureti|tusheti|svaneti/i, 'mountain'], ['wine', /kakheti|wine|sighnaghi|signagi|telavi/i, 'glass'], ['city', /walking|brutal|night tour|old tbilisi|tiflis/i, 'pin'], ['south', /vardzia|borjomi|uplistsikhe|rabati/i, 'map'], ['west', /kutaisi|chiatura|katskhi|tskaltubo/i, 'map'], ['armenia', /armenia|yerevan|sevan|dilijan|haghpat/i, 'globe']];
-  const titleKey = (th, role) => (th === 'mountain' ? (role === 'guide' ? 'eagle' : 'goat') : th);
-  function holders() {
-    if (memo.hold) return memo.hold;
-    const td = today(), from = addDays(td, -365), cnt = {}, out = {};
-    for (const t of db.tours) {
-      if (!live(t) || t.date > td || t.date < from) continue;
-      for (const [th, re] of THEMES) if (re.test(t.title)) for (const [role, id] of [['guide', t.guide_id], ['driver', t.driver_id]]) if (id) { const c = cnt[th + ':' + role] = cnt[th + ':' + role] || {}; c[id] = (c[id] || 0) + 1; }
-    }
-    for (const key of Object.keys(cnt)) { const [th, role] = key.split(':'), max = Math.max(...Object.values(cnt[key])); if (max < 5) continue; for (const id of Object.keys(cnt[key])) if (cnt[key][id] === max && (person(id) || {}).active !== false) (out[id] = out[id] || []).push({ th, role, n: max, key: titleKey(th, role), icon: THEMES.find(x => x[0] === th)[2] }); }
-    return memo.hold = out;
-  }
-  const titlesOf = id => (holders()[id] || []).map(x => T('ti_' + x.key));
-  function firstRuns() {
-    if (memo.first) return memo.first;
-    const by = {}; let start = '9999';
-    for (const t of db.tours) { if (!live(t)) continue; if (t.date < start) start = t.date; (by[t.title] = by[t.title] || []).push(t); }
-    const fresh = new Set(), cut = addDays(start === '9999' ? today() : start, 60);
-    for (const k of Object.keys(by)) { const ts = by[k].sort((x, y) => x.date.localeCompare(y.date)); if (ts[0].date >= cut) ts.slice(0, 3).forEach(t => fresh.add(t.id)); }
-    return memo.first = fresh;
-  }
-  const nf = n => new Intl.NumberFormat(LOCALES[lang()]).format(Math.round(n));
-  function game(id) {
-    if (memo['g' + id]) return memo['g' + id];
-    const p = person(id) || {}, td = today(), s = personStats(id), ts = s.ts, mo = td.slice(0, 7), pm = (() => { const d = D(td); d.setDate(1); d.setMonth(d.getMonth() - 1); return iso(d).slice(0, 7); })();
-    const isD = p.role === 'driver' || !!p.vehicle, isG = p.role !== 'driver', own = p.vehicle === 'own', delica = p.vehicle === 'delica';
-    let km = 0, walk = 0, solo = 0, drives = 0, mountain = 0, wine = 0, late = 0, early = 0, night = 0, weekend = 0, full = 0, earned = 0;
-    const per = { w: {}, m: {}, y: {}, s: {} }, hid = { newyear: 0, snow: 0, fri13: 0, sunrise: 0 }, r0 = rules(); let weekNow = 0; const thisMon = monday(td);
-    let armenia = 0, khink = 0, road = 0, kakh = 0, pioneer = 0, smart = 0, nights = 0, kids = 0; const cn = id === me().id ? (state.counts || {}) : {}; const fresh = firstRuns(), mineFirst = {}, d90 = addDays(td, -90);
-    const regs = new Set(), months = new Set(), starts = {}, partners = {}, cur = { tours: 0, guests: 0, km: 0 }, prev = { tours: 0, guests: 0, km: 0 };
-    for (const t of ts) {
-      const k = kmOf(t.title), drv = t.driver_id === id || (t.guide_id === id && !t.driver_id && own && k > 0), st = t.start_time || '', dow = D(t.date).getDay(), mm = t.date.slice(0, 7);
-      if (drv) { km += k; drives++; } if (t.guide_id === id) walk += walkOf(t.title);
-      if (t.guide_id === id && !t.driver_id && own && k > 0) solo++;
-      if (/kazbegi|tusheti|svaneti|khevsureti|gudauri|truso|juta/i.test(t.title)) mountain++;
-      if (/kakheti|wine|sighnaghi|signagi/i.test(t.title)) wine++;
-      nights += Math.max(0, tourDays(t).length - 1); kids += Number(t.children) || 0;
-      if (/armenia|yerevan|sevan|dilijan|haghpat/i.test(t.title)) armenia++; if (/kazbegi|gudauri|truso|juta|ananuri|pasanauri|stepantsminda/i.test(t.title)) khink++; if (/kakheti|sighnaghi|signagi|telavi/i.test(t.title)) kakh++; if (k >= 100) road++; if (/gudauri|kazbegi|truso|juta|stepantsminda/i.test(t.title)) smart++; if (fresh.has(t.id)) pioneer++;
-      if (!mineFirst[t.title] || t.date < mineFirst[t.title]) mineFirst[t.title] = t.date;
-      if (st && st < '07:30') early++; if (st >= '12:00') late++; if ((t.end_time || '') >= '21:00') night++;
-      if (dow === 0 || dow === 6) weekend++;
-      if (t.kind === 'group' && t.capacity > 0 && t.pax >= t.capacity) full++;
-      earned += payFor(t, t.guide_id === id ? 'guide' : 'driver') || 0;
-      regionsOf(t.title).forEach(r => regs.add(r)); months.add(t.date.slice(5, 7)); starts[t.date] = (starts[t.date] || 0) + 1;
-      const other = t.guide_id === id ? t.driver_id : t.guide_id; if (other && other !== id) partners[other] = (partners[other] || 0) + 1;
-      const yy = t.date.slice(0, 4), mN = Number(t.date.slice(5, 7)), dN = Number(t.date.slice(8, 10)), wk = monday(t.date); per.w[wk] = (per.w[wk] || 0) + 1; per.m[mm] = (per.m[mm] || 0) + 1; per.y[yy] = (per.y[yy] || 0) + 1; if (mN >= r0.seasonFrom && mN <= r0.seasonTo) per.s[yy] = (per.s[yy] || 0) + 1; if (wk === thisMon) weekNow++;
-      if ((mN === 12 && dN === 31) || (mN === 1 && dN <= 2)) hid.newyear++; if ((mN === 12 || mN <= 2) && /kazbegi|truso|juta|gudauri|khevsureti|tusheti|svaneti/i.test(t.title)) hid.snow++; if (dN === 13 && dow === 5) hid.fri13++; if (st && st < '06:00') hid.sunrise++;
-      const box = mm === mo ? cur : mm === pm ? prev : null; if (box) { box.tours++; box.guests += t.pax || 0; if (drv) box.km += k; }
-    }
-    const days = [...new Set(ts.flatMap(tourDays))].filter(d => d <= td).sort(); let streak = 0, run = 0, gap = 0; const yearAgo = addDays(td, -365);
-    let away = 0; days.forEach((d, i) => { run = i && daysBetween(days[i - 1], d) === 1 ? run + 1 : 1; streak = Math.max(streak, run); if (i) away = Math.max(away, daysBetween(days[i - 1], d) - 1); if (i && d >= yearAgo) gap = Math.max(gap, daysBetween(days[i - 1], d) - 1); });
-    const best = o => Math.max(0, ...Object.values(o));
-    const offers = db.offers.filter(o => o.user_id === id).length, rep = id === me().id ? (state.repeatN || 0) : 0;
-    const B = (k, track, icon, have, goal, unit) => ({ k, track, icon, raw: have, have: Math.min(have, goal), goal, done: have >= goal, unit: unit || '' });
-    const n = ts.length, list = [B('welcome', 'all', 'heart', 1, 1), B('first', 'all', 'star', n, 1), B('firstoff', 'all', 'sun', db.time_off.filter(o => o.user_id === id).length, 1)];
-    if (isG) list.push(B('t50', 'guide', 'guide', n, 50), B('t100', 'guide', 'guide', n, 100), B('t250', 'guide', 'guide', n, 250), B('g500', 'guide', 'users', s.guests, 500), B('g1000', 'guide', 'users', s.guests, 1000), B('explorer', 'guide', 'map', Object.keys(s.titles).length, 5), B('routes10', 'guide', 'map', Object.keys(s.titles).length, 10), B('walk42', 'guide', 'boot', walk, 42, 'km'), B('walk100', 'guide', 'boot', walk, 100, 'km'), B('polyglot', 'guide', 'globe', s.langs, 2), B('seller', 'guide', 'coin', offers, 10), B('familiar', 'guide', 'heart', rep, 5), B('reviewer', 'guide', 'check', s.scores, 20));
-    if (isD) list.push(B('d100', 'driver', 'driver', drives, 100), B('km1000', 'driver', 'car', km, 1000, 'km'), B('km10000', 'driver', 'car', km, 10000, 'km'), B('earth', 'driver', 'globe', km, 40075, 'km'), B('moon', 'driver', 'moon', km, 384400, 'km'), B('goat', 'driver', 'mountain', mountain, 10));
-    if (own && isG) list.push(B('solo10', 'own', 'car', solo, 10), B('solo50', 'own', 'car', solo, 50));
-    if (delica) list.push(B('delica1', 'delica', 'car', km, 1000, 'km'), B('delica10', 'delica', 'car', km, 10000, 'km'), B('offroad', 'delica', 'mountain', mountain, 20));
-    list.push(B('geo3', 'geo', 'map', regs.size, 3), B('geo6', 'geo', 'map', regs.size, 6), B('geoall', 'geo', 'map', regs.size, REGIONS.length));
-    list.push(B('early', 'fun', 'clock', early, 10), B('late', 'fun', 'bed', late, 10), B('night', 'fun', 'moon', night, 5), B('weekend', 'fun', 'sun', weekend, 20), B('lazy', 'fun', 'bed', gap, 11), B('gold', 'fun', 'coin', earned, 10000, rules().currency || 'GEL'), B('double', 'fun', 'bolt', Object.values(starts).filter(x => x > 1).length, 5), B('iron', 'fun', 'bolt', streak, 6), B('seasons', 'fun', 'cal', months.size, 12), B('full', 'fun', 'users', full, 10), B('wine', 'fun', 'glass', wine, 20), B('bears', 'fun', 'paw', s.bears, 10), B('mountain', 'fun', 'mountain', s.multi, 1), B('rested', 'fun', 'sun', s.rested, 3), B('team', 'fun', 'check', s.tasks, 10));
-    { const ab = ts.filter(t => /tusheti|omalo/i.test(t.title)).length * 2; list.push(B('abano2', 'geo', 'mountain', ab, 2), B('abano10', 'geo', 'mountain', ab, 10), B('abano30', 'geo', 'mountain', ab, 30)); }
-    { const mp = db.photos.filter(x => twin(x.user_id) === id), pl = mp.reduce((a, x) => a + likesN(x), 0), tk = db.thanks.filter(x => twin(x.to_id) === id).length; list.push(B('photo1', 'fun', 'camera', mp.length, 1), B('photo10', 'fun', 'camera', mp.length, 10), B('photo50', 'fun', 'camera', mp.length, 50), B('liked25', 'fun', 'heart', pl, 25), B('thanks10', 'fun', 'heart', tk, 10)); }
-    const newToMe = Object.values(mineFirst).filter(d => d >= d90).length;
-    list.push(B('pioneer', 'new', 'star', pioneer, 1), B('pioneer5', 'new', 'star', pioneer, 5), B('newdest', 'new', 'map', newToMe, 5), B('armenia1', 'new', 'globe', armenia, 1), B('armenia10', 'new', 'globe', armenia, 10));
-    const offs = db.time_off.filter(o => o.user_id === id && o.type !== 'sick'), notice = rules().minNoticeDays || 14;
-    const planned = offs.filter(o => o.created_at && daysBetween(o.created_at.slice(0, 10), o.date_from) >= notice).length, restDays = offs.filter(o => o.status === 'approved').reduce((n, o) => n + daysBetween(o.date_from, o.date_to) + 1, 0);
-    const dq = db.pay_disputes.filter(q => q.user_id === id);
-    list.push(B('nights5', 'new', 'moon', nights, 5), B('nights30', 'new', 'moon', nights, 30));
-    if (isG) list.push(B('kids50', 'guide', 'users', kids, 50), B('kids200', 'guide', 'users', kids, 200), B('noshow5', 'guide', 'pin', cn.noshow || 0, 5), B('diplomat', 'guide', 'heart', cn.trouble || 0, 1), B('steel', 'guide', 'bolt', cn.trouble || 0, 5));
-    list.push(B('ritual', 'fun', 'check', db.tasks.filter(k => k.kind === 'week_check' && k.done_by === id).length, 10));
-    list.push(B('planner', 'fun', 'cal', planned, 5), B('rest10', 'fun', 'bed', restDays, 15), B('accountant', 'fun', 'coin', dq.length, 1), B('sharpeye', 'fun', 'coin', dq.filter(q => q.status === 'accepted').length, 3));
-    list.push(B('khinkali', 'fun', 'heart', khink, 20), B('smart', 'fun', 'car', smart, 25), B('churchkhela', 'fun', 'glass', kakh, 10));
-    list.push(B('week5', 'now', 'bolt', best(per.w), 5), B('month20', 'now', 'cal', best(per.m), 20), B('season80', 'now', 'sun', best(per.s), 80), B('year150', 'now', 'star', best(per.y), 150));
-    // tour mastery: the three tours this person has done most, each on its own ladder up to 500
-    Object.entries(s.titles).sort((x, y) => y[1] - x[1]).slice(0, 3).forEach(([title, c]) => { const goal = [10, 25, 50, 100, 250, 500].find(x => x > c) || 500, b = B('m:' + title, 'master', 'star', c, goal); b.title = title; b.desc = T('bd_master', { n: c, goal }); b.done = c >= 10; b.tier = [10, 25, 50, 100, 250, 500].filter(x => x <= c).length; list.push(b); });
-    (holders()[id] || []).forEach(x => { const b = B('ti:' + x.key, 'titles', x.icon, x.n, x.n); b.title = T('ti_' + x.key); b.desc = T('bd_title'); list.push(b); });
-    [['newyear', 'star', hid.newyear], ['snow', 'mountain', hid.snow], ['comeback', 'bolt', away > 30 ? 1 : 0], ['hattrick', 'bolt', Object.values(starts).some(x => x >= 3) ? 1 : 0], ['fri13', 'moon', hid.fri13], ['sunrise', 'sun', hid.sunrise]].forEach(([k, icon, v]) => { const b = B(k, 'secret', icon, v, 1); b.hidden = true; list.push(b); });
-    // guests' countries (from the phone code), names, extras and places: counted from this person's own tours
-    { const tids = new Set(ts.map(t => t.id)), bk = db.bookings.filter(b => tids.has(b.tour_id)), cty = {}, nm = {}, myFirst = String(firstName(p)).toLowerCase(); let wineN = 0, rare = 0, same = 0;
-      for (const b of bk) { const pax = Number(b.pax) || 1, c = phoneIso(b.phone); if (c) cty[c] = (cty[c] || 0) + pax; if ((b.marks || []).includes('wine')) wineN++;
-        const f = (cleanName(b.guest).split(/\s+/)[0] || '').toLowerCase(); if (f.length > 1) { nm[f] = (nm[f] || 0) + 1; if (/^[qxz]/.test(f)) rare++; if (myFirst && f === myFirst) same = 1; } }
-      const topC = Object.keys(cty).sort((x, y) => cty[y] - cty[x])[0], topN = Object.keys(nm).sort((x, y) => nm[y] - nm[x])[0], world = Object.keys(cty).length, cap = x => x ? x[0].toUpperCase() + x.slice(1) : '';
-      list.push(B('world10', 'geo', 'globe', world, 15), B('world25', 'geo', 'globe', world, 30), B('world40', 'geo', 'globe', world, 50));
-      [50, 200, 1000].forEach(g => { const b = B('country' + g, 'geo', 'globe', topC ? cty[topC] : 0, g); b.desc = topC ? T('bd_country', { n: g, c: countryName(topC) }) : T('bd_country0', { n: g }); list.push(b); });
-      [5, 15].forEach(g => { const b = B('names' + g, 'fun', 'users', topN ? nm[topN] : 0, g); b.desc = topN && nm[topN] >= 2 ? T('bd_names', { n: g, name: cap(topN), have: nm[topN] }) : T('bd_names0', { n: g }); list.push(b); });
-      // Legends: goals so far away that they are a joke and a dream at once. They show real progress all the same.
-      { const b1 = B('legend_country', 'legend', 'globe', topC ? cty[topC] : 0, 100000); b1.desc = topC ? T('bd_legend_country', { c: countryName(topC) }) : T('bd_legend_country0'); const b2 = B('legend_names', 'legend', 'users', topN ? nm[topN] : 0, 2000); b2.desc = topN && nm[topN] >= 2 ? T('bd_legend_names', { name: cap(topN) }) : T('bd_legend_names0'); list.push(b1, b2, B('legend_guests', 'legend', 'users', s.guests, 100000), B('legend_mother', 'legend', 'pin', ts.filter(t => /walking|old tbilisi|old town/i.test(t.title)).length, 10000)); }
-      if (isG) list.push(B('tamada5', 'guide', 'glass', wineN, 5), B('tamada25', 'guide', 'glass', wineN, 25), B('tamada100', 'guide', 'glass', wineN, 100), B('baker25', 'guide', 'glass', kakh, 25));
-      const cnt = re => ts.filter(t => re.test(t.title + ' ' + (t.notes || ''))).length, mother = cnt(/walking|old tbilisi|old town/i);
-      if (isG) list.push(B('mother50', 'guide', 'pin', mother, 75), B('mother200', 'guide', 'pin', mother, 250));
-      UNLOCKS.forEach(([k, re]) => { const b = B('pl_' + k, 'geo', 'pin', cnt(re), 3); b.desc = T('bd_pl_' + k) + ' · ' + T('pl_x3'); list.push(b); });
-      const took = db.change_requests.filter(q => q.user_id === id && q.patch && (q.patch.guide_id === id || q.patch.driver_id === id)).length; list.push(B('enthusiast3', 'fun', 'bolt', took, 3), B('enthusiast10', 'fun', 'bolt', took, 10));
-      [['namesake', 'heart', same], ['rarename', 'star', rare >= 3 ? 1 : 0]].forEach(([k, icon, v]) => { const b = B(k, 'secret', icon, v, 1); b.hidden = true; list.push(b); }); }
-    { const at = (p.display && p.display.badgeAt) || {}; list.forEach(b => { if (at[b.k] && !b.done && !b.hidden && b.track !== 'master' && b.track !== 'titles') { b.done = true; b.have = b.goal; b.raw = b.goal; } }); }
-    const done = list.filter(b => b.done).length, xp = n * 10 + s.guests + Math.round(km / 20) + Math.round(walk * 2) + done * 25;
-    const level = Math.floor((1 + Math.sqrt(1 + 8 * xp / 100)) / 2), base = 100 * level * (level - 1) / 2, next = 100 * level * (level + 1) / 2;
-    return memo['g' + id] = { list, done, xp, level, base, next, km, walk, regs, partners, cur, prev, isD, isG, rep, weekNow, yearNow: per.y[td.slice(0, 4)] || 0 };
-  }
-  // ---------- medals: flat vector art drawn here, so they are sharp at any size and work offline ----------
-  const METAL = { bronze: ['#7d4a1e', '#b87333', '#e0a36b'], silver: ['#7c838b', '#b9bec4', '#eceef0'], gold: ['#a67c12', '#e2b340', '#f6d67a'] };   // rim, face, highlight
-  const RIBBON = { guide: '#f0901e', all: '#f0901e', master: '#a8500e', driver: '#3b5bbd', delica: '#3b5bbd', own: '#3b5bbd', geo: '#2f6b48', fun: '#6243bd', new: '#0f766e', now: '#0f766e', titles: '#20251f', secret: '#20251f' };
-  const mPoly = (n, r1, r2, rot) => [...Array(n * 2)].map((_, i) => { const a = Math.PI * i / n + (rot || 0), r = i % 2 ? r2 : r1; return (48 + r * Math.sin(a)).toFixed(1) + ',' + (62 - r * Math.cos(a)).toFixed(1); }).join(' ');
-  const M_SHAPE = { seal: mPoly(16, 37, 33.5), burst: mPoly(12, 38, 31), hex: mPoly(3, 38, 38), shield: null };
-  // Bronze, silver or gold: the place of a badge on its own ladder (50 / 100 / 250 tours), or how far a tour mastery has gone.
-  function tierOf(b, list) {
-    if (b.track === 'titles' || b.track === 'secret') return 'gold';
-    if (b.track === 'master') { const n = Array.isArray(b.tier) ? b.tier.length : Number(b.tier) || [10, 25, 50, 100, 250, 500].filter(x => x <= b.raw).length; return n >= 4 ? 'gold' : n >= 2 ? 'silver' : 'bronze'; }
-    const pre = String(b.k).replace(/\d+$/, ''), sib = (list || []).filter(x => x.track === b.track && String(x.k).replace(/\d+$/, '') === pre && /\d$/.test(x.k)).sort((x, y) => x.goal - y.goal);
-    if (sib.length > 1) { const i = sib.findIndex(x => x.k === b.k); return i <= 0 ? 'bronze' : i === sib.length - 1 ? 'gold' : 'silver'; }
-    return ['welcome', 'first', 'firstoff'].includes(b.k) ? 'bronze' : 'silver';
-  }
-  // Badges are cute round stickers (cute.js): a soft colour by group, one friendly picture, and one to three small stars for the step
-  // on the ladder. Not earned yet: pale, with a ring that fills as the person gets closer.
-  const STICKER = { guide: '#ffe2b8', all: '#ffe2b8', master: '#fff0b8', driver: '#cfe8fb', delica: '#cfe8fb', own: '#cfe8fb', geo: '#d5f0df', fun: '#fbd9e3', new: '#e4dcf7', now: '#e4dcf7', titles: '#fff0b8', secret: '#e4dcf7' };
-  const cuteOf = b => { const C = window.CUTE || { art: {}, pick: () => '' }, n = C.pick(b) || (b.track === 'geo' ? 'map' : b.track === 'driver' || b.track === 'delica' ? 'van' : 'star'); return C.art[n] || C.art.star || ''; };
-  // Stars mean a level: one to three on badges that come in steps (10 / 50 / 100 tours, tour mastery). A one-off badge or a title has none.
-  function starsOf(b, tier) {
-    if (b.track === 'titles' || b.track === 'secret') return 0; const byTier = tier === 'gold' ? 3 : tier === 'silver' ? 2 : 1; if (b.track === 'master') return byTier;
-    if (!/\d$/.test(b.k)) return 0; const pre = String(b.k).replace(/\d+$/, ''), list = (game(me().id) || {}).list || []; return list.filter(x => x.track === b.track && /\d$/.test(x.k) && String(x.k).replace(/\d+$/, '') === pre).length > 1 ? byTier : 0;
-  }
-  function medalInner(b, tier, hex) {
-    const secret = b.hidden && !b.done, done = !!b.done, O = '#4a3526';
-    const c = hex ? { rim: '#d9d9d0', face: '#f1efe8', ink: '#70766d', acc: '#314b3c', paper: '#ffffff' } : { rim: 'var(--line)', face: 'var(--surface2)', ink: 'var(--muted)', acc: 'var(--accent)', paper: 'var(--surface)' };
-    const p = Math.max(0, Math.min(100, Math.round((b.have || 0) / (b.goal || 1) * 100))), n = starsOf(b, tier);
-    const stars = done && n && window.CUTE ? `<rect x="${48 - (n * 13 + 10) / 2}" y="84" width="${n * 13 + 10}" height="19" rx="9.5" fill="#ffffff" stroke="${O}" stroke-width="2"/>` + [...Array(n)].map((_, i) => window.CUTE.star(48 + (i - (n - 1) / 2) * 13, 93.5, 5.4)).join('') : '';
-    const pic = secret ? `<text x="48" y="61" text-anchor="middle" font-size="34" font-weight="700" fill="${c.ink}" font-family="-apple-system,Segoe UI,Roboto,sans-serif">?</text>` : `<g transform="translate(18 16) scale(1.25)"${done ? '' : ' style="filter:grayscale(1);opacity:.4"'}>${cuteOf(b)}</g>`;
-    return `<circle cx="48" cy="46" r="42" fill="${done ? '#ffffff' : c.paper}" stroke="${done ? O : c.rim}" stroke-width="3"/>
-      <circle cx="48" cy="46" r="35.5" fill="${done ? STICKER[b.track] || '#ffe2b8' : c.face}"/>
-      ${!done && !secret && p ? `<circle cx="48" cy="46" r="39" fill="none" stroke="${c.acc}" stroke-width="4" stroke-linecap="round" stroke-dasharray="${(p * 2.45).toFixed(1)} 246" transform="rotate(-90 48 46)"/>` : ''}
-      ${pic}${stars}`;
-  }
-  const medalArt = b => `<span class="art">${`<svg viewBox="0 0 96 104" aria-hidden="true"><defs><clipPath id="mc-${esc(String(b.k).replace(/[^a-z0-9]/gi, ''))}"><circle cx="48" cy="46" r="41"/></clipPath></defs>${medalInner(b, tierOf(b, (game(me().id) || {}).list))}${b.done ? `<g clip-path="url(#mc-${esc(String(b.k).replace(/[^a-z0-9]/gi, ''))})"><rect class="shine" x="-30" y="0" width="16" height="96" fill="#fff" opacity=".6" transform="rotate(20 48 46)"/></g>` : ''}</svg>`}</span>`;
-  const bName = b => b.title || T('b_' + b.k), bDesc = b => b.desc || T('bd_' + b.k), bSecret = b => b.hidden && !b.done;
-  const medal = b => (bSecret(b) ? `<button class="mdl secret" data-act="badge" data-k="${esc(b.k)}" style="--p:0" aria-label="${T('b_secret')}">${medalArt(b)}<span class="mt">${T('b_secret')}</span><span class="muted small">&nbsp;</span></button>`
-    : `<button class="mdl ${b.done ? 'done' : ''}" data-t="${b.track}" data-act="badge" data-k="${esc(b.k)}" style="--p:${Math.round(b.have / b.goal * 100)}" aria-label="${esc(bName(b))}">${medalArt(b)}<span class="mt">${esc(bName(b))}</span><span class="muted small num">${b.track === 'titles' ? nf(b.raw) + ' ' + T('tours_n') : b.track === 'master' ? '×' + nf(b.raw) : b.done ? T('b_done') : nf(b.have) + '/' + nf(b.goal)}</span></button>`);
-  function badgeModalHtml(m) {
-    const g = game(me().id), b = g.list.find(x => x.k === m.k); if (!b) return '';
-    const head = `<div class="hdr"><span class="spacer"></span><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>`;
-    if (bSecret(b)) return `${head}<div class="ccard"><span class="mdl big secret" style="--p:0">${medalArt(b)}</span><h2>${T('b_secret')}</h2><p class="muted">${T('bd_secret')}</p></div>`;
-    return `${head}<div class="ccard"><span class="mdl big ${b.done ? 'done' : ''}" data-t="${b.track}" style="--p:${Math.round(b.have / b.goal * 100)}">${medalArt(b)}</span>${(() => { const n = db.badge_likes.filter(x => x.badge === b.k).length, mine = db.badge_likes.some(x => x.badge === b.k && x.user_id === me().id); return `<span class="bheart"><button class="iconbtn blike" data-act="blike" data-k="${esc(b.k)}" aria-pressed="${mine}" aria-label="${esc(T('bl_like'))}" title="${esc(T('bl_like'))}" ${state.viewAs ? 'disabled' : ''}>${msi('favorite')}</button>${n ? `<span class="num small">${n}</span>` : ''}</span>`; })()}<h2>${esc(bName(b))}</h2><p class="muted">${esc(bDesc(b))}</p>
-        ${b.track === 'titles' ? '' : `<b class="num">${nf(b.raw)}/${nf(b.goal)} ${esc(b.unit)}</b><span class="meter" style="width:100%"><i style="width:${Math.round(b.have / b.goal * 100)}%"></i></span>`}${b.done && b.track !== 'master' ? `<span class="tag t-ok">${T('b_done')}</span>` : ''}${b.done && badgeAt(b.k) ? `<span class="muted small num">${T('b_on', { date: fmt(badgeAt(b.k), { day: 'numeric', month: 'long', year: 'numeric' }) })}</span>` : ''}</div>
-      ${(() => { if (b.track === 'master' || b.track === 'titles') return ''; const team = staff().filter(p => p.role !== 'admin' || p.id === me().id), n = team.filter(p => p.id !== me().id && (game(p.id).list.find(x => x.k === b.k) || {}).done).length; return `<span class="muted small">${esc(n === 0 ? T(b.done ? 'b_team_only' : 'b_team_none') : T('b_team_n', { n, of: team.length - 1 }))}</span>`; })()}
-      ${b.done ? `<div class="actions"><button class="btn" data-act="phfrombadge" data-k="${esc(b.k)}">${msi('photo_camera')}${T('ph_use_badge')}</button><button class="btn" data-act="celereplay" data-k="${esc(b.k)}">${T('b_replay')}</button><button class="btn" data-act="badgesave" data-k="${esc(b.k)}">${T('b_save')}</button><button class="btn primary" data-act="badgeshare" data-k="${esc(b.k)}">${ico('share')}${T('share')}</button></div>` : ''}`;
-  }
-  // ---------- a newly earned badge gets a full-screen moment ----------
-  const seenKey = () => 'fs-badges-' + me().id;
-  let celeTimer = null;
-  function checkBadges() {
-    if (state.viewAs) { clearTimeout(celeTimer); return; }   // looking as someone: their badges are theirs to open; nothing is shown and nothing is marked as seen
-    if (!gameOn()) return;   // the person turned the game side off: no badge windows, no weekly challenge
-    setTimeout(() => { try { weeklySave(); } catch (e) { /* later */ } }, 2500);
-    clearTimeout(celeTimer);
-    celeTimer = setTimeout(() => {
-      if (!me() || !me().active || state.viewAs || state.modal || window.__noCelebrate) return;
-      const list = game(me().id).list, done = list.filter(b => b.done).map(b => b.k); let local = null;
-      try { local = JSON.parse(S.ls.get(seenKey()) || 'null'); } catch (e) { local = null; }
-      // Seen badges live on the account, so the welcome badge shows once per person, not once per phone.
-      const acct = Array.isArray(me().badges_seen) ? me().badges_seen : null;
-      let seen = acct || local ? [...new Set([...(acct || []), ...(local || [])])] : done.filter(k => k !== 'welcome');
-      const fresh = done.filter(k => !seen.includes(k)); if (!fresh.length) { if (!acct && local) saveSeen(seen); return; }
-      seen = [...seen, ...fresh]; S.ls.set(seenKey(), JSON.stringify(seen)); saveSeen(seen, fresh); track('badge');
-      // Only the welcome badge and region titles get the full screen; other badges arrive as a small note.
-      const big = fresh.find(k => k === 'welcome' || (list.find(b => b.k === k) || {}).track === 'titles');
-      if (big) { state.modal = { type: 'celebrate', k: big, more: fresh.length - 1 }; renderModal(); fx.sheet(); }
-      else badgeNote(fresh.map(k => list.find(b => b.k === k)).filter(Boolean));
-    }, 900);
-  }
-  const badgeAt = k => ((me().display || {}).badgeAt || {})[k] || '';
-  function saveSeen(seen, fresh) { if (state.viewAs || S.mode === 'demo' && !me()) return; const d = (me().display && typeof me().display === 'object') ? me().display : {}, at = { ...(d.badgeAt || {}) }; (fresh || []).forEach(k => { if (!at[k]) at[k] = today(); }); S.save('profiles', { ...stripEmail(me()), badges_seen: seen, display: { ...d, badgeAt: at } }).catch(() => { /* kept on this phone until next time */ }); }
-  function badgeNote(bs) {
-    if (!bs.length || state.viewAs) return; const old = document.querySelector('.bnote'); if (old) old.remove();
-    const el = document.createElement('div'); el.className = 'bnote'; el.setAttribute('role', 'status');
-    const bye = () => { if (!el.isConnected) return; document.removeEventListener('pointerdown', away, true); el.classList.remove('in'); setTimeout(() => el.remove(), 250); }, away = e => { if (!el.contains(e.target)) bye(); };
-    let sx = null; el.addEventListener('touchstart', e => { sx = [e.touches[0].clientX, e.touches[0].clientY]; }, { passive: true }); el.addEventListener('touchmove', e => { if (sx && (Math.abs(e.touches[0].clientX - sx[0]) > 40 || e.touches[0].clientY - sx[1] > 24)) { sx = null; bye(); } }, { passive: true });
-    el.addEventListener('click', e => { if (e.target.closest('.bnx')) bye(); }); setTimeout(() => document.addEventListener('pointerdown', away, true), 400);
-    el.innerHTML = `<span class="mdl done" data-t="${esc(bs[0].track)}" style="--p:100">${medalArt(bs[0])}</span><span class="grow-l"><b>${esc(bs.length > 1 ? T('bn_many', { n: bs.length }) : T('bn_one'))}</b><span class="small">${esc(bs.map(bName).join(', '))}</span></span><button class="btn sm" data-act="bnview">${T('bn_view')}</button><button class="iconbtn bnx" type="button" aria-label="${T('close')}">✕</button>`;
-    document.body.appendChild(el); requestAnimationFrame(() => el.classList.add('in')); setTimeout(bye, 6000);
-  }
-  function celebrateHtml(m) {
-    const b = game(me().id).list.find(x => x.k === m.k); if (!b) return '';
-    const cols = ['#f0901e', '#2f6b48', '#3b5bbd', '#20251f', '#e2b340', '#6243bd'], rib = RIBBON[b.track] || '#f0901e';
-    const bits = [...Array(28)].map((_, i) => `<i style="left:${(i * 37) % 100}%;background:${cols[i % cols.length]};animation-delay:${(i % 9) * 0.12}s;animation-duration:${2.2 + (i % 5) * 0.35}s"></i>`).join('');
-    // A gift box first: the person opens it with a tap, then the lid flies off and the medal comes out.
-    const box = `<svg class="gbox" viewBox="0 0 200 190" aria-hidden="true"><g class="gbase"><rect x="30" y="86" width="140" height="94" rx="10" fill="#e9e3d2" stroke="#20251f" stroke-width="4"/><rect x="88" y="86" width="24" height="94" fill="${rib}" stroke="#20251f" stroke-width="4"/></g>
-      <g class="glid"><rect x="20" y="56" width="160" height="36" rx="8" fill="#f1efe8" stroke="#20251f" stroke-width="4"/><rect x="88" y="56" width="24" height="36" fill="${rib}" stroke="#20251f" stroke-width="4"/><path d="M100 56c-26-34-58-18-40-2 10 8 26 6 40 2zm0 0c26-34 58-18 40-2-10 8-26 6-40 2z" fill="${rib}" stroke="#20251f" stroke-width="4" stroke-linejoin="round"/></g></svg>`;
-    if (!m.opened) return `<div class="celebrate"><button class="iconbtn celex" data-act="celeok" aria-label="${T('close')}">✕</button><span class="muted">${T(b.track === 'titles' ? 'ce_title' : 'ce_new')}</span><button class="gboxbtn shake" data-act="celeopen" aria-label="${T('ce_open')}">${box}</button><h2>${T('ce_box')}</h2><div class="actions"><button class="btn primary big" data-act="celeopen">${T('ce_open')}</button></div></div>`;
-    return `<div class="celebrate opened"><div class="confetti" aria-hidden="true">${bits}</div><button class="iconbtn celex" data-act="celeok" aria-label="${T('close')}">✕</button><span class="muted">${T(b.track === 'titles' ? 'ce_title' : 'ce_new')}</span>
-      <div class="gstage"><span class="grays" aria-hidden="true"></span><span class="mdl big done pop" data-t="${b.track}" style="--p:100">${medalArt(b)}</span><span class="gboxbtn gone" aria-hidden="true">${box}</span></div><h2>${esc(bName(b))}</h2><p class="muted">${esc(bDesc(b))}</p><span class="muted small num">${T('b_on', { date: fmt(badgeAt(b.k) || today(), { day: 'numeric', month: 'long', year: 'numeric' }) })}</span>
-      <div class="actions"><button class="btn" data-act="badgeshare" data-k="${esc(b.k)}">${ico('share')}${T('share')}</button><button class="btn primary big" data-act="celeok">${T('ce_ok')}</button></div></div>`;
-  }
-
-  // A square picture of an earned badge, drawn in the browser, to save or to send to colleagues, guests and friends.
-  const xml = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  function wrapText(s, max) { const out = []; let line = ''; for (const w of String(s).split(/\s+/)) { if ((line + ' ' + w).trim().length > max && line) { out.push(line); line = w; } else line = (line + ' ' + w).trim(); } if (line) out.push(line); return out.slice(0, 4); }
-  function badgeSvg(b) {
-    const p = me(), colors = { titles: ['#20251f', '#f0901e'], fun: ['#20251f', '#ffffff'], geo: ['#2f6b48', '#ffffff'], driver: ['#3b5bbd', '#ffffff'], delica: ['#3b5bbd', '#ffffff'], own: ['#3b5bbd', '#ffffff'] }[b.track] || ['#f0901e', '#20251f'];
-    const title = wrapText(bName(b), 22), desc = wrapText(bDesc(b), 44), font = 'font-family="-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif"';
-    const count = b.track === 'titles' ? `${nf(b.raw)} ${T('tours_n')}` : b.track === 'master' ? `×${nf(b.raw)}` : b.unit ? `${nf(b.raw)} ${b.unit}` : '';
-    let y = 660;
-    const tl = title.map(l => { const s = `<text x="540" y="${y}" text-anchor="middle" font-size="68" font-weight="700" fill="#20251f" ${font}>${xml(l)}</text>`; y += 80; return s; }).join(''); y += 4;
-    const dl = desc.map(l => { const s = `<text x="540" y="${y}" text-anchor="middle" font-size="34" fill="#55594f" ${font}>${xml(l)}</text>`; y += 46; return s; }).join('');
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080"><rect width="1080" height="1080" fill="#f7f5ef"/><rect x="36" y="36" width="1008" height="1008" rx="56" fill="#ffffff" stroke="#d9d9d0" stroke-width="3"/>
-      <g transform="translate(300 70) scale(5)">${medalInner({ ...b, done: true }, tierOf(b, (game(p.id) || {}).list), true)}</g>
-      ${tl}${dl}${count ? `<text x="540" y="${y + 34}" text-anchor="middle" font-size="40" font-weight="700" fill="#20251f" ${font}>${xml(count)}</text>` : ''}
-      <circle cx="96" cy="984" r="12" fill="#b94a2f"/><text x="122" y="996" font-size="34" font-weight="700" fill="#20251f" ${font}>Friendly.ge</text>
-      ${/^data:image\//.test(p.avatar || '') ? `<defs><clipPath id="av"><circle cx="948" cy="972" r="44"/></clipPath></defs><image href="${xml(p.avatar)}" x="904" y="928" width="88" height="88" preserveAspectRatio="xMidYMid slice" clip-path="url(#av)"/><circle cx="948" cy="972" r="44" fill="none" stroke="${colors[0]}" stroke-width="5"/><text x="884" y="984" text-anchor="end" font-size="34" fill="#55594f" ${font}>${xml(p.name || '')}</text>` : `<circle cx="948" cy="972" r="44" fill="${xml(p.color || '#66737f')}"/><text x="948" y="986" text-anchor="middle" font-size="38" font-weight="700" fill="#ffffff" ${font}>${xml(initials(p.name || '?'))}</text><text x="884" y="984" text-anchor="end" font-size="34" fill="#55594f" ${font}>${xml(p.name || '')}</text>`}</svg>`;
-  }
-  function badgePng(b) {
-    return new Promise((res, rej) => { const img = new Image(), url = URL.createObjectURL(new Blob([badgeSvg(b)], { type: 'image/svg+xml;charset=utf-8' }));
-      img.onload = () => { try { const c = document.createElement('canvas'); c.width = c.height = 1080; c.getContext('2d').drawImage(img, 0, 0); URL.revokeObjectURL(url); c.toBlob(bl => (bl ? res(bl) : rej(new Error('image'))), 'image/png'); } catch (e) { rej(e); } };
-      img.onerror = () => rej(new Error('image')); img.src = url; });
-  }
-  async function badgeOut(k, share) {
-    const b = game(me().id).list.find(x => x.k === k); if (!b) return;
-    const text = T('b_share_text', { badge: bName(b) }), name = 'friendly-' + String(b.k).replace(/[^\w]+/g, '-').toLowerCase() + '.png';
-    let blob = null; try { blob = await badgePng(b); } catch (e) { console.error(e); }
-    const file = blob ? new File([blob], name, { type: 'image/png' }) : null;
-    if (share) {
-      try { if (file && navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], text }); return; } if (navigator.share) { await navigator.share({ text }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
-      if (!blob) { window.open(waLink('', text), '_blank', 'noopener'); return; }
-    }
-    if (!blob) { toast(T('err_save')); return; }
-    const el = document.createElement('a'); el.href = URL.createObjectURL(blob); el.download = name; document.body.appendChild(el); el.click(); el.remove(); toast(T('b_saved'));
-  }
-
-
   // ---------- tips: the guide's Keepz link as a QR code guests can scan ----------
   // The QR library is fetched only the first time a QR code is shown, so it does not slow down opening the app.
   let qrLoading = null;
@@ -2052,23 +1821,6 @@
       <div class="ttres" style="--i:${t.steps.length}"><svg viewBox="0 0 48 48" aria-hidden="true">${art}</svg><b>${T('wa_' + t.an)}</b><span>${esc(T('wa_' + t.an + '_t', t.v))}</span></div>
       <p class="muted small ttnote" style="--i:${t.steps.length + 1}">${T('tt_note')}</p><div class="seerow c"><button class="lnk small seelnk" data-act="gosee">${T('pf_hide')}</button></div>`;
   }
-  // ---------- one quick question a day: how do you feel? (kept as a count; the office sees it, and the card says so) ----------
-  const MOODS = [5, 4, 3, 2, 1], moodKey = () => 'fs-mood-' + (me() ? me().id : ''), moodToday = () => { try { const v = JSON.parse(localStorage.getItem(moodKey()) || '{}'); return v.day === today() ? v : null; } catch (e) { return null; } };
-  const moodFace = n => `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="${['', '#c9b3ee', '#bcd3ea', '#fff3d6', '#cfeecd', '#ffd166'][n]}" stroke="#4a3526" stroke-width="1.600"/><circle cx="8.500" cy="10" r="1.100" fill="#4a3526"/><circle cx="15.500" cy="10" r="1.100" fill="#4a3526"/><path d="${['', 'M8 17q4-3.500 8 0', 'M8.500 16.500q3.500-2 7 0', 'M8.500 16h7', 'M8.500 15q3.500 2.400 7 0', 'M7.500 14.500q4.500 4.500 9 0'][n]}" fill="none" stroke="#4a3526" stroke-width="1.600" stroke-linecap="round"/></svg>`;
-  const moodBtns = () => `<div class="moods">${MOODS.map(n => `<button class="moodb" data-act="mood" data-v="${n}">${moodFace(n)}<span>${T('md_' + n)}</span></button>`).join('')}</div>`;
-  function moodCardHtml() { const m = me(); if (!m || !m.active || state.viewAs || pref('mood') === 'off' || moodToday()) return ''; return `<div class="card f moodcard"><div class="row nw"><b class="grow-l">${T('md_q', { name: firstName(m) })}</b><button class="lnk small" data-act="mood" data-v="0">${T('md_skip')}</button></div>${moodBtns()}<span class="muted small">${T('md_note')}</span><button class="lnk small askoff" data-act="askoff" data-k="mood">${T('ask_never')}</button></div>`; }
-  function moodLineHtml() { const v = moodToday(); return v && v.v ? `<span class="wrline moodline">${moodFace(v.v)}<span>${T('md_today', { m: T('md_' + v.v) })} <button class="lnk small" data-act="moodredo">${T('md_change')}</button></span></span>` : ''; }
-  // ---------- after a tour: one tap to say how it went ----------
-  const rateSkip = () => { try { return JSON.parse(localStorage.getItem('fs-rate-skip') || '[]'); } catch (e) { return []; } };
-  // The same tour can exist twice (same day, title and start): answering one answers both.
-  const twinsOf = x => db.tours.filter(y => y.date === x.date && y.title === x.title && (y.start_time || '') === (x.start_time || ''));
-  function rateCardHtml() {
-    const m = me(); if (!m || !m.active || state.viewAs || pref('rate') === 'off') return ''; const td = today(), now = hm(new Date().toISOString()), skip = rateSkip();
-    const t = db.tours.filter(x => live(x) && involves(x, m.id) && x.date <= td && x.date >= addDays(td, -1) && (endOf(x) < td || !x.end_time || x.end_time <= now) && !twinsOf(x).some(y => myScore(y.id, m.id) || skip.includes(y.id))).sort((a, b) => (b.date + (b.start_time || '')).localeCompare(a.date + (a.start_time || '')))[0];
-    if (!t) return ''; return `<div class="card f ratecard"><div class="row nw"><b class="grow-l">${T('rt_q', { tour: aliasOf(t.title), day: t.date === td ? T('today').toLowerCase() : fmtDay(t.date) })}</b><button class="lnk small" data-act="rateskip" data-id="${t.id}">${T('md_skip')}</button></div><div class="moods">${[[10, 5, 'rt_great'], [7, 4, 'rt_good'], [5, 3, 'rt_ok'], [3, 2, 'rt_hard']].map(([sc, f, k]) => `<button class="moodb" data-act="ratequick" data-id="${t.id}" data-s="${sc}">${moodFace(f)}<span>${T(k)}</span></button>`).join('')}</div><button class="lnk small askoff" data-act="askoff" data-k="rate">${T('ask_never')}</button></div>`;
-  }
-  // One question at a time at the top of the home page: the tour that just ended first, otherwise today's mood.
-  const askCardHtml = () => rateCardHtml() || moodCardHtml();
   // Work and rest for a guide or driver, in two parts for the Time off page: the card (numbers, advice, more) and the wishes (their own fold).
   function workRestParts() {
     const m = me(); if (!m || isAdmin()) return null; const td = today(), r = rules(), pf = wrPrefs(), driver = m.role === 'driver';
@@ -2936,89 +2688,7 @@
   }
   const LANG_CODES = { english: 'EN', russian: 'RU', german: 'DE', french: 'FR', spanish: 'ES', italian: 'IT', georgian: 'KA', hebrew: 'HE', chinese: 'ZH', arabic: 'AR', polish: 'PL', ukrainian: 'UK', turkish: 'TR', dutch: 'NL', japanese: 'JA', korean: 'KO' };
   // A pasted email may be the raw message (headers, quoted-printable, HTML). Turn it into plain lines first; plain text passes through unchanged.
-  function mailText(raw) {
-    let t = String(raw || '').replace(/\r\n?/g, '\n');
-    const subj = (t.match(/^Subject:\s*([^\n]+)/im) || [])[1] || '';
-    if (/^Content-Transfer-Encoding:\s*quoted-printable/im.test(t) || /=3D["']/.test(t)) {
-      t = t.replace(/=\n/g, ''); const bytes = []; for (let i = 0; i < t.length; i++) { const h = t[i] === '=' ? t.slice(i + 1, i + 3) : ''; if (/^[0-9A-F]{2}$/i.test(h)) { bytes.push(parseInt(h, 16)); i += 2; } else { const c = t.charCodeAt(i); if (c < 128) bytes.push(c); else bytes.push(...new TextEncoder().encode(t[i])); } }
-      try { t = new TextDecoder('utf-8').decode(new Uint8Array(bytes)); } catch (e) { /* keep as is */ }
-    }
-    if (/<(html|body|div|table|p|br)\b/i.test(t)) {
-      const at = t.search(/<(!doctype|html)\b/i); if (at > 0) t = t.slice(at);
-      t = t.replace(/<(head|style|script)\b[\s\S]*?<\/\1>/gi, ' ').replace(/<(br|\/div|\/p|\/tr|\/td|\/h\d|\/li|\/span|\/b)\b[^>]*>/gi, '\n').replace(/<[^>]+>/g, ' ')
-        .replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&mdash;|&ndash;/gi, '-').replace(/&quot;/gi, '"').replace(/&#0?39;|&apos;/gi, "'").replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&#(\d+);/g, (m, n) => String.fromCharCode(+n));
-      t = t.split('\n').map(x => x.trim()).filter(Boolean).join('\n'); if (subj) t = 'Subject: ' + subj + '\n' + t;
-    }
-    return t;
-  }
-  function parseBooking(raw) {
-    const t = mailText(raw).replace(/\[[^\]]*\]\([^)]*\)/g, ' ').replace(/https?:\/\/\S+/g, ' ').replace(/\|/g, '\n').replace(/[ \t\u00a0]+/g, ' ').replace(/\n\s*\n+/g, '\n').replace(/^\s*(ticket-booking|calendar|users|single-person|globe|pin|currency)\s*$/gim, '').replace(/^(Booking time|Booking notification sent|Booked (?:at|on)|Please confirm the booking before)[^\n]*\n?[^\n]*$/gim, '').replace(/\n\s*([AaPp]\.?[Mm]\.?)(?=\s*(?:\n|$))/g, ' $1');
-    const get = re => { const m = t.match(re); return m ? m[1].trim() : ''; };
-    const src = /get\s?your\s?guide|\bGYG[A-Z0-9]{8,}\b/i.test(t) ? 'GetYourGuide' : /viator|tripadvisor/i.test(t) ? 'Viator' : /klook/i.test(t) ? 'Klook' : /trip\.com|ctrip|VBK system/i.test(t) ? 'Trip.com' : /airbnb|booked your experience|Hosted by/i.test(t) ? 'Airbnb' : /civitatis/i.test(t) ? 'Civitatis' : /freetour/i.test(t) ? 'FreeTour' : /tourradar/i.test(t) ? 'TourRadar' : /trekksoft/i.test(t) ? 'Website' : '';
-    let ref = get(/\b(GYG[A-Z0-9]{8,})\b/) || get(/\b(BR-[0-9A-Z]{6,})\b/) || get(/\b(\d{4,6}-\d{12,14}-[A-Z0-9]{3,})\b/) || get(/Booking reference ID\s*:?\s*([A-Z0-9-]{5,})/i) || get(/Confirmation code\s*:?\s*([A-Z0-9]{6,})/i) || get(/(?:RESERVATION|BOOKING) NUMBER\s*:?\s*([A-Z0-9-]{5,})/i) || get(/(?:Booking (?:Reference\b|ID\b|number\b|No\b\.?|code\b)|Reference (?:number\b|no\b\.?)|Order (?:number\b|ID\b|No\b\.?)|Confirmation (?:number|code)|Voucher (?:number|code))\s*[:#]?\s*#?\s*([A-Z0-9][A-Z0-9-]{4,})/i) || get(/basket\s*#\s*(\d{5,}[A-Z0-9]*)/i) || get(/New order[^\n]*\n\s*#(\d{5,}[A-Z0-9]*)/i) || get(/(?:Ctrip )?order No\.?\s*:?\s*(\d{9,}[A-Z]*)/i) || get(/Booking Request\s*#(\d{4,}[A-Z0-9]*)/i) || get(/order[^#\n]{0,80}#\s?(\d{6,})/i);
-    if (src === 'Viator' && /^\d{6,}[A-Z]*$/.test(ref)) ref = 'BR-' + ref;   // "Tripadvisor Experiences" mails drop the BR- prefix; the saved booking has it
-    let title = get(/following booking has\s+(?:changed|been (?:cancell?ed|updated|amended))\.?\s*\n(?!\s*Reference)([^\n]{6,160})/i) || get(/following booking for (.+?) on (?:[A-Z][a-z]{2}, )?[A-Z][a-z]{2} \d{1,2}, \d{4}/) || get(/\n\s*(?:Canceled|Cancelled)\s*\n([^\n]{6,160})/) || get(/Customer:[^\n]*? Tour:\s*(.+?)\s+Date:/) || get(/(?:^|\n)\s*(?:Tour Name|Activity name|Product name|ACTIVITY|Tour|Product)\s*:[ \t]*\n?[ \t]*([^\n]+)/i) || get(/\n([^\n]{8,200})\n\s*Reference number\b/i) || get(/\n([^\n]{8,200})\n\s*Package\s*:/i) || get(/Tour Grade Description\s*:\s*([^\n]+)/i) || get(/^([^\n]{6,140}?) (?:Edited )?Tour Reservation (?:Previous )?Date of the Tour/m) || get(/booking\s*\(#[^)]*\)\s*for\s+(.+?)(?=\s+at \d{1,2}:\d{2}\s*[AP]M on|\s+Date of|\s*$)/i) || get(/\d+(?:&nbsp;|\s)*day tour\s*\n([^\n]+)/i) || get(/(?:^|\n)([^\n:]{6,120})\n\s*Tour Reservation\b/i) || get(/Booked product\s*\n\s*([^\n]+)/i) || get(/has been booked:?\s*\n\s*([^\n]+)/i) || get(/new reservation for ([^.\n]+)/i) || get(/order for (.+?) and issued/i) || get(/\n([^\n]+)\n\s*Hosted by/i) || get(/(?:Activity|Product|Experience)\s*:\s*([^\n]+)/i);
-    title = title.replace(/\s+Reference number.*$/i, '').replace(/^\d{5,}-/, '').replace(/\t.*$/, '').trim();
-    // GetYourGuide change mail: "Date  New" then the new date, then the old date struck through. The first date is the one that counts; the second is what it was.
-    const dm = t.match(/(?:^|\n)\s*Date\s*\n\s*(?:New\s*\n\s*)?([^\n]*\d{4}[^\n]*)(?:\n\s*([^\n]*\d{4}[^\n]*))?/i), was = dm && dm[2] && parseWhen(dm[2]).date ? parseWhen(dm[2]) : null;
-    let when = dm && parseWhen(dm[1]).date ? parseWhen(dm[1]) : parseWhen(get(/(?:Travel Date|Activity Date|Tour date|Date of (?:the )?(?:tour|activity|use)|Departure date|Date Request|Date and time)\s*:?\s*([^\n]+)/i) || get(/\bDate\s*:?\s*([^\n]+)/i) || get(/\bon (\d{4}-\d{2}-\d{2})\b/));
-    if (!when.time) when.time = parseWhen(get(/(?:Tour Grade|Start time|Time|Hour|Option)\s*:?\s*([^\n]*\d{1,2}:\d{2}[^\n]*)/i)).time || parseWhen(get(/\bat (\d{1,2}:\d{2}\s*[AP]M) on \d{4}-/i)).time;
-    // FreeTour change: "Previous Date of the Tour: ... New Date of the Tour: ..."; Klook change: "Date Request: <new> <old>".
-    let was2 = was;
-    const nd = parseWhen(get(/New Date of the Tour\s*:\s*([^\n]*)/i)), pd = parseWhen(get(/Previous Date of the Tour\s*:\s*([^\n]*)/i));
-    if (nd.date) { when = nd; if (pd.date) was2 = pd; }
-    else { const kd = t.match(/Date Request\s*:?\s*(\d{4}-\d{2}-\d{2})\s+(\d{4}-\d{2}-\d{2})/i); if (kd) { when = Object.assign({}, when, { date: kd[1] }); was2 = { date: kd[2], time: '' }; } }
-    // No year in the mail (Airbnb: "Thursday, November 12", "10:30 AM"): take the year in which that weekday fits, nearest to today. No weekday-and-date line (TourRadar "Friday, 25 Sep 2026") is read as a plain date.
-    if (!when.date) {
-      const wd = t.match(/\b(Mon|Tues|Wednes|Thurs|Fri|Satur|Sun)day,?\s+(?:([A-Z][a-z]+)\s+(\d{1,2})|(\d{1,2})\s+([A-Z][a-z]+))(?:,?\s*(\d{4}))?/);
-      if (wd) {
-        const mon = String(wd[2] || wd[5]).slice(0, 3).toLowerCase(), mi = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'].indexOf(mon), dd = Number(wd[3] || wd[4]), wi = ['Sun', 'Mon', 'Tues', 'Wednes', 'Thurs', 'Fri', 'Satur'].indexOf(wd[1]);
-        if (mi >= 0 && dd >= 1 && dd <= 31) {
-          const ty = new Date().getFullYear(), ys = wd[6] ? [Number(wd[6])] : [ty - 1, ty, ty + 1].filter(y => new Date(y, mi, dd).getDay() === wi).sort((a, b) => Math.abs(new Date(a, mi, dd) - Date.now()) - Math.abs(new Date(b, mi, dd) - Date.now()));
-          if (ys[0]) {
-            when = Object.assign({}, when, { date: `${ys[0]}-${String(mi + 1).padStart(2, '0')}-${String(dd).padStart(2, '0')}` });
-            if (!when.time) { const tm = t.slice(wd.index).match(/\b(\d{1,2}):(\d{2})\s*([AaPp][Mm])?/); if (tm) { let h = Number(tm[1]); if (/p/i.test(tm[3] || '') && h < 12) h += 12; if (/a/i.test(tm[3] || '') && h === 12) h = 0; when.time = `${String(h).padStart(2, '0')}:${tm[2]}`; } }
-          }
-        }
-      }
-    }
-    let guest = get(/Lead travell?er(?: name)?\s*:?\s*([^\n]+)/i) || get(/(?:Booking Name|Lead participant|Main customer|Customer name|Customer(?=\s*:)|Contact (?:name|person)|Guest name|Booked by)\s*:?\s*([^\n]+)/i) || get(/^\s*([^\n]{2,40}?) booked your experience/im) || get(/^\s*([^\n]{2,40}?) (?:CANCELED|CANCELLED|RESCHEDULED|UPDATED) THEIR RESERVATION/m) || get(/\n([^\n]{2,40})\n\s*Identity verified/i) || get(/Your customer:\s*(.+?) has (?:cancell?ed|edited)/i) || get(/Traveler names?\s*:?\s*([^\n]+)/i);
-    guest = guest.replace(/\s+(?:Booking E-?mail|E-?mail|Phone|Tel|Language|Adults|Tour:|Date:|Price)\b.*$/i, '').replace(/^\(\s*\)\s*/, '').replace(/^[\/\s-]+$/, '').replace(/\S+@\S+.*$/, '').replace(/\s*(Phone|Tel|Mobile)\b.*$/i, '').replace(/^\((?:MR|MRS|MS|MISS|DR)\)\s*/i, '').trim();
-    if (/^[A-Z' -]+\/[A-Z' -]+$/.test(guest)) { const [sn, gn] = guest.split('/'); const cap = s => s.toLowerCase().replace(/\b\w/g, x => x.toUpperCase()); guest = `${cap(gn)} ${cap(sn)}`.trim(); }
-    if (!guest) guest = get(/(?:^|\n)\s*Name\s*:\s*([^\n]+)/i);
-    const native = get(/\bName\s*:\s*([^\n]+)/); if (native && /[^\u0000-\u024f]/.test(native) && !guest.includes(native)) guest = guest ? `${guest} (${native.trim()})` : native.trim();
-    const num = re => { const m = t.match(re), n = m ? Number(m[1]) : 0; return n >= 1 && n <= 99 ? n : 0; };   // a head count is 1-99; a longer number is a booking code, not people
-    let adults = num(/(\d+)\s*x?\s*Adults?\b/i) || num(/\bAdults?\s*:\s*(\d+)/i), children = num(/\b(?:Children|Kids|Minors)\s*:\s*(\d+)/i) + num(/(\d+)\s*x?\s*(?:Child|Children|Kids?)\b/i) + num(/(\d+)\s*x?\s*Youths?\b/i) + num(/(\d+)\s*x?\s*Infants?\b/i);
-    if (!adults && !children && src === 'Airbnb') adults = num(/(\d+)\s+guests?\b/i);
-    if (!adults && !children) adults = num(/(?:Travell?ers|Participants|Persons|People|Guests|Number of (?:participants|people|guests)|Booking Quantity|Quantity)\s*:?\s*(\d+)/i) || 1;
-    const phs = [...t.matchAll(/(?:Phone|Mobile|Tel(?:ephone)?|WhatsApp)\s*(?:number)?\s*:?\s*(?:\([^)]*\))?\s*(?:[A-Z]{2}\s*)?(\+?\d[\d\s()*-]{6,}\d)/gi)].map(m => m[1]).filter(x => !x.includes('*')).map(x => x.replace(/[\s()-]/g, ''));
-    const phone = normPhone(phs.find(x => x.startsWith('+')) || (phs[0] ? (phs[0].length > 10 && !/^5/.test(phs[0]) ? '+' + phs[0] : phs[0]) : ''));
-    // The guest's email: the address on an "E-mail:" line first, else the first address that is not ours or the platform's own sender. Relay addresses (GetYourGuide, Viator, Airbnb, Apple) are the guest's and are kept.
-    const notGuest = e => /\*|no-?reply|do-?not-?reply|notification|mailer|support@|bookings?@|info@|hello@|partner|supplier|friendly\.ge|friendlygeorg|trekksoft|@(?:www\.)?(?:freetour|klook|trip|viator|getyourguide|airbnb|civitatis|tourradar)\.com$|example/i.test(e);
-    const mails = (t.match(/[\w.+*-]+@[\w-]+(?:\.[\w-]+)+/g) || []), labelled = get(/(?:Booking E-?mail|Customer e-?mail|Guest e-?mail|E-?mail(?: address)?)\s*:?\s*([\w.+-]+@[\w-]+(?:\.[\w-]+)+)/i);
-    const email = (labelled && !notGuest(labelled) ? labelled : '') || mails.find(e => !notGuest(e)) || '';
-    const lv = (get(/(?:Tour Language|Guide language|Preferred language|Language)\s*:?\s*([^\n]+)/i) || '').toLowerCase(), lang = (Object.entries(LANG_CODES).find(([k]) => lv.includes(k)) || [])[1] || '';
-    const pickup = get(/(?<!at )(?:Pick-?up(?: point| location| address)?|Meeting Point|Departure location|Hotel(?: name)?)\s*:?\s*([^\n]+)/i).replace(/\s*Open in Google Maps.*$/i, '').trim();
-    const marks = []; if (/non[\s-]?refundable|no refund/i.test(t)) marks.push('nonref'); if (/wine tasting/i.test(t)) marks.push('wine'); if (/front seat/i.test(t)) marks.push('front_seat'); if (/\bPick-?up\b/i.test(t) && pickup && !/Meeting Point/i.test(t)) marks.push('pickup'); if (src === 'FreeTour') marks.push('freetour');
-    const price = get(/Total \((?:USD|EUR|GEL)\)\s*:?\s*([^\n]+)/i) ? get(/Total \(((?:USD|EUR|GEL))\)/i) + ' ' + get(/Total \((?:USD|EUR|GEL)\)\s*:?\s*\$?€?([\d,.]+)/i) : get(/(?:Price|Net Rate|Total(?: price)?|Amount(?: paid)?|Sales Price)\s*:?\s*((?:USD|EUR|GEL|\$|€|₾)\s*\$?\s*[\d,.]+)/i);
-    const pnum = Number(String(price).replace(/[^\d.,]/g, '').replace(/,(?=\d{3}\b)/g, '').replace(',', '.')) || null, pcur = /EUR|€/.test(price) ? 'EUR' : /GEL|₾/.test(price) ? 'GEL' : price ? 'USD' : '';
-    // Only an explicit past-tense cancel counts: policy text such as "you can cancel" or "CANCELLATIONS" on a new booking must not.
-    const head = t.slice(0, 700), status = /\bcancell?ed\b|cancel request|取消申请|已提交取消/i.test(head) ? 'cancel' : /(?:^|\n)\s*New booking\b|booked your experience|great news|You've received a/i.test(head) ? 'new' : /amend|reschedul|\bchanged\b|modif|has been updated|unable to update|Edited Tour Reservation|UPDATED THEIR RESERVATION|改期/i.test(head) ? 'change' : 'new';
-    const kind = /private/i.test(title) ? 'private' : /group|shared|small-group|join-in/i.test(title) ? 'group' : /private tour/i.test(t) ? 'private' : /join-in|small group/i.test(t) || src === 'FreeTour' ? 'group' : '';
-    const res = { src, ref, title, date: when.date, time: when.time, was: was2, guest, adults, children, phone, email: email.toLowerCase(), lang, pickup, marks, price, pnum, pcur, status, kind };
-    // Website (TrekkSoft) order lines: "2 x Tour name (24 November, 2026, 10:30)", then "Guest 1 / First name / Last name / phone" blocks.
-    const tk = t.match(/^\s*(\d{1,2})\s*x\s+(.+?)\s*\(([^()]*\d{4}[^()]*)\)\s*$/m);
-    if (tk) {
-      const w = parseWhen(tk[3]); res.title = tk[2].trim(); res.date = w.date || res.date; res.time = w.time || res.time; res.src = res.src || 'Website';
-      res.kind = /private/i.test(res.title) ? 'private' : /group/i.test(res.title) ? 'group' : res.kind;
-      const blocks = t.split(/\n\s*Guest\s+\d+\s*\n/i).slice(1), people = blocks.map(b => ({ name: [((b.match(/First name\s*:\s*([^\n]+)/i) || [])[1] || '').trim(), ((b.match(/Last name\s*:\s*([^\n]+)/i) || [])[1] || '').trim()].join(' ').trim(), phone: normPhone(((b.match(/Phone[^:\n]*:\s*(\+?[\d\s()-]{7,})/i) || [])[1] || '').replace(/[\s()-]/g, '')), email: ((b.match(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/) || [])[0] || '').toLowerCase(), child: /child|kid|infant/i.test(b) }));
-      const n = (Number(tk[1]) >= 1 && Number(tk[1]) <= 99 ? Number(tk[1]) : 0) || people.length || 1, kids = people.filter(x => x.child).length;
-      res.adults = n - kids; res.children = kids;
-      if (people.length) { const lead = people.find(x => x.name) || people[0]; res.guest = lead.name || res.guest; res.phone = lead.phone || res.phone; res.email = lead.email || res.email; const others = people.filter(x => x !== lead && (x.name || x.phone)); if (others.length) res.others = others.map(x => [x.name, x.phone].filter(Boolean).join(' ')).join('; '); }
-      const sums = [...t.matchAll(/\(\s*(USD|EUR|GEL)\s*([\d.,]+)\s*\)/gi)]; if (sums.length) { res.pnum = sums.reduce((s, m) => s + Number(m[2].replace(',', '')), 0); res.pcur = sums[0][1].toUpperCase(); res.price = `${res.pcur} ${res.pnum}`; }
-    }
-    return res;
-  }
+  const { mailText, parseBooking, isReview, parseReview, RV_LABELS } = window.FSParse({ normPhone, parseWhen, LANG_CODES });   // parse.js
   // Similar tour names: shared words count, ignoring small words.
   const words = s => new Set(String(s || '').toLowerCase().replace(/[^a-z0-9\u10a0-\u10ff\u0400-\u04ff ]+/g, ' ').split(/\s+/).filter(w => w.length > 3 && !/^(tour|tours|from|with|tbilisi|day|trip|private|group|small|guided|hours|full|half|georgia|the|and)$/.test(w)));
   const simil = (x, y) => { const A = words(x), B = words(y); if (!A.size || !B.size) return 0; let n = 0; A.forEach(w => { if (B.has(w)) n++; }); return n / Math.min(A.size, B.size); };
@@ -3036,48 +2706,6 @@
     return { old, oldTour: old ? db.tours.find(x => x.id === old.tour_id) : null, cat: cat && cat.s >= 0.4 ? cat.x : null, tour: tours[0] ? tours[0].x : null };
   }
 
-  // ---------- guest reviews pasted from a platform (GetYourGuide first). Admin only. ----------
-  const RV_LABELS = [['guide', /^(?:the )?guide(?:'s)?(?: knowledge| quality)?$/i], ['language', /^language(?: skills)?$/i], ['value', /^value(?: for money)?$/i], ['pace', /^pace(?: of the tour)?$/i], ['accuracy', /^(?:accuracy|organi[sz]ation|as described|accuracy of (?:the )?(?:description|information))$/i], ['transport', /^transport(?:ation)?$/i]];
-  function isReview(raw) {
-    const t = String(raw || ''); const hits = RV_LABELS.filter(([, re]) => t.split('\n').some(l => re.test(l.replace(/[:\d★☆.\s/]+$/g, '').trim()))).length;
-    if (/received a new review for your product|gave your experience [1-5] stars?/i.test(t)) return true;   // notification e-mails
-    return /replied on|getyourguide traveler|show details|traveler type|travel date/i.test(t) && hits >= 2 || hits >= 4 || (/\bGYG[A-Z0-9]{8,}\b/.test(t) && hits >= 2);
-  }
-  function parseReview(raw) {
-    const lines = mailText(String(raw || '')).replace(/https?:\/\/\S+/g, ' ').split('\n').map(x => x.replace(/[ \t ]+/g, ' ').trim()).filter(Boolean);
-    const t = lines.join('\n'), get = re => { const m = t.match(re); return m ? m[1].trim() : ''; };
-    const stars = x => { const n = (String(x).match(/★/g) || []).length; if (n) return n; const m = String(x).match(/\b([1-5](?:\.\d)?)\b/); return m ? Number(m[1]) : null; };
-    // Notification e-mails. Airbnb: "<name> gave your experience 5 stars", stars, an optional quoted comment, the tour, "November 11 at 8:30 AM". GetYourGuide: "You have received a new review for your product <tour>." (no star rating in the mail).
-    const monthDay = x => { const m = String(x).match(/([A-Z][a-z]+)\.? (\d{1,2})\b/); if (!m) return ''; const mi = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'].indexOf(m[1].slice(0, 3).toLowerCase()); if (mi < 0) return ''; const n = new Date(), y = new Date(n.getFullYear(), mi, Number(m[2])) > new Date(n.getTime() + 2 * 864e5) ? n.getFullYear() - 1 : n.getFullYear(); return `${y}-${String(mi + 1).padStart(2, '0')}-${String(m[2]).padStart(2, '0')}`; };
-    const ab = t.match(/^(.+?) gave your experience ([1-5]) stars?/m);
-    if (ab) {
-      const i = lines.findIndex(l => l.startsWith(ab[0])), rest = lines.slice(i + 1).filter(l => !/^★+☆*$/.test(l)), q = /^["“]/;
-      let comment = '', k = 0; if (rest[0] && q.test(rest[0])) { const buf = []; while (k < rest.length) { buf.push(rest[k]); if (/["”]$/.test(rest[k])) { k++; break; } k++; } comment = buf.join(' ').replace(/^["“]|["”]$/g, '').trim(); }
-      const title = (rest[k] || '').replace(/\s*(?:\.\.\.|…)$/, '').trim(), dl = rest.find(l => /^[A-Z][a-z]+ \d{1,2} at \d/.test(l));
-      return { platform: 'Airbnb', ref: '', reviewer: ab[1].trim(), country: '', reviewed_on: null, rating: Number(ab[2]), ratings: {}, comment, tour_title: title, option_name: '', travel_date: dl ? monthDay(dl) || null : null, traveler_type: '', replied_on: null };
-    }
-    const gn = t.match(/new review for your product (.+?)\.?\s*(?:\n|$)/i);
-    if (gn) {
-      const i = lines.findIndex(l => /new review for your product/i.test(l)), end = lines.findIndex((l, j) => j > i && /best regards|the getyourguide team|getyourguide (?:deutschland|receives)|become a supply partner/i.test(l)), body = lines.slice(i + 1, end > i ? end : undefined).filter(l => l.length > 3 && !/^(?:-+|hi supply partner|reply|respond|view |read |see |log in|get started)/i.test(l));
-      return { platform: 'GetYourGuide', ref: get(/\b(GYG[A-Z0-9]{8,})\b/), reviewer: 'GetYourGuide traveler', country: '', reviewed_on: null, rating: null, ratings: {}, comment: body.join('\n'), tour_title: gn[1].trim(), option_name: '', travel_date: null, traveler_type: '', replied_on: null };
-    }
-    const ratings = {};
-    lines.forEach((l, i) => { const bare = l.replace(/\s*[:\-]?\s*(?:[1-5](?:\.\d)?(?:\s*\/\s*5)?|★+☆*)\s*$/, '').trim(); const found = RV_LABELS.find(([, re]) => re.test(bare)); if (!found || ratings[found[0]] != null) return; const same = bare !== l ? stars(l.slice(bare.length)) : null, nxt = same == null && lines[i + 1] && /^(?:[1-5](?:\.\d)?(?:\s*\/\s*5)?|★+☆*)$/.test(lines[i + 1]) ? stars(lines[i + 1]) : null; const v = same != null ? same : nxt; if (v != null) ratings[found[0]] = v; });
-    const vals = Object.values(ratings);
-    let rating = null; const top = lines.slice(0, 6).find(l => /^(?:[1-5](?:\.\d)?(?:\s*\/\s*5)?|★{1,5}☆*)$/.test(l) || /^[1-5](?:\.\d)? (?:out of 5|stars?)$/i.test(l)); if (top) rating = stars(top); else rating = stars(get(/(?:Overall|Rating)\s*:?\s*([^\n]+)/i)) ; if (rating == null && vals.length) rating = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length * 10) / 10;
-    const ref = get(/\b(GYG[A-Z0-9]{8,})\b/), tw = get(/Travel date\s*:?\s*\n?([^\n]+)/i), travel = tw && parseWhen(tw).date ? parseWhen(tw).date : '';
-    const rw = get(/(?:Reviewed(?: on)?|Review date|Submitted(?: on)?)\s*:?\s*\n?([^\n]+)/i), reviewed = rw && parseWhen(rw).date ? parseWhen(rw).date : (lines.map(l => parseWhen(l)).find(w => w.date && w.date !== travel) || {}).date || '';
-    const rep = get(/Replied on\s*:?\s*\n?([^\n]+)/i), replied = rep && parseWhen(rep).date ? parseWhen(rep).date : '';
-    const type = get(/Traveler type\s*:?\s*\n?([^\n]+)/i) || get(/^(Solo|Couple|Family(?: with [a-z ]+)?|Friends|Group of friends|Business)$/im);
-    const labelRe = /^(?:show details|replied on|reply|travel date|traveler type|booking (?:reference|ref)|reference|option|activity|tour|reviewed|review date|submitted)\b/i, junk = l => RV_LABELS.some(([, re]) => re.test(l.replace(/[:\d★☆.\s/]+$/g, '').trim())) || labelRe.test(l) || /^[1-5](?:\.\d)?(?:\s*\/\s*5)?$|^★+☆*$/.test(l) || /^GYG[A-Z0-9]{8,}$/.test(l) || (parseWhen(l).date && l.length < 30);
-    const text = lines.filter(l => !junk(l)); 
-    const reviewer = (text.find(l => /getyourguide traveler/i.test(l)) || '').replace(/\s*[,·|].*$/, '') || (text.find(l => l.length <= 40 && !/[.!?]$/.test(l) && !/\b(?:tour|trip|walking|private|group)\b/i.test(l)) || '');
-    const country = get(/(?:Country|From)\s*:?\s*([A-Za-z .'-]{3,40})/) || (text.find(l => /^[A-Z][A-Za-z .'-]{2,30}$/.test(l) && l !== reviewer && l.split(' ').length <= 3 && !/\b(?:tour|trip|walking|private|group)\b/i.test(l)) || '');
-    const tour = get(/(?:Activity|Tour|Product)\s*:\s*([^\n]+)/i) || (text.find(l => /\b(?:tour|trip|walk|excursion|day)\b/i.test(l) && l.length <= 140 && l !== reviewer) || '');
-    const option = get(/Option\s*:?\s*\n?([^\n]+)/i);
-    const comment = text.filter(l => l !== reviewer && l !== country && l !== tour && l !== option && l !== type && l.length > 25).join('\n');
-    return { platform: 'GetYourGuide', ref, reviewer: reviewer || 'GetYourGuide traveler', country, reviewed_on: reviewed || null, rating, ratings, comment, tour_title: tour, option_name: option, travel_date: travel || null, traveler_type: type, replied_on: replied || null };
-  }
   function rvMatch(rv) {
     const old = rv.ref ? db.guest_reviews.find(x => (x.ref || '').toUpperCase() === rv.ref.toUpperCase()) : db.guest_reviews.find(x => !x.ref && x.platform === rv.platform && x.reviewer === rv.reviewer && x.tour_title === rv.tour_title && (x.comment || '').slice(0, 40) === (rv.comment || '').slice(0, 40));
     const b = rv.ref ? db.bookings.find(x => (x.ref || '').toUpperCase() === rv.ref.toUpperCase()) : null;
@@ -3441,101 +3069,6 @@
       <div class="cols">${kindsOn.length ? `<div class="card"><b>${T('st_kinds')}</b>${kindsOn.map(([k, n]) => `<div class="row"><span class="tag t-${k}">${T('kind_' + k)}</span><span class="meter"><i style="width:${inYear.length ? Math.round(n / inYear.length * 100) : 0}%"></i></span><b class="num">${n}</b></div>`).join('')}</div>` : ''}
       ${top.length ? `<div class="card"><div class="bar"><b>${T('st_top')}</b><span class="spacer"></span>${isAdmin() ? `<button class="btn sm" data-act="tnames">${T('tn_btn')}</button>` : ''}</div>${top.map(([t, n]) => `<div class="row"><span style="flex:1;min-width:0;overflow-wrap:anywhere">${esc(t)}</span><b class="num">${n}</b></div>`).join('')}</div>` : ''}</div>${(person(id) || {}).role !== 'driver' ? compareHtml(id, y) : ''}`}`;
   }
-  // ---------- Photo of the day: one photo per person per day, likes from the team, the best one leads; older days are the archive ----------
-  // Only the team sees the photos (private storage, opened with short-lived links).
-  const PH = { url: {}, asked: new Set(), want: new Set(), timer: 0 };
-  const phPath = (p, k) => `${p.user_id}/${p.id}-${k}.jpg`, likesN = p => (Array.isArray(p.likes) ? p.likes.length : 0), iLike = p => (p.likes || []).includes(S.authId);
-  function phAsk(paths) {
-    paths.forEach(x => { if (!PH.asked.has(x)) { PH.asked.add(x); PH.want.add(x); } }); if (!PH.want.size || PH.timer) return;
-    PH.timer = setTimeout(async () => { PH.timer = 0; const list = [...PH.want]; PH.want = new Set(); try { Object.assign(PH.url, await S.photoUrls(list)); } catch (e) { list.forEach(x => PH.asked.delete(x)); return; } if (state.modal && state.modal.type === 'photos') renderModal(); else if (!state.modal) render(); }, 80);
-  }
-  function phSrc(p, k) { if (p.data) return p.data; const path = phPath(p, k), u = PH.url[path]; if (u) return u; phAsk([path]); return ''; }
-  const phImg = (p, k, cls) => { const src = phSrc(p, k); return src ? `<img class="${cls}" src="${esc(src)}" alt="${esc(p.caption || pname(p.user_id))}" loading="lazy" decoding="async">` : `<span class="${cls} wait" aria-hidden="true">${msi('photo_camera')}</span>`; };
-  // A badge the person has earned can ride on their photo as a sticker; the few words sit on the photo as a paper label.
-  const phBadge = p => { if (!p.sticker) return null; const id = twin(p.user_id), g = game(id), b = g && g.list.find(x => x.k === p.sticker); return b && b.done ? { b, tier: tierOf(b, g.list) } : null; };
-  const phStick = (p, cls) => { const x = phBadge(p); return x ? `<span class="phstick ${cls || ''}" title="${esc(bName(x.b))}"><svg viewBox="0 0 96 104" aria-hidden="true">${medalInner({ ...x.b, done: true }, x.tier, true)}</svg></span>` : ''; };
-  const phCap = p => (p.caption ? `<span class="phcap">${esc(p.caption)}</span>` : '');
-  const myStickers = () => game(me().id).list.filter(b => b.done && !(b.hidden && !b.done)).slice(0, 60);
-  async function phDataUrl(p) { if (p.data) return p.data; let u = PH.url[phPath(p, 'f')]; if (!u) { Object.assign(PH.url, await S.photoUrls([phPath(p, 'f')])); u = PH.url[phPath(p, 'f')]; } const bl = await (await fetch(u)).blob(); return await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(bl); }); }
-  // The photo as a picture to share: the photo fills the card, the words sit on a paper label, the badge is a sticker in the corner.
-  async function photoPng(p) {
-    const xml = t => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'), font = 'font-family="-apple-system,Segoe UI,Roboto,Noto Sans,Noto Sans Georgian,sans-serif"';
-    const src = await phDataUrl(p), x = phBadge(p), words = String(p.caption || '').split(/\s+/).filter(Boolean), lines = []; let cur = '';
-    words.forEach(w => { if ((cur + ' ' + w).trim().length > 30 && cur) { lines.push(cur); cur = w; } else cur = (cur + ' ' + w).trim(); }); if (cur) lines.push(cur); const ls = lines.slice(0, 3), bh = ls.length ? 60 + ls.length * 62 : 0;
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1080" height="1350" viewBox="0 0 1080 1350"><rect width="1080" height="1350" fill="#f7f5ef"/><defs><clipPath id="pc"><rect x="40" y="40" width="1000" height="1130" rx="56"/></clipPath></defs>
-      <image href="${src}" xlink:href="${src}" x="40" y="40" width="1000" height="1130" preserveAspectRatio="xMidYMid slice" clip-path="url(#pc)"/>
-      ${bh ? `<rect x="80" y="${1130 - bh}" width="920" height="${bh}" rx="32" fill="#ffffff" opacity=".93"/>${ls.map((l, i) => `<text x="120" y="${1130 - bh + 84 + i * 62}" font-size="48" font-weight="600" fill="#20251f" ${font}>${xml(l)}</text>`).join('')}` : ''}
-      ${x ? `<g transform="translate(770 70) scale(2.6)">${medalInner({ ...x.b, done: true }, x.tier, true)}</g>` : ''}
-      <circle cx="84" cy="1262" r="14" fill="#b94a2f"/><text x="114" y="1276" font-size="40" font-weight="700" fill="#20251f" ${font}>Friendly.ge</text>
-      <text x="1000" y="1276" text-anchor="end" font-size="36" fill="#55594f" ${font}>${xml(pname(p.user_id))} · ${xml(fmt(p.day, { day: 'numeric', month: 'long', year: 'numeric' }))}</text></svg>`;
-    return await new Promise((res, rej) => { const img = new Image(), url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' })); img.onload = () => { try { const c = document.createElement('canvas'); c.width = 1080; c.height = 1350; c.getContext('2d').drawImage(img, 0, 0); URL.revokeObjectURL(url); c.toBlob(b => (b ? res(b) : rej(new Error('image'))), 'image/jpeg', 0.88); } catch (e) { rej(e); } }; img.onerror = () => rej(new Error('image')); img.src = url; });
-  }
-  const photosOn = day => db.photos.filter(p => p.day === day).sort((x, y) => likesN(y) - likesN(x) || String(x.created_at || '').localeCompare(String(y.created_at || '')));
-  const myPhoto = day => db.photos.find(p => p.day === day && twin(p.user_id) === me().id);
-  // The greeting line. Ordinary day: "Good morning, <name>" and one short phrase (phrases.js). A special day gets a card:
-  // own birthday or anniversary (special dates), a holiday from the team calendar, a sick day (get well) or an approved day off.
-  const firstName = m => String((m && m.name) || '').replace(/\(.*?\)/g, '').trim().split(/\s+/)[0] || '';
-  const hiText = (k, name) => T(k, { name }).replace(/[,،]\s*$/, '').replace(/,\s*!/, '!');
-  function specialOn(day) {
-    const m = me(); if (!m) return null; const md = day.slice(5);
-    const mine = db.personal_dates.filter(d => twin(d.user_id) === m.id && (d.yearly ? String(d.date).slice(5) === md : d.date === day)).map(d => pdKind(d.title));
-    const k = mine.includes('birthday') ? 'birthday' : mine.includes('anniversary') ? 'anniversary' : ''; if (k) return { k, art: 'gift' };
-    const o = offOn(m.id, day); if (o && o.type === 'sick') return { k: 'sick', art: 'cup' };
-    const h = holidayOn(day); if (h) return { k: 'holiday', art: 'star', name: h.name };
-    return o && o.status === 'approved' && o.type !== 'half' ? { k: 'off', art: 'sofa' } : null;
-  }
-  const specialText = sp => [hiText('gr_' + sp.k, sp.k === 'holiday' ? trName(sp.name) : firstName(me())), T('gr_' + sp.k + '_t')];
-  // Bank details the office typed in for a person: they show a banner until the person confirms or edits them.
-  const bankWaiting = (pd, id) => !!(pd && pd.entered_by && pd.entered_by !== id && !pd.confirmed_at && (pd.account || pd.bank_name || pd.holder));
-  const bankBannerHtml = () => (me() && !state.viewAs && bankWaiting(db.payout_details.find(x => x.id === me().id), me().id) ? `<button class="banner small setupban" data-act="bankgo"><span>${T('bk_banner')}</span><b>${T('xc_see')} ›</b></button>` : '');
-  function greetHtml() {
-    const m = me(); if (!m || !m.active || state.viewAs) return ''; const td = today(), sp = specialOn(td), art = k => (window.CUTE && window.CUTE.art[k]) || '';
-    const bk = bankBannerHtml();
-    if (sp) { const [h, t] = specialText(sp); return `<div class="card greet"><svg viewBox="0 0 48 48" aria-hidden="true">${art(sp.art)}</svg><span class="grow-l"><b>${esc(h)}</b><span class="muted small">${esc(t)}</span></span></div>` + bk; }
-    return bk;
-  }
-  // For the greeting shown while the app opens next time: first name, language, and the words for the next seven days. Kept on this phone only.
-  function saveHello() {
-    try {
-      if (!me()) { localStorage.removeItem('fs-hello'); return; }
-      const d = {}, td = today();
-      for (let i = 0; i < 7; i++) { const day = addDays(td, i), sp = specialOn(day); if (sp) d[day] = { h: specialText(sp)[0], s: specialText(sp)[1] }; }
-      localStorage.setItem('fs-hello', JSON.stringify({ n: firstName(me()), l: lang(), d }));
-    } catch (e) { /* private mode */ }
-  }
-  function photoStripHtml() {
-    if (!photoOn()) return '';
-    if (!me() || !me().active) return ''; const td = today(), ps = photosOn(td), show = ps.length ? ps : photosOn(addDays(td, -1));
-    return `<button class="phstrip" data-act="photos">${msi('photo_camera')}<span class="grow-l"><b>${T('ph_title')}</b><span class="muted small">${ps.length ? T('ph_n', { n: ps.length }) : T(myPhoto(td) ? 'ph_n' : 'ph_add_first', { n: 0 })}</span></span><span class="phs-th">${show.slice(0, 3).map(p => phImg(p, 't', 'phs-i')).join('')}</span><b>›</b></button>`;
-  }
-  function photosModalHtml(m) {
-    const td = today(), day = m.day || td, ps = photosOn(day), mine = myPhoto(day), big = m.full && db.photos.find(p => p.id === m.full), can = day === td && !state.viewAs;
-    const head = `<div class="hdr"><h2>${T('ph_title')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>`;
-    if (big) return `${head}<button class="lnk" data-act="phfull" data-id="">‹ ${T('back')}</button><div class="phbig">${phImg(big, 'f', 'phbig-i')}${phStick(big, 'lg')}${phCap(big)}</div><div class="row nw">${avatar(big.user_id)}<span class="grow-l"><b>${esc(pname(big.user_id))}</b></span><button class="btn sm phlike" data-act="phlike" data-id="${big.id}" aria-pressed="${iLike(big)}" ${state.viewAs ? 'disabled' : ''}>${msi('favorite')}<span class="num">${likesN(big)}</span></button><button class="btn sm" data-act="phshare" data-id="${big.id}">${ico('share')}${T('share')}</button></div><span class="muted small">${esc(fmtDay(big.day))}${phBadge(big) ? ' · ' + esc(bName(phBadge(big).b)) : ''}</span>`;
-    // Step 2 of adding: the chosen photo, a few words, a sticker, one big Post button.
-    const dr = m.draft, st = can ? myStickers() : [], sel = m.sticker !== undefined ? m.sticker : (mine ? mine.sticker || '' : '');
-    const stickRow = st.length ? `<span class="muted small">${T('ph_sticker')}</span><div class="phstk">${st.map(b => `<button type="button" class="phstk-b" data-act="phstick" data-k="${esc(b.k)}" aria-pressed="${sel === b.k}" aria-label="${esc(bName(b))}" title="${esc(bName(b))}"><svg viewBox="0 0 96 104" aria-hidden="true">${medalInner({ ...b, done: true }, tierOf(b, st), true)}</svg></button>`).join('')}</div>` : '';
-    const words = v => `<label>${T('ph_cap')}<input class="inp" id="ph-cap" maxlength="140" value="${esc(v || '')}" autocomplete="off"></label>`;
-    if (dr || m.edit) return `${head}<div class="phsteps"><b>${T(dr ? 'ph_step2' : 'ph_edit')}</b></div>
-      <div class="phprev">${dr ? `<img class="phprev-i" src="${esc(dr.url)}" alt="">` : phImg(mine, 't', 'phprev-i')}</div>
-      <div class="f">${words(m.cap !== undefined ? m.cap : (mine && !dr ? mine.caption : (mine ? mine.caption : '')))}${stickRow}
-      ${m.err ? `<div class="banner small warn" role="alert">${esc(m.err)}</div>` : ''}
-      <div class="actions"><button type="button" class="btn" data-act="phcancel">${T('cancel')}</button>${dr ? `<button type="button" class="btn primary" data-act="phpost" ${m.busy ? 'disabled' : ''}>${m.busy ? T('ph_sending') : T('ph_post')}</button>` : `<button type="button" class="btn primary" data-act="phsave">${T('save')}</button>`}</div>
-      <span class="muted small">${T('ph_rules')}</span></div>`;
-    const card = (p, i) => { const own = twin(p.user_id) === me().id && !state.viewAs; return `<div class="phcard" data-key="ph${p.id}"><button class="phpic" data-act="phfull" data-id="${p.id}" aria-label="${T('ph_open')}">${phImg(p, 't', 'phpic-i')}${phStick(p)}${phCap(p)}${i === 0 && likesN(p) > 0 ? `<span class="tag t-ok phbest">${T('ph_best')}</span>` : ''}</button><div class="row nw">${avatar(p.user_id)}<span class="grow-l"><b>${esc(pname(p.user_id))}</b></span><button class="btn sm phlike" data-act="phlike" data-id="${p.id}" aria-pressed="${iLike(p)}" aria-label="${T('ph_like')}" ${state.viewAs ? 'disabled' : ''}>${msi('favorite')}<span class="num">${likesN(p)}</span></button></div>${own && p.day === td ? `<div class="bar"><button class="btn sm" data-act="phedit">${msi('edit')}${T('ph_words')}</button><label class="btn sm filebtn">${msi('photo_camera')}${T('ph_other')}<input type="file" class="vh" accept="image/*" data-ch="phfile"></label></div>` : ''}${own || (isAdmin() && !state.viewAs) ? `<button class="lnk small" data-act="phdel" data-id="${p.id}">${T('ph_del')}</button>` : ''}</div>`; };
-    const from = addDays(td, -60), days = [...new Set(db.photos.filter(p => p.day >= from && p.day !== day).map(p => p.day))].sort().reverse();
-    const month = td.slice(0, 7), score = {}; db.photos.filter(p => p.day.slice(0, 7) === month).forEach(p => { const id = twin(p.user_id), x = score[id] = score[id] || { n: 0, l: 0 }; x.n++; x.l += likesN(p); });
-    const top = Object.entries(score).sort((x, y) => y[1].l - x[1].l || y[1].n - x[1].n).slice(0, 3);
-    return `${head}
-      ${can && !mine ? `<label class="phdrop">${msi('photo_camera')}<b>${T('ph_add')}</b><span class="muted small">${T('ph_add_t')}</span><input type="file" class="vh" accept="image/*" data-ch="phfile"></label>${m.err ? `<div class="banner small warn" role="alert">${esc(m.err)}</div>` : ''}` : ''}
-      <div class="bar"><button class="iconbtn" data-act="phnav" data-d="-1" aria-label="${T('prev')}">‹</button><b class="grow-l" style="justify-content:center">${esc(day === td ? T('today') : fmtDay(day))}</b><button class="iconbtn" data-act="phnav" data-d="1" aria-label="${T('next')}" ${day >= td ? 'disabled' : ''}>›</button></div>
-      ${ps.length ? `<div class="phgrid">${ps.map(card).join('')}</div><span class="muted small">${T('ph_vote')}</span>` : `<p class="muted">${T(day === td ? 'ph_none_today' : 'ph_none')}</p>`}
-      ${top.length ? `<h3>${T('ph_top')}</h3><div class="card f">${top.map(([id, x]) => `<div class="row nw">${avatar(id)}<span class="grow-l">${esc(pname(id))}</span><span class="muted small num">${T('ph_score', { n: x.n, l: x.l })}</span></div>`).join('')}</div>` : ''}
-      ${days.length ? `<details class="sect" ${m.arch ? 'open' : ''}><summary>${T('ph_archive')} (${days.length})</summary><div class="pharch">${days.map(d => { const w = photosOn(d)[0]; return `<button class="pharch-b" data-act="phday" data-day="${d}">${phImg(w, 't', 'pharch-i')}<span class="small num">${esc(fmt(d, { day: 'numeric', month: 'short' }))}</span></button>`; }).join('')}</div></details>` : ''}`;
-  }
-  // A photo that could not be sent says why in the sheet itself, in plain words, and is written to the problem log for the office.
-  function phFail(m, e) { const msg = String((e && e.message) || e || ''), off = msg === 'offline' || !navigator.onLine; console.error(e); m.err = off ? T('ph_offline') : T('ph_fail') + (msg ? ' (' + msg.slice(0, 120) + ')' : ''); try { if (!off) logErr('photo', msg || 'photo failed', (e && e.stack) || ''); } catch (x) { /* log later */ } fx.err(); if (state.modal === m) renderModal(); }
-  const shrink = (img, max, q) => new Promise(res => { const k = Math.min(1, max / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k)); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); c.toBlob(b => res({ blob: b, url: c.toDataURL('image/jpeg', q) }), 'image/jpeg', q); });
   // ---------- Thank-you notes between teammates ----------
   const thanksTo = id => db.thanks.filter(x => twin(x.to_id) === id).sort((x, y) => String(y.created_at || '').localeCompare(String(x.created_at || '')));
   function thanksHtml(id) {
@@ -3631,13 +3164,21 @@
       ${m.role === 'guide' ? myToursHtml(m) : ''}</div></div>`;
   }
   // App settings, apart from the profile: how the app looks on this phone, language, notifications, install, privacy, sign out.
+  // Data used by this phone (counted here, in this app only; see store.js trafficAdd)
+  function trafficHtml() {
+    const t = Store.trafficGet ? Store.trafficGet() : {}, ks = Object.keys(t); if (!ks.length) return '';
+    const mb = b => b < 1e6 ? Math.max(1, Math.round(b / 1e3)) + ' KB' : (b / 1e6).toFixed(1) + ' MB';
+    const td = iso(new Date()), from = d => ks.filter(k => k >= addDays(td, -d)).reduce((a, k) => ({ n: a.n + t[k].n, b: a.b + t[k].b }), { n: 0, b: 0 });
+    const x = t[td] || { n: 0, b: 0 }, w = from(6), mo = from(29);
+    return `<details class="sect"><summary>${T('tr_title')}</summary><div class="f"><div class="row"><span>${T('tr_today')}</span><b class="num">${mb(x.b)} · ${x.n}</b></div><div class="row"><span>${T('tr_week')}</span><b class="num">${mb(w.b)} · ${w.n}</b></div><div class="row"><span>${T('tr_month')}</span><b class="num">${mb(mo.b)} · ${mo.n}</b></div><p class="muted small">${T('tr_note')}</p></div></details>`;
+  }
   function settingsHtml(m, perm) {
     return `<div class="cols"><div class="card f">
       <label>${T('language')}<select id="me-lang" data-ch="lang">${opt('en', 'English', lang())}${opt('ru', 'Русский', lang())}${opt('ka', 'ქართული', lang())}</select></label>
       <div class="f" id="me-see"><b>${T('pf_title')}</b><div class="checks col"><label><input type="checkbox" data-ch="pref" data-k="game" ${gameOn() ? 'checked' : ''}>${T('pf_game')}</label>${gameOn() ? '' : `<span class="muted small" id="me-see-off">${T('pf_game_off')}</span>`}<label><input type="checkbox" data-ch="pref" data-k="photo" ${photoOn() ? 'checked' : ''}>${T('pf_photo')}</label><label><input type="checkbox" data-ch="pref" data-k="mood" ${pref('mood') !== 'off' ? 'checked' : ''}>${T('pf_mood')}</label><label><input type="checkbox" data-ch="pref" data-k="rate" ${pref('rate') !== 'off' ? 'checked' : ''}>${T('pf_rate')}</label></div><span class="muted small">${T('pf_note')}</span></div>
       <div class="f"><b>${T('ds_title')}</b>${displayHtml()}</div>
       ${notifCardHtml(perm)}<div class="checks col">${Object.keys(NOTE_GROUPS).map(g => `<label><input type="checkbox" id="mute-${g}" data-ch="mutepref" data-g="${g}" ${(m.mute || []).includes(g) ? '' : 'checked'}>${T('note_' + g)}</label>`).join('')}</div></div>
-      ${ticketCardHtml()}</div><div class="list">${installCardHtml(true)}<div class="card f">
+      ${ticketCardHtml()}${trafficHtml()}</div><div class="list">${installCardHtml(true)}<div class="card f">
       <button class="btn" data-act="welcome">${T('wl_again')}</button>
       <details class="sect"><summary>${T('privacy_link')}</summary><p class="muted small">${T('privacy_text', { n: pv().guideDays })}</p></details>
       <button class="btn" data-act="signout">${T('signout')}</button>${testOn() ? `<button class="lnk" data-act="testinfo">${T('tb_chip')}: ${T('tb_title')}</button>` : ''}<span class="muted small num">${T('version')} ${APP_VERSION}${S.syncedAt ? ' · ' + T('updated_at', { time: new Intl.DateTimeFormat(LOCALES[lang()], { hour: '2-digit', minute: '2-digit' }).format(new Date(S.syncedAt)) }) : ''}</span></div></div></div>`;
@@ -3917,7 +3458,7 @@
       on.forEach(x => { const cur = rows[x.table][x.row.id] || { ...x.row }; Object.assign(cur, x.patch); if (x.table === 'bookings') cur.history = [...(Array.isArray(cur.history) ? cur.history : []), { at: now, w: 'checked', note: x.note, by: me().id }]; rows[x.table][x.row.id] = cur; });
       return run(async () => { for (const t of ['bookings', 'clients']) { const list = Object.values(rows[t]); if (list.length) await S.saveMany(t, list); } logAct(`Guest list check: ${on.length} fixes`); state.gc = guestCheck(); }, T('gc_done', { n: on.length }));
     },
-    vastart() { const v = ($('#va-who') || {}).value; if (!v) return; clearTimeout(celeTimer); { const n = document.querySelector('.bnote'); if (n) n.remove(); } state.viewAs = v; state.view = 'calendar'; state.adminTab = null; state.mine = true; render(); window.scrollTo(0, 0); },
+    vastart() { const v = ($('#va-who') || {}).value; if (!v) return; clearCele(); { const n = document.querySelector('.bnote'); if (n) n.remove(); } state.viewAs = v; state.view = 'calendar'; state.adminTab = null; state.mine = true; render(); window.scrollTo(0, 0); },
     vaexit() { state.viewAs = null; state.view = 'admin'; state.mine = false; render(); window.scrollTo(0, 0); },
     expnew(el) { state.modal = { type: 'exp', draft: { kind: 'meal', date: (el && el.dataset.date) || today(), tour_id: (el && el.dataset.tour) || '', currency: rules().currency || 'GEL' } }; renderModal(); },
     expdel(el) { return run(() => S.remove('expenses', el.dataset.id), T('saved')); },
@@ -4453,6 +3994,8 @@
   // Kept on the phone for speed and in the person's profile so it follows them to another phone.
   const pref = k => { try { const v = localStorage.getItem('fs-pref-' + k); if (v) return v; } catch (e) { /* private mode */ } const d = me() && me().display; return (d && typeof d === 'object' && d[k]) || 'on'; };
   const gameOn = () => !isDrv() && pref('game') !== 'off', photoOn = () => pref('photo') !== 'off';
+  // badges, medals and the new-badge moment live in game.js; every helper it needs is handed over here, after all of them exist.
+  const { PH, askCardHtml, bName, badgeModalHtml, badgeNote, badgeOut, bankWaiting, celebrateHtml, checkBadges, clearCele, game, greetHtml, likesN, medal, medalInner, moodFace, moodKey, moodLineHtml, myPhoto, nf, phFail, phPath, photoPng, photoStripHtml, photosModalHtml, rateSkip, saveHello, shrink, starsOf, tierOf, titlesOf } = window.FSGame({ getMemo: () => memo, firstName, pref, hm, involves, endOf, myScore, aliasOf, fmtDay, render, pname, pdKind, offOn, holidayOn, trName, photoOn, avatar, isAdmin, logErr, D, IC, LOCALES, REGIONS, S, T, UNLOCKS, addDays, cleanName, countryName, daysBetween, db, esc, fmt, fx, gameOn, ico, initials, iso, kmOf, lang, live, me, monday, msi, payFor, person, personStats, phoneIso, regionsOf, renderModal, rules, staff, state, stripEmail, toast, today, tourDays, track, twin, waLink, walkOf, weeklySave });
   const DKEYS = { fs: 'fs-fsize', theme: 'fs-theme', contrast: 'fs-contrast', accent: 'fs-accent', cur: 'fs-paycur' };
   const ACCENTS = [['', '#314b3c'], ['sea', '#1f5f7a'], ['plum', '#5b3f7a'], ['terra', '#b8441c'], ['sky', '#5aa9e6'], ['mint', '#45b88a'], ['lilac', '#b39ddb'], ['rose', '#f28fad'], ['sun', '#f2c94c'], ['amber', '#f0901e']];
   const dget = k => { try { return localStorage.getItem(DKEYS[k]) || ''; } catch (e) { return ''; } };
