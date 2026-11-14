@@ -2,7 +2,7 @@
 (() => {
   'use strict';
   const CFG = window.APP_CONFIG || {};
-  const TABLES = ['profiles', 'expenses', 'tours', 'bookings', 'clients', 'client_ratings', 'tour_ratings', 'payout_details', 'log', 'change_requests', 'pay_adjustments', 'personal_dates', 'usage', 'offers', 'time_off', 'holidays', 'tasks', 'notifications', 'settings', 'invites', 'pay_disputes', 'tour_costs', 'photos', 'thanks', 'badge_likes', 'tickets', 'guest_reviews', 'commission_rules', 'payments', 'staff_payments'];
+  const TABLES = ['profiles', 'expenses', 'tours', 'bookings', 'clients', 'client_ratings', 'tour_ratings', 'payout_details', 'log', 'change_requests', 'pay_adjustments', 'personal_dates', 'usage', 'offers', 'time_off', 'holidays', 'tasks', 'notifications', 'settings', 'invites', 'pay_disputes', 'tour_costs', 'photos', 'thanks', 'badge_likes', 'tickets', 'guest_reviews', 'commission_rules', 'payments', 'staff_payments', 'tour_tips'];
   const ADMIN_ONLY = ['commission_rules', 'payments', 'staff_payments'];   // the database shows these to admins only; other phones do not ask
   const DEMO_KEY = 'fs-demo-v18';
   const db = {}; TABLES.forEach(t => db[t] = []);
@@ -213,6 +213,17 @@
     for (let i = 0; i < need.length; i += 100) { const { data } = await sb.from('clients').select('*').in('id', need.slice(i, i + 100)); if (data && data.length) { db.clients = db.clients.concat(data); changed = true; } }
     return changed;
   }
+  // How often the checks run for this person while the live connection works. Admin: top 7 min, medium 30, full 60. A guide or driver with a tour today or tomorrow
+  // keeps a fast top check (guide 7 min, driver 10); with nothing on, it is slower (guide 20, driver 30). Drivers also get the slow tables less often (full every 2 hours).
+  function gaps() {
+    const live = store.live, r = me && me.role;
+    if (!live) return { top: 140000, med: 300000, full: 600000, back: 120000, backTop: 45000 };
+    if (r === 'admin' || !me) return { top: 420000, med: 1800000, full: 3600000, back: 1800000, backTop: 180000 };
+    const a = iso(new Date()), t = new Date(); t.setDate(t.getDate() + 1); const z = iso(t);
+    const busy = db.tours.some(x => x.date >= a && x.date <= z && x.status !== 'cancelled' && (x.guide_id === me.id || x.driver_id === me.id));
+    const drv = r === 'driver', top = drv ? (busy ? 600000 : 1800000) : (busy ? 420000 : 1200000);
+    return { top, med: drv ? 3600000 : 1800000, full: drv ? 7200000 : 3600000, back: drv ? 3600000 : 1800000, backTop: Math.round(top / 3) };
+  }
   async function pulse(kind) {
     const full = kind !== 'quick';
     if (mode !== 'supabase') { store.syncedAt = new Date().toISOString(); return false; }
@@ -231,7 +242,7 @@
           for (let i = 0; i < need.length; i += 100) { const { data } = await sb.from('clients').select('*').in('id', need.slice(i, i + 100)); if (data && data.length) { db.clients = db.clients.concat(data); changed = true; } }
         }
       } else if (await refreshNear()) changed = true;
-      const medDue = full || ageOf('medAt') > (store.live ? 1800000 : 300000), list = full ? TOP.concat(MED, COLD) : medDue ? TOP.concat(MED) : TOP, fresh = await Promise.all(list.map(t => fetchTable(t))); // the small tables load side by side, not one after another
+      const medDue = full || ageOf('medAt') > gaps().med, list = full ? TOP.concat(MED, COLD) : medDue ? TOP.concat(MED) : TOP, fresh = await Promise.all(list.map(t => fetchTable(t))); // the small tables load side by side, not one after another
       list.forEach((t, i) => { const rows = fresh[i]; if (rows && sig(rows) !== sig(db[t])) { db[t] = rows; changed = true; } });
       const mine = db.profiles.find(p => p.id === me.id); if (mine) me = { ...me, ...mine };
       store.syncedAt = new Date().toISOString(); if (full) store.fullAt = store.syncedAt; if (medDue) store.medAt = store.syncedAt;
@@ -243,12 +254,12 @@
   if (mode === 'supabase') {
     // While the live connection works: top check every 7 minutes (medium every 30, full every 60). Without it the old fast timing comes back (2.5 and 10 minutes).
     const age = ageOf;
-    const due = () => { if (document.hidden) return; if (age('fullAt') > (store.live ? 3600000 : 600000)) pulse(); else if (age('syncedAt') > (store.live ? 420000 : 140000)) pulse('quick'); };
+    const due = () => { if (document.hidden) return; if (age('fullAt') > gaps().full) pulse(); else if (age('syncedAt') > gaps().top) pulse('quick'); };
     setInterval(due, 60000);
     // The connection looked down: try again every 30 seconds and when the app is opened again.
     setInterval(() => { if (store.offline && navigator.onLine && !document.hidden && me) store.sync(); }, 30000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden && store.offline && navigator.onLine && me) store.sync(); });
-    document.addEventListener('visibilitychange', () => { if (document.hidden) return; if (age('fullAt') > (store.live ? 1800000 : 120000)) pulse(); else if (age('syncedAt') > (store.live ? 180000 : 45000)) pulse('quick'); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden) return; if (age('fullAt') > gaps().back) pulse(); else if (age('syncedAt') > gaps().backTop) pulse('quick'); });
   }
   async function afterLogin(user) {
     const { data: p, error: pe } = await sb.from('profiles').select('*').eq('id', user.id).maybeSingle();

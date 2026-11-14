@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.78';
+  const APP_VERSION = '3.79';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -1165,7 +1165,7 @@
         ${canCheck && d.bookings.length && d.bookings.every(b => b.attendance === 'noshow') ? `<div class="nhbox"><span>${msi('event_busy')}${T('nh_ask')}</span><button class="btn" data-act="nohappen" data-id="${d.id}">${T('nh_btn')}</button></div>` : ''}
         ${mine && d.date <= today() && live(d) ? `<button class="btn exptour" data-act="expnew" data-tour="${d.id}" data-date="${d.date}">${msi('receipt_long')} ${T('ex_tour')}</button>` : ''}
         <details class="sect"><summary>${T('more')}</summary><div class="f">
-          <div class="bar"><button class="btn sm" data-act="share" data-title="${esc(d.title)}" data-v="${esc(tourText(d))}">${ico('share')}${T('share')}</button><a class="btn sm" href="${esc(gcalLink(d))}" target="_blank" rel="noopener">${ico('cal')}${T('cal_short')}</a><button class="btn sm" data-act="copy" data-v="${esc(tourText(d))}">${ico('copy')}${T('copy')}</button>${tipUrl(d) && (mine || isAdmin()) ? `<button class="btn sm" data-act="tipqr" data-id="${d.id}">${T('tip_btn')}</button>` : ''}</div>
+          <div class="bar"><button class="btn sm" data-act="share" data-title="${esc(d.title)}" data-v="${esc(tourText(d))}">${ico('share')}${T('share')}</button><a class="btn sm" href="${esc(gcalLink(d))}" target="_blank" rel="noopener">${ico('cal')}${T('cal_short')}</a><button class="btn sm" data-act="copy" data-v="${esc(tourText(d))}">${ico('copy')}${T('copy')}</button>${tipUrl(d) && (mine || isAdmin()) ? `<button class="btn sm" data-act="tipqr" data-id="${d.id}">${T('tip_btn')}</button>` : ''}${(mine || isAdmin()) && tourBookings(d.id).some(isFree) ? `<button class="btn sm" data-act="tipsin" data-id="${d.id}">${T('tips_btn')}${tipsOf(d.id) ? ' · ' + esc(tipsText(d.id)) : ''}</button>` : ''}</div>
           <div class="muted small num">${esc([T('kind_' + d.kind), paxText(d), d.language, cn.duration, cn.note, endOf(d) !== d.date ? T('multiday', { n: tourDays(d).length }) : ''].filter(Boolean).join(' · '))}</div>
           ${mine && !isAdmin() ? `<div class="row small"><span class="muted">${T('my_pay')}: <b class="num">${payShow(myPay, d.date)}</b>${myPay ? ` <span class="muted small">(${esc(payHow(d, d.guide_id === me().id ? 'guide' : 'driver'))})</span>` : ''}</span>${disputeTag(disputeOf(d.id, me().id))}<button class="btn sm dpbtn" data-act="dispute" data-id="${d.id}">${msi('flag')}${T('dp_btn')}</button></div>` : (mine && myPay ? `<div class="muted small">${T('my_pay')}: <b class="num">${payShow(myPay, d.date)}</b>${myPay ? ` <span class="muted small">(${esc(payHow(d, d.guide_id === me().id ? 'guide' : 'driver'))})</span>` : ''}</div>` : '')}${isAdmin() ? `<div class="muted small num">${T('a_pay')}: ${payFor(d, 'guide')} + ${payFor(d, 'driver')} ${esc(cur)}</div>` : ''}
           ${isAdmin() ? '' : warnHtml}${reqs}
@@ -1528,6 +1528,18 @@
     if (live(row)) { await notify(after.filter(p => !before.includes(p)), 'tour_assigned', np); await notify(before.filter(p => !after.includes(p)), 'tour_removed', { title: t.title, date: t.date, time: t.start_time || '' }); if (row.date !== t.date || row.start_time !== t.start_time) await notify(after.filter(p => before.includes(p)), 'tour_changed', np); }
     logAct(`Moved tour: ${t.title}, ${t.date} ${t.start_time || ''} → ${row.date} ${row.start_time || ''}`);
     state.date = row.date; closeModal(); toast(T('mv_done', { date: fmtDay(row.date), time: row.start_time || '' }));
+  }
+  // Free tours: the guide writes down the tips received for the tour (information only, no money moves through the app).
+  const tipsOf = id => (db.tour_tips || []).filter(x => x.tour_id === id);
+  const tipsText = id => { const by = {}; tipsOf(id).forEach(x => { by[x.currency] = (by[x.currency] || 0) + (Number(x.amount) || 0); }); return Object.entries(by).map(([c, v]) => `${nf(v)} ${c}`).join(' + '); };
+  function tipsModalHtml(m) {
+    const t = db.tours.find(x => x.id === m.id); if (!t) return `<div class="hdr"><h2>—</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>`;
+    const rows = tipsOf(t.id).slice().sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+    return `<div class="hdr"><h2>${T('tips_title')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>
+      <p class="muted small">${esc(aliasOf(t.title))} · ${esc(fmtDay(t.date))}. ${T('tips_text')}</p>
+      <form class="f" data-form="tips" data-id="${t.id}"><div class="two"><label>${T('ex_amount')}<input name="amount" type="number" inputmode="decimal" min="0" step="any" required></label><label>${T('currency')}<select name="currency">${CURRENCIES.map(c => opt(c, c, rules().currency || 'GEL')).join('')}</select></label></div>
+        <label>${T('notes')}<input name="note"></label><div class="actions"><button class="btn primary">${T('save')}</button></div></form>
+      ${rows.length ? `<div class="list">${rows.map(x => `<div class="exrow"><span class="grow-l"><b class="num">${esc(nf(Number(x.amount) || 0))} ${esc(x.currency)}</b><span class="muted small"> · ${esc(pname(x.user_id))}${x.note ? ' · ' + esc(x.note) : ''}</span></span><button class="iconbtn" data-act="tipsdel" data-id="${x.id}" aria-label="${T('delete')}">${msi('delete')}</button></div>`).join('')}</div><div class="small num">${T('tips_total')}: <b>${esc(tipsText(t.id))}</b></div>` : ''}`;
   }
   function tipModalHtml(m) {
     const url = tipUrl(), who = '';
@@ -2185,7 +2197,7 @@
     return [[d.length >= 7 ? 'p' + d.slice(-9) : '', 'dup_phone'], [c.email && !relayEmail(c.email) ? 'e' + String(c.email).toLowerCase() : '', 'dup_email'], [nm.includes(' ') && nm.length > 5 ? 'n' + nm : '', 'dup_name']];
   });
   const dupTours = () => dupSets(db.tours.filter(live), t => [[`${(t.title || '').toLowerCase().trim()}|${t.date}|${t.start_time || ''}`, 'dup_same_tour']]);
-  const TOUR_REFS = ['change_requests', 'expenses', 'offers', 'pay_disputes', 'photos', 'tasks', 'thanks', 'tour_ratings'];
+  const TOUR_REFS = ['change_requests', 'expenses', 'tour_tips', 'offers', 'pay_disputes', 'photos', 'tasks', 'thanks', 'tour_ratings'];
   async function mergeTours(keepId, otherIds) {
     const keep = { ...db.tours.find(t => t.id === keepId) };
     for (const oid of otherIds) {
@@ -3333,7 +3345,7 @@
     const el = $('#modal'); if (!el) return; const m = state.modal;
     if (m && !modalHist) { modalHist = true; navPush(); } else if (!m && modalHist) { modalHist = false; navPop(); }
     if (!m) { el.innerHTML = ''; modalKey = ''; return; }
-    const inner = m.type === 'exp' ? expModalHtml(m) : m.type === 'tnames' ? tnamesHtml(m) : m.type === 'revreq' ? revreqModalHtml(m) : m.type === 'tour' ? tourModalHtml(m) : m.type === 'off' ? offModalHtml(m) : m.type === 'task' ? taskModalHtml(m) : m.type === 'client' ? clientModalHtml(m) : m.type === 'offer' ? offerModalHtml(m) : m.type === 'guest' ? guestSheetHtml(m) : m.type === 'creq' ? creqModalHtml(m) : m.type === 'cancel' ? cancelModalHtml(m) : m.type === 'person' ? personModalHtml(m) : m.type === 'invite' ? inviteModalHtml(m) : m.type === 'tip' ? tipModalHtml(m) : m.type === 'share' ? shareModalHtml(m) : m.type === 'test' ? testModalHtml() : m.type === 'display' ? `<div class="hdr"><h2>${T('ds_title')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div><div class="f">${displayHtml()}</div>` : m.type === 'ticket' ? ticketModalHtml(m) : m.type === 'move' ? moveModalHtml(m) : m.type === 'welcome' ? welcomeModalHtml(m) : m.type === 'totem' ? totemModalHtml(m) : m.type === 'photos' ? photosModalHtml(m) : m.type === 'thanks' ? thanksModalHtml() : m.type === 'recap' ? recapModalHtml() : m.type === 'celebrate' ? celebrateHtml(m) : m.type === 'cat' ? catModalHtml(m) : m.type === 'dispute' ? disputeModalHtml(m) : m.type === 'prange' ? payRangeHtml(m.id, payRange().from, payRange().to, true) : m.type === 'badge' ? badgeModalHtml(m) : m.type === 'summary' ? summaryHtml(m) : m.type === 'statement' ? statementHtml(m.id, m.month, true) : m.type === 'pstats' ? `<div class="hdr"><h2>${T(state.mode === 'month' ? 'inc_month' : 'inc_week')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>${periodStatsHtml(m.from, m.to).replace('<details class="wstats">', '<details class="wstats" open>')}` : m.type === 'addmenu' ? addMenuHtml() : m.type === 'pdate' ? pdModalHtml(m) : m.type === 'confirm' ? `<div class="hdr"><h2>${esc(m.text)}</h2></div><div class="actions"><button class="btn" data-act="close">${T('close')}</button><button class="btn ${m.plain ? 'primary' : 'danger'}" data-act="confirmyes">${esc(m.yes)}</button></div>` : bellHtml();
+    const inner = m.type === 'tips' ? tipsModalHtml(m) : m.type === 'exp' ? expModalHtml(m) : m.type === 'tnames' ? tnamesHtml(m) : m.type === 'revreq' ? revreqModalHtml(m) : m.type === 'tour' ? tourModalHtml(m) : m.type === 'off' ? offModalHtml(m) : m.type === 'task' ? taskModalHtml(m) : m.type === 'client' ? clientModalHtml(m) : m.type === 'offer' ? offerModalHtml(m) : m.type === 'guest' ? guestSheetHtml(m) : m.type === 'creq' ? creqModalHtml(m) : m.type === 'cancel' ? cancelModalHtml(m) : m.type === 'person' ? personModalHtml(m) : m.type === 'invite' ? inviteModalHtml(m) : m.type === 'tip' ? tipModalHtml(m) : m.type === 'share' ? shareModalHtml(m) : m.type === 'test' ? testModalHtml() : m.type === 'display' ? `<div class="hdr"><h2>${T('ds_title')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div><div class="f">${displayHtml()}</div>` : m.type === 'ticket' ? ticketModalHtml(m) : m.type === 'move' ? moveModalHtml(m) : m.type === 'welcome' ? welcomeModalHtml(m) : m.type === 'totem' ? totemModalHtml(m) : m.type === 'photos' ? photosModalHtml(m) : m.type === 'thanks' ? thanksModalHtml() : m.type === 'recap' ? recapModalHtml() : m.type === 'celebrate' ? celebrateHtml(m) : m.type === 'cat' ? catModalHtml(m) : m.type === 'dispute' ? disputeModalHtml(m) : m.type === 'prange' ? payRangeHtml(m.id, payRange().from, payRange().to, true) : m.type === 'badge' ? badgeModalHtml(m) : m.type === 'summary' ? summaryHtml(m) : m.type === 'statement' ? statementHtml(m.id, m.month, true) : m.type === 'pstats' ? `<div class="hdr"><h2>${T(state.mode === 'month' ? 'inc_month' : 'inc_week')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>${periodStatsHtml(m.from, m.to).replace('<details class="wstats">', '<details class="wstats" open>')}` : m.type === 'addmenu' ? addMenuHtml() : m.type === 'pdate' ? pdModalHtml(m) : m.type === 'confirm' ? `<div class="hdr"><h2>${esc(m.text)}</h2></div><div class="actions"><button class="btn" data-act="close">${T('close')}</button><button class="btn ${m.plain ? 'primary' : 'danger'}" data-act="confirmyes">${esc(m.yes)}</button></div>` : bellHtml();
     const key = m.type + ':' + (m.id || (m.draft && m.draft.id) || '') + ':' + (m.edit ? 'e' : '');
     // On a computer the tour card opens as a small window next to the tour that was clicked (like a calendar popup), not in the middle of the screen.
     const pop = m.type === 'tour' && !m.edit && !m.back && m.at && !PHONE();
@@ -3481,6 +3493,8 @@
       state.modal = { type: 'share', title, text, back: state.modal }; renderModal();
     },
     move(el) { const t = db.tours.find(x => x.id === el.dataset.id); if (t) openMove(t, {}); },
+    tipsin(el) { state.modal = { type: 'tips', id: el.dataset.id, back: state.modal }; renderModal(); },
+    tipsdel(el) { if (!confirm(T('m_del_ask'))) return; run(() => S.remove('tour_tips', el.dataset.id)).then(renderModal); },
     tipqr(el) { state.modal = { type: 'tip', id: el.dataset.id, back: state.modal }; renderModal(); },
     cxpreset(el) { const i = el.closest('form') && el.closest('form').querySelector('#cx-reason'); if (i) { i.value = T('nh_reason'); i.focus(); } },
     nohappen(el) {
@@ -3756,6 +3770,7 @@
     async creq() { await saveCreq(); renderModal(); },
     async mail(fd) { state.mail = parseOrderEmail(String(fd.get('text') || '')); },
     async adjust(fd) { await S.save('pay_adjustments', { id: S.uid(), user_id: fd.get('user_id'), month: fd.get('month'), amount: Number(fd.get('amount')) || 0, note: fd.get('note') || '', created_by: me().id, created_at: new Date().toISOString() }); await notify([fd.get('user_id')], 'adjusted', { title: fd.get('month'), time: fd.get('note') || '' }); logAct(`Pay correction for ${pname(fd.get('user_id'))}, ${fd.get('month')}: ${fd.get('amount')}`); renderModal(); },
+    async tips(fd, form) { const amount = Number(fd.get('amount')); if (!(amount >= 0) || fd.get('amount') === '') return; await S.save('tour_tips', { id: S.uid(), tour_id: form.dataset.id, user_id: me().id, amount, currency: fd.get('currency') || 'GEL', note: String(fd.get('note') || '').trim() || null, created_at: new Date().toISOString() }); toast(T('saved')); renderModal(); },
     async expense(fd) {
       const amount = Number(fd.get('amount')); if (!(amount > 0)) { toast(T('ex_amount_bad')); return; }
       await S.save('expenses', { id: S.uid(), user_id: me().id, tour_id: fd.get('tour_id') || null, date: fd.get('date') || today(), kind: fd.get('kind') || 'other', amount, currency: fd.get('currency') || 'GEL', note: String(fd.get('note') || '').trim() || null, paid_back: false, created_at: new Date().toISOString() });

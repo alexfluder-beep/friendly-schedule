@@ -583,3 +583,15 @@ alter table public.staff_payments add column if not exists payee_name text;
 alter table public.staff_payments alter column user_id drop not null;
 alter table public.staff_payments drop constraint if exists staff_payments_payee_chk;
 alter table public.staff_payments add constraint staff_payments_payee_chk check (user_id is not null or coalesce(btrim(payee_name),'') <> '');
+
+-- 3.79: tips written down for free tours (information only)
+create table if not exists public.tour_tips (id uuid primary key default gen_random_uuid(), tour_id uuid not null references public.tours(id) on delete cascade, user_id uuid not null references public.profiles(id) on delete cascade, amount numeric not null default 0 check (amount >= 0), currency text not null default 'GEL', note text, created_at timestamptz not null default now());
+create index if not exists tour_tips_tour_idx on public.tour_tips(tour_id);
+create index if not exists tour_tips_user_idx on public.tour_tips(user_id);
+alter table public.tour_tips enable row level security;
+create policy tips_read on public.tour_tips for select to authenticated using (user_id = (select auth.uid()) or (select public.is_admin()));
+create policy tips_add on public.tour_tips for insert to authenticated with check (user_id = (select auth.uid()) and public.on_tour(tour_id));
+create policy tips_edit on public.tour_tips for update to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()) and public.on_tour(tour_id));
+create policy tips_remove on public.tour_tips for delete to authenticated using (user_id = (select auth.uid()));
+create policy tips_admin on public.tour_tips for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
+grant select, insert, update, delete on public.tour_tips to authenticated;
