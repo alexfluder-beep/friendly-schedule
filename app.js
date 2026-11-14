@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.88';
+  const APP_VERSION = '3.89';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -1618,7 +1618,12 @@
   const CAR_COLORS = [['white', '#ffffff'], ['black', '#20242a'], ['silver', '#c3c8cf'], ['grey', '#7b838d'], ['red', '#c0392b'], ['blue', '#2f5fa8'], ['green', '#2f7d4f'], ['yellow', '#f2c230'], ['orange', '#e0762b'], ['brown', '#7a5233'], ['beige', '#d8c3a0'], ['gold', '#b99a45']];
   const carColorName = v => (CAR_COLORS.some(x => x[0] === v) ? T('carc_' + v) : v || '');
   const carLine = c => [c.model, carColorName(c.color), c.plate, c.seats ? T('car_seats_n', { n: c.seats }) : ''].filter(Boolean).join(' · ');
-  function carsSync() { const m = state.modal, f = document.querySelector('#modal form[data-form=cars]'); if (!m || !m.cars || !f) return; m.cars.forEach((c, i) => { const g = k => { const e = f.querySelector(`[data-car="${i}.${k}"]`); return e ? e.value : c[k]; }; c.model = g('model').trim(); { const r = f.querySelector(`input[name="carcolor-${i}"]:checked`); c.color = r ? r.value : (c.color || ''); } c.plate = g('plate').trim().toUpperCase(); c.seats = g('seats').trim(); }); }
+  const hasCar = p => !!p && (p.role === 'driver' || !!p.vehicle || carsOf(p).length > 0);
+  const blankCar = () => ({ model: '', color: '', plate: '', seats: '', photo: null });
+  const carsCur = () => { if (state.modal && state.modal.type === 'cars') return state.modal; if (state.meTab === 'car' && me()) { if (!state.carsTab || state.carsTab.id !== me().id) { const l = carsOf(me()).map(c => ({ ...c })); state.carsTab = { type: 'cars', id: me().id, cars: l.length ? l : [blankCar()], before: l.length }; } return state.carsTab; } return null; };
+  const carsRerender = m => { if (m === state.modal) renderModal(); else if (m === state.carsTab) render(); };
+  const meTabs = () => ['profile', ...(hasCar(me()) ? ['car'] : []), 'settings', 'month', 'stats', 'badges'];
+  function carsSync() { const m = carsCur(), f = document.querySelector('form[data-form=cars]'); if (!m || !m.cars || !f) return; m.cars.forEach((c, i) => { const g = k => { const e = f.querySelector(`[data-car="${i}.${k}"]`); return e ? e.value : c[k]; }; c.model = g('model').trim(); { const r = f.querySelector(`input[name="carcolor-${i}"]:checked`); c.color = r ? r.value : (c.color || ''); } c.plate = g('plate').trim().toUpperCase(); c.seats = g('seats').trim(); }); }
   function carsModalHtml(m) {
     const p = person(m.id) || {}, boxes = m.cars.map((c, i) => `<div class="card f carbox"><div class="row"><b>${T('car_n', { n: i + 1 })}</b><span class="spacer"></span>${m.cars.length > 1 || c.model || c.plate || c.photo ? `<button type="button" class="btn sm" data-act="cardel" data-i="${i}">${msi('delete')}${T('car_remove')}</button>` : ''}</div>
       <div class="carphoto">${c.photo ? `<img src="${esc(c.photo)}" alt="">` : `<span class="carnoph">${msi('directions_car')}</span>`}<label class="btn sm">${msi('photo_camera')}${T('car_photo')}<input type="file" accept="image/*" data-ch="carphoto" data-i="${i}" hidden></label>${c.photo ? `<button type="button" class="btn sm" data-act="carphotodel" data-i="${i}">${T('car_photo_del')}</button>` : ''}</div>
@@ -1626,8 +1631,11 @@
       <div class="carcol"><span class="small muted">${T('car_color')}</span><div class="swatches" role="radiogroup" aria-label="${esc(T('car_color'))}">${[...CAR_COLORS, ...(c.color && !CAR_COLORS.some(x => x[0] === c.color) ? [[c.color, '#9aa1a9']] : [])].map(([k, hex]) => `<label class="sw"><input type="radio" name="carcolor-${i}" value="${esc(k)}" ${c.color === k ? 'checked' : ''}><i style="background:${hex}"></i>${esc(carColorName(k))}</label>`).join('')}</div></div>
       <label>${T('car_plate')}<input data-car="${i}.plate" value="${esc(c.plate || '')}" placeholder="AB-123-CD" autocomplete="off" autocapitalize="characters"></label>
       <label>${T('car_seats')}<input data-car="${i}.seats" type="number" min="1" max="20" inputmode="numeric" value="${esc(c.seats || '')}" placeholder="6"></label></div>`).join('');
-    return `<div class="hdr"><h2>${T('cars_title')}: ${esc(p.name || '')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>
-      <form class="f" data-form="cars">${boxes}${m.cars.length < 2 ? `<button type="button" class="btn" data-act="caradd">+ ${T('car_add2')}</button><span class="muted small">${T('car_add2_note')}</span>` : ''}
+    const form = carsFormHtml(m, boxes);
+    return m === state.carsTab ? form : `<div class="hdr"><h2>${T('cars_title')}: ${esc(p.name || '')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>${form}`;
+  }
+  function carsFormHtml(m, boxes) {
+    return `<form class="f" data-form="cars">${boxes}${m.cars.length < 2 ? `<button type="button" class="btn" data-act="caradd">+ ${T('car_add2')}</button><span class="muted small">${T('car_add2_note')}</span>` : ''}
       <div class="actions"><button class="btn primary">${T('save')}</button></div></form>`;
   }
   function personModalHtml(m) {
@@ -3315,16 +3323,17 @@
   function meHtml() {
     const m = me(), perm = ('Notification' in window) ? Notification.permission : 'unsupported', tab = state.meTab, mo = state.listMonth || today().slice(0, 7);
     const pd = db.payout_details.find(x => x.id === m.id) || {};
-    let h = `<div class="bar"><h2>${T('nav_me')}</h2><span class="spacer"></span>${helpBtn()}</div>${helpBox('me')}<div class="seg metabs">${['profile', 'settings', 'month', 'stats', 'badges'].filter(x => (x !== 'badges' || gameOn()) && !(isDrv() && x === 'stats')).map(x => `<button data-act="metab" data-v="${x}" aria-pressed="${tab === x}" title="${esc(T('me_' + x))}">${T('metab_' + x)}</button>`).join('')}</div>`;
+    let h = `<div class="bar"><h2>${T('nav_me')}</h2><span class="spacer"></span>${helpBtn()}</div>${helpBox('me')}<div class="seg metabs">${meTabs().filter(x => (x !== 'badges' || gameOn()) && !(isDrv() && x === 'stats')).map(x => `<button data-act="metab" data-v="${x}" aria-pressed="${tab === x}" title="${esc(T('me_' + x))}">${T('metab_' + x)}</button>`).join('')}</div>`;
     if (tab === 'month') { const pr = payRange(); return h + rangeBar() + (pr.month ? statementHtml(m.id, pr.month, false) : payRangeHtml(m.id, pr.from, pr.to, false)) + expensesHtml(m.id, pr.from, pr.to) + adviceHtml(m.id); }
     if (tab === 'stats') return h + statsHtml(isAdmin() ? (state.statUser || m.id) : m.id);
     if (tab === 'badges') return h + (gameOn() ? badgesHtml(m.id) : `<div class="empty">${T('pf_off')}</div>`);
+    if (tab === 'car' && hasCar(m)) return h + `<div class="cols"><div class="list"><div class="card"><p class="muted small">${T('car_tab_text')}</p>${carsModalHtml(carsCur())}</div></div></div>`;
     if (tab === 'settings') return h + settingsHtml(m, perm);
     return h + `<div class="cols"><div class="list"><div class="card f">
       <div class="row">${avatar(m.id, true)}<div><b>${esc(m.name)}</b> <span class="tag t-muted">${T('role_' + m.role)}</span>${m.email ? `<div class="muted small">${esc(m.email)}</div>` : ''}</div></div>
       <div class="bar"><label class="btn filebtn">${msi('photo_camera')}${T('photo_upload')}<input type="file" id="me-photo" class="vh" accept="image/*" data-ch="avatar"></label></div>
       <details class="sect avpick" ${state.avOpen ? 'open' : ''}><summary>${T('av_choose')}</summary>${(() => { const cur = avLib(m.avatar) || { icon: '', color: state.avColor || m.color || AV_COLORS[0] }, col = state.avColor || cur.color; return `<b class="small">${T('av_pics')}</b><div class="avgrid art">${AV_ART.map(k => `<button type="button" class="avopt pic" data-act="avpick" data-v="art:${k}" aria-pressed="${m.avatar === 'art:' + k}" aria-label="${k}"><img src="art/avatars/${k}.webp" alt="" loading="lazy" decoding="async"></button>`).join('')}</div><b class="small">${T('av_icons')}</b><div class="avcols">${AV_COLORS.map(c => `<button type="button" class="avcol" data-act="avcolor" data-v="${c}" style="background:${c}" aria-pressed="${c === col}" aria-label="${c}"></button>`).join('')}</div><div class="avgrid">${AV_ICONS.map(k => `<button type="button" class="avopt" data-act="avpick" data-v="ms:${k}:${col}" aria-pressed="${cur.icon === k}" style="background:${col}">${msi(k)}</button>`).join('')}</div>${m.avatar ? `<button type="button" class="lnk" data-act="avpick" data-v="">${T('av_none')}</button>` : ''}`; })()}</details>
-      ${m.role === 'driver' || m.vehicle || carsOf(m).length ? `<div class="card f"><button type="button" class="btn" data-act="cars" data-id="${m.id}">${msi('directions_car')}${T('cars_mine')} (${carsOf(m).length})</button>${carsOf(m).map(c => `<span class="muted small">${esc(carLine(c))}</span>`).join('')}</div>` : ''}
+      ${hasCar(m) ? '' : `<div class="card f"><button type="button" class="btn" data-act="mycaradd">${msi('directions_car')}${T('car_have')}</button></div>`}
       <form class="f" data-form="mydetails" id="me-details"><b>${T('md_title')}</b><div class="two"><label>${T('phone')}<input name="phone" type="tel" value="${esc(m.phone || '')}" placeholder="+995…" autocomplete="tel"></label></div>${langPick(m.languages, false)}<label>Telegram<input id="me-tg" name="telegram" value="${esc(m.telegram ? '@' + m.telegram : '')}" placeholder="@username" autocomplete="off" autocapitalize="off" spellcheck="false"><span class="muted small">${T('tg_mine_text')}</span></label>${(rules().promos || {})[m.id] ? `<div class="tsum">${T('promo_mine', { code: rules().promos[m.id] })}</div>` : ''}<div class="actions"><button class="btn primary qsave">${T('save')}</button></div></form>
       ${/^https:\/\/t\.me\//.test(rules().botUrl || '') || m.telegram_id ? `<div class="f" id="me-tgbot"><b>${T('tg_title')}</b>${m.telegram_id ? `<span class="row"><span class="tag t-ok">${T('tg_on')}</span><span class="muted small">${T('tg_on_text')}</span></span>` : `<ol class="tgsteps"><li>${T('tgb_1')}</li><li>${T('tgb_2')}</li><li>${T('tgb_3')}</li></ol><span class="muted small">${T('tgb_after')}</span>${m.link_code ? `<div class="row nw tgline"><b class="num tgcode">/link ${esc(m.link_code)}</b><button class="iconbtn" data-act="copy" data-v="/link ${esc(m.link_code)}" aria-label="${T('copy')}" title="${T('copy')}">${ico('copy')}</button></div>` : ''}<div class="bar">${m.link_code && botOn() ? `<a class="btn" href="${esc(rules().botUrl)}" target="_blank" rel="noopener">${T('tg_open')}</a>` : m.link_code ? '' : `<button class="btn" data-act="tgcode">${T('tg_get')}</button>`}${m.link_code ? `<button class="lnk small" data-act="tgcode">${T('tg_new')}</button>` : ''}</div>`}</div>` : ''}
       </div>
@@ -3610,7 +3619,7 @@
       try { navigator.clipboard.writeText(v).then(ok, old); } catch (e) { old(); }
     },
     score(el) { const tid = el.dataset.id, old = myScore(tid, me().id); run(() => S.save('tour_ratings', { id: old ? old.id : S.uid(), tour_id: tid, user_id: me().id, score: Number(el.dataset.s), created_at: new Date().toISOString() })).then(renderModal); },
-    metab(el) { const tabs = ['profile', 'settings', 'month', 'stats', 'badges'], a = tabs.indexOf(state.meTab || 'profile'), b = tabs.indexOf(el.dataset.v); slideTo(a, b, () => { state.meTab = el.dataset.v; render(); }); if (el.dataset.v === 'badges') { S.repeatGuests(me().id).then(n => { if (n !== state.repeatN) { state.repeatN = n; render(); } }).catch(() => {}); S.myCounts(me().id).then(c => { if (JSON.stringify(c) !== JSON.stringify(state.counts || null)) { state.counts = c; render(); } }).catch(() => {}); } },
+    metab(el) { const tabs = meTabs(), a = tabs.indexOf(state.meTab || 'profile'), b = tabs.indexOf(el.dataset.v); slideTo(a, b, () => { state.meTab = el.dataset.v; render(); }); if (el.dataset.v === 'badges') { S.repeatGuests(me().id).then(n => { if (n !== state.repeatN) { state.repeatN = n; render(); } }).catch(() => {}); S.myCounts(me().id).then(c => { if (JSON.stringify(c) !== JSON.stringify(state.counts || null)) { state.counts = c; render(); } }).catch(() => {}); } },
     payrange(el) { (state.pay = state.pay || {}).mode = el.dataset.v; render(); },
     paymonth(el) { state.pay = { ...(state.pay || {}), mode: 'month' }; state.listMonth = el.dataset.m; if (state.modal && state.modal.type === 'prange') state.modal = { type: 'statement', id: state.modal.id, month: el.dataset.m }; render(); renderModal(); },
     prange(el) { state.modal = { type: 'prange', id: el.dataset.id }; renderModal(); },
@@ -3746,9 +3755,10 @@
     avcolor(el) { state.avColor = el.dataset.v; state.avOpen = true; render(); },
     avgo() { state.modal = null; state.view = 'me'; state.meTab = 'profile'; state.avOpen = true; render(); window.scrollTo(0, 0); },
     cars(el) { const p = person(el.dataset.id); if (!p || !(isAdmin() || p.id === me().id)) return; const list = carsOf(p).map(c => ({ ...c })); state.modal = { type: 'cars', id: p.id, cars: list.length ? list : [{ model: '', color: '', plate: '', seats: '', photo: null }], before: list.length }; renderModal(); },
-    caradd() { const m = state.modal; if (!m || !m.cars) return; carsSync(); m.cars.push({ model: '', color: '', plate: '', seats: '', photo: null }); renderModal(); },
-    cardel(el) { const m = state.modal; if (!m || !m.cars) return; carsSync(); m.cars.splice(Number(el.dataset.i), 1); if (!m.cars.length) m.cars.push({ model: '', color: '', plate: '', seats: '', photo: null }); renderModal(); },
-    carphotodel(el) { const m = state.modal; if (!m || !m.cars) return; carsSync(); m.cars[Number(el.dataset.i)].photo = null; renderModal(); },
+    caradd() { const m = carsCur(); if (!m) return; carsSync(); m.cars.push(blankCar()); carsRerender(m); },
+    cardel(el) { const m = carsCur(); if (!m) return; carsSync(); m.cars.splice(Number(el.dataset.i), 1); if (!m.cars.length) m.cars.push(blankCar()); carsRerender(m); },
+    carphotodel(el) { const m = carsCur(); if (!m) return; carsSync(); m.cars[Number(el.dataset.i)].photo = null; carsRerender(m); },
+    mycaradd() { if (!me()) return; run(async () => { await S.save('profiles', { ...stripEmail(me()), vehicle: me().vehicle || 'own' }); state.meTab = 'car'; state.carsTab = null; render(); }, T('saved')); },
     avpick(el) { state.avOpen = false; run(() => S.save('profiles', { ...stripEmail(me()), avatar: el.dataset.v || null }), T('saved')); },
     gosetup(el) { const k = el.dataset.k || (setupSteps().find(x => !x.done) || {}).k; state.view = 'me'; state.meTab = 'profile'; if (k === 'photo') state.avOpen = true; render(); const x = document.getElementById(k === 'tours' ? 'me-tours' : k === 'photo' ? 'me-photo' : k === 'tg' ? (document.getElementById('me-tgbot') ? 'me-tgbot' : 'me-tg') : 'me-details'); if (x) x.scrollIntoView({ block: 'center', behavior: 'smooth' }); },
     async mytoursok() {
@@ -3960,9 +3970,9 @@
       img.onerror = () => { URL.revokeObjectURL(url); phFail(m, new Error('This file is not a photo the phone can open')); }; img.src = url;
     },
     carphoto(el) {
-      const f = el.files && el.files[0], m = state.modal, i = Number(el.dataset.i); if (!f || !m || !m.cars || !m.cars[i]) return; carsSync();
+      const f = el.files && el.files[0], m = carsCur(), i = Number(el.dataset.i); if (!f || !m || !m.cars[i]) return; carsSync();
       const img = new Image(), url = URL.createObjectURL(f);
-      img.onload = () => { const k = Math.min(1, 640 / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k)); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); m.cars[i].photo = c.toDataURL('image/jpeg', 0.72); if (state.modal === m) renderModal(); };
+      img.onload = () => { const k = Math.min(1, 640 / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k)); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); m.cars[i].photo = c.toDataURL('image/jpeg', 0.72); carsRerender(m); };
       img.onerror = () => { URL.revokeObjectURL(url); toast(T('err_save')); }; img.src = url;
     },
     avatar(el) {
@@ -4030,11 +4040,11 @@
       logAct(`Added ${ok} people from a list`); toast(T('bulk_done', { n: ok, bad }));
     },
     async cars(fd) {
-      const m = state.modal; if (!m || !m.cars) return; carsSync(); const p = person(m.id); if (!p) return;
+      const m = carsCur(); if (!m) return; carsSync(); const p = person(m.id); if (!p) return;
       const list = m.cars.filter(c => c.model || c.plate || c.photo || c.color || c.seats).map(c => ({ model: c.model || '', color: c.color || '', plate: c.plate || '', seats: c.seats || '', photo: c.photo || null }));
-      await S.save('profiles', { ...stripEmail(p), cars: list, car_plate: null, car_photo: null });
+      await S.save('profiles', { ...stripEmail(p), cars: list, car_plate: null, car_photo: null, vehicle: p.vehicle || (list.length && p.id === me().id ? 'own' : null) });
       if (list.length > (m.before || 0) && list.length > 1 && !isAdmin()) { const ad = admins(); if (ad.length) await S.save('tasks', { id: S.uid(), kind: 'car_check', title: T('car_task', { name: p.name }), notes: carLine(list[list.length - 1]), due_date: null, assignees: ad, status: 'open', tour_id: null, created_by: me().id, done_by: null, done_at: null }); }
-      logAct(`Cars updated: ${p.name}`); state.modal = null; renderModal(); render(); toast(T('saved'));
+      logAct(`Cars updated: ${p.name}`); if (m === state.carsTab) state.carsTab = null; else { state.modal = null; renderModal(); } render(); toast(T('saved'));
     },
     async person(fd) { await savePerson(fd.has('wf0') ? weekFields(weekFrom(fd)) : {}); renderModal(); },
     async tkedit(fd) { const t = db.tickets.find(x => x.id === fd.get('id')); if (!t) return; const status = TK_ST.includes(fd.get('status')) ? fd.get('status') : t.status, reply = String(fd.get('reply') || '').trim().slice(0, 1000) || null, summary = String(fd.get('summary') || '').trim().slice(0, 2000) || null, changed = status !== t.status || reply !== (t.reply || null);
