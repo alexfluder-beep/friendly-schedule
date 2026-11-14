@@ -2,7 +2,7 @@
    Paper look: near-white paper, ink text, hairlines, tonal cards, one orange action colour. Calm motion only.
    Layout: sticky top bar, one working view, bottom tab bar on phones. Team week grid on wide screens, day agenda on narrow. */
 :root{
-  --bg:#f7f5ef;--surface:#ffffff;--surface2:#f1efe8;--line:#d9d9d0;--ink:#20251f;--muted:#565b53;
+  --bg:#f4f6fa;--surface:#ffffff;--surface2:#edf1f7;--line:#dfe5ee;--ink:#1e2733;--muted:#566172;
   --accent:#f0901e;--accent-ink:#20251f;--accent-soft:#f6ecd6;
   --private:#314b3c;--group:#5b4bb0;--custom:#8a5a00;--transfer:#22618c;
   --ok:#1c7439;--warn:#8f6000;--danger:#b3261e;--off:#1f6f8b;--sick:#a8325f;--holiday:#8a6700;
@@ -14,12 +14,12 @@
   --ease:cubic-bezier(.2,0,0,1);--dur:.18s;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#171613;--surface:#201f1b;--surface2:#2a2924;--line:#3d3b34;--ink:#ece9e1;--muted:#a8a498;
+  --bg:#11161d;--surface:#192029;--surface2:#222b36;--line:#323d4b;--ink:#e8edf4;--muted:#a2adbb;
   --accent:#f5a742;--accent-ink:#241a08;--accent-soft:#33291a;
   --private:#8fc7a4;--group:#ab96f2;--custom:#e2b340;--transfer:#8cc4ea;
   --ok:#5fce85;--warn:#e2b340;--danger:#ff8078;--off:#a8a498;--sick:#f08ab0;--holiday:#e2c355;color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#171613;--surface:#201f1b;--surface2:#2a2924;--line:#3d3b34;--ink:#ece9e1;--muted:#a8a498;
+  --bg:#11161d;--surface:#192029;--surface2:#222b36;--line:#323d4b;--ink:#e8edf4;--muted:#a2adbb;
   --accent:#f5a742;--accent-ink:#241a08;--accent-soft:#33291a;
   --private:#8fc7a4;--group:#ab96f2;--custom:#e2b340;--transfer:#8cc4ea;
   --ok:#5fce85;--warn:#e2b340;--danger:#ff8078;--off:#a8a498;--sick:#f08ab0;--holiday:#e2c355;color-scheme:dark}
@@ -651,8 +651,8 @@ html[data-accent="mint"]{--accent:#45b88a;--accent-soft:#dcf1e7}
 html[data-accent="lilac"]{--accent:#b39ddb;--accent-soft:#ece6f6}
 html[data-accent="rose"]{--accent:#f28fad;--accent-soft:#fbe4eb}
 html[data-accent="sun"]{--accent:#f2c94c;--accent-soft:#fbf1d2}
-@media (prefers-color-scheme:dark){html:not([data-theme="light"])[data-accent]{--accent-soft:color-mix(in srgb,var(--accent) 22%,#201f1b)}}
-html[data-theme="dark"][data-accent]{--accent-soft:color-mix(in srgb,var(--accent) 22%,#201f1b)}
+@media (prefers-color-scheme:dark){html:not([data-theme="light"])[data-accent]{--accent-soft:color-mix(in srgb,var(--accent) 22%,#192029)}}
+html[data-theme="dark"][data-accent]{--accent-soft:color-mix(in srgb,var(--accent) 22%,#192029)}
 .accents{display:flex;flex-wrap:wrap;gap:12px}
 .acc{width:44px;height:44px;border-radius:50%;border:3px solid transparent;padding:0;box-shadow:inset 0 0 0 2px var(--surface)}
 .acc[aria-pressed="true"]{border-color:var(--ink)}
@@ -989,9 +989,9 @@ html[data-theme="dark"][data-accent="forest"]{--accent:#8fc7a4;--accent-ink:#102
 /* 3.29 Default look = the Friendly.ge brand book: green for structure, one orange for action, sand for soft bands.
    --action is the colour of the main button; other schemes use their own colour for both. */
 :root{--action:var(--accent);--action-ink:var(--accent-ink)}
-html:not([data-accent]){--accent:#314b3c;--accent-ink:#ffffff;--accent-soft:#e6e8dd;--action:#b94a2f;--action-ink:#ffffff}
-@media (prefers-color-scheme:dark){html:not([data-theme="light"]):not([data-accent]){--accent:#8fc7a4;--accent-ink:#10231a;--accent-soft:#263029;--action:#f0a07f;--action-ink:#30140a}}
-html[data-theme="dark"]:not([data-accent]){--accent:#8fc7a4;--accent-ink:#10231a;--accent-soft:#263029;--action:#f0a07f;--action-ink:#30140a}
+html:not([data-accent]){--accent:#2563c9;--accent-ink:#ffffff;--accent-soft:#e3edfb;--action:#2563c9;--action-ink:#ffffff}
+@media (prefers-color-scheme:dark){html:not([data-theme="light"]):not([data-accent]){--accent:#8db8f5;--accent-ink:#0b1d38;--accent-soft:#1f2c40;--action:#8db8f5;--action-ink:#0b1d38}}
+html[data-theme="dark"]:not([data-accent]){--accent:#8db8f5;--accent-ink:#0b1d38;--accent-soft:#1f2c40;--action:#8db8f5;--action-ink:#0b1d38}
 html[data-accent="amber"]{--accent:#f0901e;--accent-ink:#20251f;--accent-soft:#f6ecd6}
 .btn.primary,a.btn.primary,.fab{background:var(--action);border-color:var(--action);color:var(--action-ink)}
 .brand i{background:var(--action)}
@@ -1700,3 +1700,7 @@ a.phl{color:var(--accent);font-weight:600;text-decoration:underline;white-space:
 
 /* 3.83: the week/month money bar and the bottom tabs are one block: same colour, no line between them */
 body:has(.incbar) .tabs{border-top-color:transparent}
+
+/* 3.83: a cancelled tour card is red-tinted (not blue-grey), so it stands out from live tours */
+.acard.cancelled{--k:var(--danger);background:color-mix(in srgb,var(--danger) 8%,var(--surface));border-color:color-mix(in srgb,var(--danger) 40%,var(--line))}
+.mycard.cancelled{background:color-mix(in srgb,var(--danger) 8%,var(--surface))}

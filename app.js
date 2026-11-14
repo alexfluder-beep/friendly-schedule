@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.83';
+  const APP_VERSION = '3.84';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -679,7 +679,7 @@
 
   // ---------- auth screens ----------
   // A small flat picture of our world (mountains, a hill church, the road and the van) for the login page.
-  const HERO_ART = '<svg class="authart" viewBox="0 0 400 150" aria-hidden="true"><rect width="400" height="150" fill="#e9e8dc"/><circle cx="318" cy="46" r="20" fill="#f0901e"/><path d="M0 118 70 52l44 44 40-58 62 80 46-46 138 60V150H0z" fill="#b9c4ae"/><path d="M154 38l22 30-14 8-10-10-12 10z" fill="#f7f5ef"/><path d="M0 150v-30c60-22 120-6 170-14s120-30 230-6v50z" fill="#314b3c"/><g fill="#20251f"><path d="M246 98l10-26 10 26z"/><path d="M262 100l8-20 8 20z"/><path d="M232 100l7-16 7 16z"/></g><path d="M20 150c40-26 110-18 170-26" fill="none" stroke="#f7f5ef" stroke-width="5" stroke-linecap="round" stroke-dasharray="14 12"/><g transform="translate(96 108)"><rect x="0" y="4" width="44" height="18" rx="5" fill="#f7f5ef" stroke="#20251f" stroke-width="2.5"/><path d="M26 6h10l6 8H26z" fill="#9fb7c9" stroke="#20251f" stroke-width="2"/><rect x="6" y="0" width="22" height="4" rx="2" fill="#20251f"/><circle cx="11" cy="23" r="5" fill="#20251f"/><circle cx="33" cy="23" r="5" fill="#20251f"/></g></svg>';
+  const HERO_ART = '<svg class="authart" viewBox="0 0 400 150" aria-hidden="true"><rect width="400" height="150" fill="#e3ecf9"/><circle cx="318" cy="46" r="20" fill="#f0901e"/><path d="M0 118 70 52l44 44 40-58 62 80 46-46 138 60V150H0z" fill="#b9c4ae"/><path d="M154 38l22 30-14 8-10-10-12 10z" fill="#f7f5ef"/><path d="M0 150v-30c60-22 120-6 170-14s120-30 230-6v50z" fill="#314b3c"/><g fill="#20251f"><path d="M246 98l10-26 10 26z"/><path d="M262 100l8-20 8 20z"/><path d="M232 100l7-16 7 16z"/></g><path d="M20 150c40-26 110-18 170-26" fill="none" stroke="#f7f5ef" stroke-width="5" stroke-linecap="round" stroke-dasharray="14 12"/><g transform="translate(96 108)"><rect x="0" y="4" width="44" height="18" rx="5" fill="#f7f5ef" stroke="#20251f" stroke-width="2.5"/><path d="M26 6h10l6 8H26z" fill="#9fb7c9" stroke="#20251f" stroke-width="2"/><rect x="6" y="0" width="22" height="4" rx="2" fill="#20251f"/><circle cx="11" cy="23" r="5" fill="#20251f"/><circle cx="33" cy="23" r="5" fill="#20251f"/></g></svg>';
   function authHtml() {
     const a = state.auth, msg = state.authMsg ? `<div class="banner">${esc(state.authMsg)}</div>` : '', pw = state.showPw;
     // Language sits right under the form, next to the account links: a globe and three short buttons.
@@ -1404,7 +1404,7 @@
     return `<div class="hdr"><h2>${T(admin ? 'cancel_title' : 'report_cancel')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>
       <p class="muted small">${esc(t.title || '')} · ${esc(t.date ? dateText(t) : '')}${admin ? '' : '. ' + T('report_cancel_text')}</p>
       <form class="f" data-form="cancel"><label>${T('cancel_reason')}<input id="cx-reason" name="reason" maxlength="200" ${admin ? '' : 'required'} autocomplete="off"></label>
-      <div class="qreasons"><span class="muted small">${T('nh_pick')}</span><button type="button" class="btn sm" data-act="cxpreset">${esc(T('nh_reason'))}</button></div>
+      <div class="qreasons"><span class="muted small">${T('nh_pick')}</span>${CX_PRESETS.map(k => `<button type="button" class="btn sm" data-act="cxpreset" data-k="${k}">${esc(T(k))}</button>`).join('')}</div>
       <div class="actions"><button type="button" class="btn" data-act="close">${T('keep_tour')}</button><button class="btn danger">${T(admin ? 'cancel_tour' : 'send')}</button></div></form>`;
   }
   async function setCancelled(t, on, reason) {
@@ -1415,8 +1415,9 @@
     logAct(`${on ? 'Cancelled' : 'Restored'} tour: ${t.title}, ${t.date}${on && reason ? ' (' + reason + ')' : ''}`);
   }
   // The ready-made reason "Guest did not show up" is stored as text, so show it in the reader's language and count it as one reason in the statistics.
+  const CX_PRESETS = ['nh_reason', 'cxr_min', 'cxr_weather', 'cxr_staff', 'cxr_road', 'cxr_car', 'cxr_guest'];
   const NH_REASONS = () => ['en', 'ru', 'ka'].map(l => window.I18N.t(l, 'nh_reason'));
-  const cxWhy = r => NH_REASONS().includes(String(r || '').trim()) ? T('nh_reason') : r;
+  const cxWhy = r => { const x = String(r || '').trim(), k = CX_PRESETS.find(k => ['en', 'ru', 'ka'].some(l => window.I18N.t(l, k) === x)); return k ? T(k) : r; };
   async function reportCancel(t, reason) {
     if (db.change_requests.some(q => q.tour_id === t.id && q.user_id === me().id && q.status === 'pending' && (q.patch || {}).status === 'cancelled')) { toast(T('creq_pending')); return; }
     await S.save('change_requests', { id: S.uid(), tour_id: t.id, user_id: me().id, patch: { status: 'cancelled' }, cant: false, swap_with: null, agreed: false, message: reason || null, status: 'pending', created_at: new Date().toISOString(), decided_by: null });
@@ -3627,7 +3628,7 @@
     tipsin(el) { state.modal = { type: 'tips', id: el.dataset.id, back: state.modal }; renderModal(); },
     tipsdel(el) { if (!confirm(T('m_del_ask'))) return; run(() => S.remove('tour_tips', el.dataset.id)).then(renderModal); },
     tipqr(el) { state.modal = { type: 'tip', id: el.dataset.id, back: state.modal }; renderModal(); },
-    cxpreset(el) { const i = el.closest('form') && el.closest('form').querySelector('#cx-reason'); if (i) { i.value = T('nh_reason'); i.focus(); } },
+    cxpreset(el) { const i = el.closest('form') && el.closest('form').querySelector('#cx-reason'); if (i) { i.value = T(el.dataset.k || 'nh_reason'); i.focus(); } },
     nohappen(el) {
       const t = db.tours.find(x => x.id === el.dataset.id); if (!t) return;
       confirmDo(T(isAdmin() ? 'nh_q' : 'nh_q_req'), T(isAdmin() ? 'nh_btn' : 'send'), async () => { if (isAdmin()) { await setCancelled(t, true, T('nh_reason')); toast(T('saved')); } else await reportCancel(t, T('nh_reason')); }, true);   // the window closes; the calendar behind shows the result (reopening in the same tick breaks the Back button history)
