@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.77';
+  const APP_VERSION = '3.78';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -123,7 +123,7 @@
   let wxTimer = null;
   function wxLoad(p) {
     const k = wxKey(p), now = Date.now(); if (WX[k] && (WX[k].days || now - WX[k].at < 6e5)) return;
-    try { const c = JSON.parse(S.ls.get('fs-wx-' + k) || 'null'); if (c && now - c.at < 3 * 36e5) { WX[k] = c; return; } } catch (e) { /* no cache */ }
+    try { const c = JSON.parse(S.ls.get('fs-wx-' + k) || 'null'); if (c && now - c.at < 24 * 36e5) { WX[k] = c; return; } } catch (e) { /* no cache */ }
     WX[k] = { at: now };
     fetch(`https://api.open-meteo.com/v1/forecast?latitude=${p.lat.toFixed(2)}&longitude=${p.lon.toFixed(2)}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max&timezone=Asia%2FTbilisi&forecast_days=16`)
       .then(r => (r.ok ? r.json() : null)).then(j => {
@@ -911,7 +911,7 @@
   }
   // Platform commission: the price in a GetYourGuide or Viator email is what the guest paid; the platform keeps its share.
   // Back office > Rules > Platform commission, e.g. "GetYourGuide 25, Viator 20".
-  const commOf = b => { const src = srcName(sourceOf(b) || b.source); if (!src) return 0; const m = String(rules().commission ?? 'GetYourGuide 25').match(new RegExp(src.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*[=:]?\\s*([\\d.]+)', 'i')); return m ? Math.min(90, Number(m[1]) || 0) : 0; };
+  const commOf = b => { const rc = ruleCommission(b); if (rc !== null) return rc; const src = srcName(sourceOf(b) || b.source); if (!src) return 0; const m = String(rules().commission ?? 'GetYourGuide 25').match(new RegExp(src.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*[=:]?\\s*([\\d.]+)', 'i')); return m ? Math.min(90, Number(m[1]) || 0) : 0; };
   const netOf = b => (Number(b.price) || 0) * (1 - commOf(b) / 100);
   function periodStats(from, to) {
     const ts = db.tours.filter(t => live(t) && t.date >= from && t.date <= to), ids = new Set(ts.map(t => t.id)), cur = rules().currency || 'GEL';
@@ -2387,7 +2387,7 @@
   }
   function adminHtml() {
     const tab = state.adminTab, r = rules(), y = state.year;
-    const groups = [['g_daily', ['requests', 'tickets', 'tours', 'email', 'clients', 'dups']], ['g_team', ['team', 'avail', 'balance', 'pay', 'plan', 'holidays']], ['g_numbers', ['stats', 'reports', 'achv', 'usage']], ['g_setup', ['catalog', 'rules', 'import', 'backup', 'privacy', 'log', 'problems']]], tabs = [...groups.flatMap(x => x[1]), 'guests'];
+    const groups = [['g_daily', ['requests', 'tickets', 'tours', 'email', 'clients', 'dups']], ['g_team', ['team', 'avail', 'balance', 'pay', 'plan', 'holidays']], ['g_numbers', ['stats', 'reports', 'money', 'achv', 'usage']], ['g_setup', ['catalog', 'rules', 'import', 'backup', 'privacy', 'log', 'problems']]], tabs = [...groups.flatMap(x => x[1]), 'guests'];
     if (!tab) return `<div class="bar"><h2>${T('nav_admin')}</h2><span class="spacer"></span>${helpBtn()}</div>${helpBox('admin')}${S.mode === 'supabase' || window.__fsLookAsDemo ? `<div class="card f vapick"><b>${T('va_title')}</b><span class="muted small">${T('va_text')}</span><div class="bar"><select class="inp" id="va-who">${crew().filter(p => p.id !== S.me.id).map(p => opt(p.id, `${p.name} · ${T('role_' + p.role)}`, '')).join('')}</select><button class="btn primary" data-act="vastart">${T('va_go')}</button></div></div>` : ''}${backupDue() ? `<div class="banner small"><span>${lastBackup() ? T('bk_due', { date: fmtDay(lastBackup().slice(0, 10)) }) : T('bk_never')}</span><button class="btn sm primary" data-act="backup">${T('bk_download')}</button></div>` : ''}${groups.map(([gk, gt]) => `<h3>${T(gk)}</h3><div class="tiles">${gt.map(x => `<button class="card" data-act="admintab" data-v="${x}"><span class="ttl">${T('a_' + x)}${x === 'requests' && db.change_requests.some(q => q.status === 'pending') ? ` <span class="badge">${db.change_requests.filter(q => q.status === 'pending').length}</span>` : ''}${x === 'pay' && db.pay_disputes.some(q => q.status === 'open') ? ` <span class="badge">${db.pay_disputes.filter(q => q.status === 'open').length}</span>` : ''}</span><span class="muted small">${T('ad_' + x)}</span></button>`).join('')}</div>`).join('')}`;
     let h = `<div class="bar backbar"><button class="btn sm" data-act="admintab" data-v="${tab === 'guests' ? 'clients' : ''}">‹ ${tab === 'guests' ? T('a_clients') : T('nav_admin')}</button><h2>${T('a_' + tab)}</h2><span class="spacer"></span>${helpBtn()}</div>${helpBox('admin')}`;
     if (tab === 'stats') return h + statsTabHtml(y);
@@ -2395,6 +2395,7 @@
     if (tab === 'tickets') return h + ticketsAdminHtml();
     if (tab === 'dups') return h + dupsHtml();
     if (tab === 'achv') return h + achvTabHtml();
+    if (tab === 'money') return h + moneyHtml();
     if (tab === 'balance') return h + balanceHtml(state.balMonth || today().slice(0, 7));
     if (tab === 'avail') return h + availHtml(state.availWk || addDays(monday(today()), 7));
     if (tab === 'problems') {
@@ -3272,7 +3273,7 @@
   }
   // ---------- one line that says how fresh the schedule is and whether my changes were delivered ----------
   const hm = iso => new Intl.DateTimeFormat(LOCALES[lang()], { hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
-  function syncState() { const n = S.pending || 0, at = S.syncedAt || S.cachedAt, old = at && Date.now() - new Date(at).getTime() > 10 * 60000; return S.warming ? 'warm' : S.offline ? 'off' : (n || S.syncing) ? 'send' : old ? 'old' : 'ok'; }   // warm: the saved copy is on screen, fresh data is on its way
+  function syncState() { const n = S.pending || 0, at = S.syncedAt || S.cachedAt, old = at && Date.now() - new Date(at).getTime() > (S.live ? 20 : 10) * 60000; return S.warming ? 'warm' : S.offline ? 'off' : (n || S.syncing) ? 'send' : old ? 'old' : 'ok'; }   // warm: the saved copy is on screen, fresh data is on its way
   // All fine: only the green dot before the app name. Offline, old data, sending or a failed save: a line under the header says so.
   function syncRow() {
     const n = S.pending || 0, at = S.syncedAt || S.cachedAt, st = syncState(); document.documentElement.classList.toggle('syncing', st === 'send' || st === 'warm');
@@ -3356,7 +3357,10 @@
   const closeModal = () => { state.modal = (state.modal && state.modal.back) || null; if (state.modal && state.modal.type === 'tour' && !state.modal.edit) { const fresh = db.tours.find(x => x.id === state.modal.draft.id); if (fresh) { state.modal.draft = { ...fresh, bookings: tourBookings(fresh.id).map(b => ({ ...b, marks: [...(b.marks || [])] })) }; } } renderModal(); };
 
   // ---------- events ----------
+  const MONEY = window.FSMoney({ getMemo: () => memo, setMemo: v => { memo = v; }, db, state, S, T, me, isAdmin, run, toast, logAct, render, msi, esc, nf: (...a) => nf(...a), fmt, fmtDay, today, iso, opt, crew, pname, rules, rateOf, fxOn, manualRate, statKey, aliasOf, srcName, sourceOf, netOf, guestCur, live, statement, CURRENCIES, SOURCES });
+  const { moneyHtml, ruleCommission } = MONEY;
   const acts = {
+    ...MONEY.acts,
     prelangb(el) { S.ls.set('fs-lang', el.dataset.v); render(); },
     view(el) { const from = state.view === 'admin' && state.adminTab === 'clients' ? 'clients' : state.view; slideTo(VIEW_ORDER.indexOf(from), VIEW_ORDER.indexOf(el.dataset.v), () => acts.viewNow(el)); },
     viewNow(el) { state.view = el.dataset.v; if (state.view === 'clients') { state.view = 'admin'; state.adminTab = 'clients'; state.q = ''; } else if (state.view === 'admin') state.adminTab = null; try { history.replaceState(null, '', '#' + state.view); } catch (e) { location.hash = state.view; } render(); window.scrollTo(0, 0); },
@@ -3737,6 +3741,7 @@
   };
   const stripEmail = p => { const { email, ...rest } = p; return rest; };
   const forms = {
+    ...MONEY.forms,
     async signin(fd) { await S.signIn(fd.get('email'), fd.get('password')); displayFromAccount(); state.mine = !isAdmin(); state.mode = 'week'; state.view = 'calendar'; checkBadges(); weekCheck(); setTimeout(xcNudge, 4000); },
     async signup(fd) { const inside = await S.signUp(fd.get('name'), fd.get('email'), fd.get('password')); if (!inside) { state.auth = 'signin'; state.authMsg = T('check_email'); } },
     async reset(fd) { await S.resetPassword(fd.get('email')); state.auth = 'signin'; state.authMsg = T('reset_sent'); },

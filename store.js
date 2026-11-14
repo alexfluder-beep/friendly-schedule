@@ -2,7 +2,8 @@
 (() => {
   'use strict';
   const CFG = window.APP_CONFIG || {};
-  const TABLES = ['profiles', 'expenses', 'tours', 'bookings', 'clients', 'client_ratings', 'tour_ratings', 'payout_details', 'log', 'change_requests', 'pay_adjustments', 'personal_dates', 'usage', 'offers', 'time_off', 'holidays', 'tasks', 'notifications', 'settings', 'invites', 'pay_disputes', 'tour_costs', 'photos', 'thanks', 'badge_likes', 'tickets', 'guest_reviews'];
+  const TABLES = ['profiles', 'expenses', 'tours', 'bookings', 'clients', 'client_ratings', 'tour_ratings', 'payout_details', 'log', 'change_requests', 'pay_adjustments', 'personal_dates', 'usage', 'offers', 'time_off', 'holidays', 'tasks', 'notifications', 'settings', 'invites', 'pay_disputes', 'tour_costs', 'photos', 'thanks', 'badge_likes', 'tickets', 'guest_reviews', 'commission_rules', 'payments', 'staff_payments'];
+  const ADMIN_ONLY = ['commission_rules', 'payments', 'staff_payments'];   // the database shows these to admins only; other phones do not ask
   const DEMO_KEY = 'fs-demo-v18';
   const db = {}; TABLES.forEach(t => db[t] = []);
   const listeners = [];
@@ -36,7 +37,7 @@
     async set(k, v) { try { const d = await idb.open(); await new Promise(res => { const tx = d.transaction('kv', 'readwrite'); tx.objectStore('kv').put(v, k); tx.oncomplete = res; tx.onerror = res; }); } catch (e) { /* no storage: the app still works online */ } }
   };
   let outbox = [], cacheTimer = null, subscribed = false;
-  const saveCache = () => { if (mode !== 'supabase' || !me || !me.active) return; clearTimeout(cacheTimer); cacheTimer = setTimeout(() => { idb.set('cache', { me, db, at: new Date().toISOString(), delCursor: store.delCursor || null, loadedFrom: store.loadedFrom || null }); idb.set('outbox', outbox); }, 800); };
+  const saveCache = () => { if (mode !== 'supabase' || !me || !me.active) return; clearTimeout(cacheTimer); cacheTimer = setTimeout(() => { idb.set('cache', { me, db, at: new Date().toISOString(), delCursor: store.delCursor || null, loadedFrom: store.loadedFrom || null }); idb.set('outbox', outbox); }, 2500); };
   const isNetErr = e => !navigator.onLine || /fetch|network|load failed|abort|timed? ?out/i.test(String((e && e.message) || e) + ' ' + ((e && e.name) || ''));
   // Weak internet: a request that hangs is stopped after 15 seconds, and the change waits on the phone instead.
   // Data counter (Me > Settings): requests and bytes received per day, kept on this phone only.
@@ -160,8 +161,8 @@
     const began = new Date(Date.now() - 60000).toISOString();   // a minute earlier, so nothing deleted during the load is missed
     since = since || windowStart(); store.loadedFrom = since;
     // All tables are asked for at the same time (one after another took many seconds on a slow phone); the screen changes only when all have arrived.
-    const got = await Promise.all(TABLES.map(t => fetchTable(t, since))); TABLES.forEach((t, i) => { db[t] = got[i] || []; });
-    store.syncedAt = new Date().toISOString(); store.delCursor = began;
+    const got = await Promise.all(TABLES.map(t => (ADMIN_ONLY.includes(t) && !(me && me.role === 'admin') ? Promise.resolve([]) : fetchTable(t, since)))); TABLES.forEach((t, i) => { db[t] = got[i] || []; });
+    store.syncedAt = store.fullAt = new Date().toISOString(); store.delCursor = began;
   }
   // "Only the changes": tours, bookings and guests carry an updated_at stamp (set by the database). After the first full load
   // only rows changed since the newest stamp we hold are fetched, and deleted ids come from deleted_rows. Null = not possible, load everything.
@@ -189,43 +190,65 @@
       applyLocal(p.table, row, type); emit(p.table, row, type, true); saveCache();
     }).subscribe(status => { store.live = status === 'SUBSCRIBED'; if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') store.pulse(); });
   }
-  // Safety net for live updates: every few minutes, and when the app comes back to the screen, the near-term
-  // schedule is re-read, so a missed live message is repaired within minutes.
-  const HOT = ['profiles', 'time_off', 'holidays', 'tasks', 'change_requests', 'settings', 'notifications', 'invites', 'pay_disputes', 'pay_adjustments', 'photos', 'thanks'];
+  // Safety net for live updates, three priorities. The live connection already pushes every change by itself; these only repair a missed message.
+  //  TOP (quick check every 7 min while live): the schedule from yesterday to 7 days ahead (tours, bookings, their guests), my tasks, notices, change requests.
+  //  MEDIUM (every 30 min while live): people (guide and driver edits), time off, holidays, settings.
+  //  LOW (full check every 60 min while live, or when the app is opened after 30 min away): every changed tour/booking/guest, photos, thanks, disputes, adjustments, invites.
+  //  Old tours, payments, analytics, badges and ratings only arrive with the live connection or the full check. Weather is kept 24 hours on the phone and exchange rates load once a day.
+  const TOP = ['tasks', 'notifications', 'change_requests'], MED = ['profiles', 'time_off', 'holidays', 'settings'];
+  const COLD = ['invites', 'pay_disputes', 'pay_adjustments', 'photos', 'thanks'];
   const sig = rows => rows.map(r => JSON.stringify(r)).sort().join('|');
   let pulsing = false;
-  async function pulse() {
+  const ageOf = k => (store[k] ? Date.now() - new Date(store[k]).getTime() : 1e9);
+  async function refreshNear() {   // yesterday .. 3 days ahead; returns true when something changed
+    const lo = new Date(), hi = new Date(); lo.setDate(lo.getDate() - 1); hi.setDate(hi.getDate() + 7); const a = iso(lo), z = iso(hi);
+    const tours = await pageAll(() => sb.from('tours').select('*').gte('date', a).lte('date', z).order('id')); if (!tours) return false;
+    const ids = tours.map(t => t.id), bookings = [];
+    for (let i = 0; i < ids.length; i += 100) { const part = await pageAll(() => sb.from('bookings').select('*').in('tour_id', ids.slice(i, i + 100)).order('id')); if (!part) return false; bookings.push(...part); }
+    const oldT = db.tours.filter(t => t.date >= a && t.date <= z), oldIds = new Set(oldT.map(t => t.id)), oldB = db.bookings.filter(b => oldIds.has(b.tour_id) || ids.includes(b.tour_id));
+    let changed = false;
+    if (sig(oldT) !== sig(tours)) { db.tours = db.tours.filter(t => !(t.date >= a && t.date <= z)).concat(tours); changed = true; }
+    if (sig(oldB) !== sig(bookings)) { const keep = new Set([...oldIds, ...ids]); db.bookings = db.bookings.filter(b => !keep.has(b.tour_id)).concat(bookings); changed = true; }
+    const have = new Set(db.clients.map(c => c.id)), need = [...new Set(bookings.map(b => b.client_id).filter(c => c && !have.has(c)))];
+    for (let i = 0; i < need.length; i += 100) { const { data } = await sb.from('clients').select('*').in('id', need.slice(i, i + 100)); if (data && data.length) { db.clients = db.clients.concat(data); changed = true; } }
+    return changed;
+  }
+  async function pulse(kind) {
+    const full = kind !== 'quick';
     if (mode !== 'supabase') { store.syncedAt = new Date().toISOString(); return false; }
     if (pulsing || !me || !me.active || store.offline || store.syncing || outbox.length || !navigator.onLine) return false;
     pulsing = true; let changed = false;
     try {
-      const d = new Date(); d.setDate(d.getDate() - 2); const cut = iso(d);
-      const dl = await delta(); if (dl) changed = true;
-      const tours = dl === null ? await fetchTable('tours', cut) : null, bookings = dl === null ? await fetchTable('bookings', cut) : null;
-      if (tours && bookings) {
-        const oldT = db.tours.filter(t => t.date >= cut), hot = new Set([...oldT, ...tours].map(t => t.id)), oldB = db.bookings.filter(b => hot.has(b.tour_id));
-        if (sig(oldT) !== sig(tours)) { db.tours = db.tours.filter(t => t.date < cut).concat(tours); changed = true; }
-        if (sig(oldB) !== sig(bookings)) { db.bookings = db.bookings.filter(b => !hot.has(b.tour_id)).concat(bookings); changed = true; }
-        const have = new Set(db.clients.map(c => c.id)), need = [...new Set(bookings.map(b => b.client_id).filter(c => c && !have.has(c)))];
-        for (let i = 0; i < need.length; i += 100) { const { data } = await sb.from('clients').select('*').in('id', need.slice(i, i + 100)); if (data && data.length) { db.clients = db.clients.concat(data); changed = true; } }
-      }
-      const fresh = await Promise.all(HOT.map(t => fetchTable(t))); // the small tables load side by side, not one after another
-      HOT.forEach((t, i) => { const rows = fresh[i]; if (rows && sig(rows) !== sig(db[t])) { db[t] = rows; changed = true; } });
+      if (full) {
+        const d = new Date(); d.setDate(d.getDate() - 2); const cut = iso(d);
+        const dl = await delta(); if (dl) changed = true;
+        const tours = dl === null ? await fetchTable('tours', cut) : null, bookings = dl === null ? await fetchTable('bookings', cut) : null;
+        if (tours && bookings) {
+          const oldT = db.tours.filter(t => t.date >= cut), hot = new Set([...oldT, ...tours].map(t => t.id)), oldB = db.bookings.filter(b => hot.has(b.tour_id));
+          if (sig(oldT) !== sig(tours)) { db.tours = db.tours.filter(t => t.date < cut).concat(tours); changed = true; }
+          if (sig(oldB) !== sig(bookings)) { db.bookings = db.bookings.filter(b => !hot.has(b.tour_id)).concat(bookings); changed = true; }
+          const have = new Set(db.clients.map(c => c.id)), need = [...new Set(bookings.map(b => b.client_id).filter(c => c && !have.has(c)))];
+          for (let i = 0; i < need.length; i += 100) { const { data } = await sb.from('clients').select('*').in('id', need.slice(i, i + 100)); if (data && data.length) { db.clients = db.clients.concat(data); changed = true; } }
+        }
+      } else if (await refreshNear()) changed = true;
+      const medDue = full || ageOf('medAt') > (store.live ? 1800000 : 300000), list = full ? TOP.concat(MED, COLD) : medDue ? TOP.concat(MED) : TOP, fresh = await Promise.all(list.map(t => fetchTable(t))); // the small tables load side by side, not one after another
+      list.forEach((t, i) => { const rows = fresh[i]; if (rows && sig(rows) !== sig(db[t])) { db[t] = rows; changed = true; } });
       const mine = db.profiles.find(p => p.id === me.id); if (mine) me = { ...me, ...mine };
-      store.syncedAt = new Date().toISOString();
+      store.syncedAt = new Date().toISOString(); if (full) store.fullAt = store.syncedAt; if (medDue) store.medAt = store.syncedAt;
       if (changed) { saveCache(); emit(null, null, 'BULK', true); }
     } catch (e) { if (isNetErr(e)) { store.offline = true; emit(null, null, 'STATE', true); } else console.error('pulse', e); }
     finally { pulsing = false; }
     return changed;
   }
   if (mode === 'supabase') {
-    // While the live connection works, changes arrive by themselves, so the full check is only a safety net (every 10 minutes). Without it: every 2.5 minutes.
-    const age = () => store.syncedAt ? Date.now() - new Date(store.syncedAt).getTime() : 1e9;
-    setInterval(() => { if (!document.hidden && age() > (store.live ? 600000 : 140000)) pulse(); }, 150000);
+    // While the live connection works: top check every 7 minutes (medium every 30, full every 60). Without it the old fast timing comes back (2.5 and 10 minutes).
+    const age = ageOf;
+    const due = () => { if (document.hidden) return; if (age('fullAt') > (store.live ? 3600000 : 600000)) pulse(); else if (age('syncedAt') > (store.live ? 420000 : 140000)) pulse('quick'); };
+    setInterval(due, 60000);
     // The connection looked down: try again every 30 seconds and when the app is opened again.
     setInterval(() => { if (store.offline && navigator.onLine && !document.hidden && me) store.sync(); }, 30000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden && store.offline && navigator.onLine && me) store.sync(); });
-    document.addEventListener('visibilitychange', () => { if (!document.hidden && (!store.syncedAt || Date.now() - new Date(store.syncedAt).getTime() > (store.live ? 180000 : 45000))) pulse(); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden) return; if (age('fullAt') > (store.live ? 1800000 : 120000)) pulse(); else if (age('syncedAt') > (store.live ? 180000 : 45000)) pulse('quick'); });
   }
   async function afterLogin(user) {
     const { data: p, error: pe } = await sb.from('profiles').select('*').eq('id', user.id).maybeSingle();
@@ -233,7 +256,7 @@
     store.loginNote = pe ? 'Profile could not be read: ' + (pe.message || pe.code || 'error') : !p ? 'No profile row for this account' : !p.active ? `Profile found: role ${p.role}, not active` : '';
     me = p || { id: user.id, name: user.email, role: 'guide', active: false, lang: null };
     me.email = user.email;
-    if (me.active) { let d = null; try { d = await delta(); } catch (e) { if (isNetErr(e)) throw e; } if (d === null) await loadAll(); else store.syncedAt = new Date().toISOString(); me = { ...(db.profiles.find(x => x.id === user.id) || me), email: user.email }; subscribe(); saveCache(); }
+    if (me.active) { let d = null; try { d = await delta(); } catch (e) { if (isNetErr(e)) throw e; } if (d === null) await loadAll(); else store.syncedAt = store.fullAt = new Date().toISOString(); me = { ...(db.profiles.find(x => x.id === user.id) || me), email: user.email }; subscribe(); saveCache(); }
   }
 
   function demoStale(months) {

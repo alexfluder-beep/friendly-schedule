@@ -577,3 +577,9 @@ do $$ declare t text; begin foreach t in array array['commission_rules','payment
   execute format('drop policy if exists %I on public.%I', t||'_admin', t);
   execute format('create policy %I on public.%I for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()))', t||'_admin', t);
 end loop; end $$;
+
+-- 3.78: payments to people outside the team (name only, no profile)
+alter table public.staff_payments add column if not exists payee_name text;
+alter table public.staff_payments alter column user_id drop not null;
+alter table public.staff_payments drop constraint if exists staff_payments_payee_chk;
+alter table public.staff_payments add constraint staff_payments_payee_chk check (user_id is not null or coalesce(btrim(payee_name),'') <> '');
