@@ -7,6 +7,7 @@ Team scheduling for guides and drivers: tours (private, group, customised), days
 With `config.js` left empty the app runs in **demo mode**: sample data, stored only in that browser, no login.
 
 ## What is included
+- 3.88: the opening greeting follows the hour (00:26 says Good night, not Good afternoon); car colour is picked from a list of 12 colours instead of typed.
 - 3.87: cars on the profile (model, colour, number, seats, photo, a second car sends a check task to the office); Timeline fits many people and keeps the hour column in view; Usage tab shows opens per day, day / evening / night and checks during tours, with Guides, Drivers and Delica drivers apart and admins left out; tour places are a searchable multi-select list with about 50 places (new column cars on profiles, task rule tasks_car_own).
 - 3.86: on a computer every screen uses the whole window width (like Setmore); the team hover card is bigger and clickable: phone with WhatsApp, Call and Copy, Telegram, car type and car number with Copy, car photo; Back office > Team has new Car number and Car photo fields (new columns car_plate, car_photo on profiles).
 - 3.85: hover card on a team name in the calendar side panel (today, this month, next tour, days off, waiting requests, languages); requests sorted by date with the time they arrived and a "we got your request" note for the guide; guides without an avatar get a must-do task before they can make changes; "Not duplicates" button on duplicate cards; Day view no longer repeats the date.

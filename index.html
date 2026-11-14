@@ -22,7 +22,7 @@
 // While the schedule loads: a greeting by the time of day, with the person's first name from their last visit (kept on this phone only).
 (function () {
   try {
-    var h = JSON.parse(localStorage.getItem('fs-hello') || '{}'), hr = new Date().getHours(), part = hr >= 5 && hr < 12 ? 0 : hr < 18 ? 1 : hr < 23 ? 2 : 3;
+    var h = JSON.parse(localStorage.getItem('fs-hello') || '{}'), hr = new Date().getHours(), part = hr >= 5 && hr < 12 ? 0 : hr >= 12 && hr < 18 ? 1 : hr >= 18 && hr < 23 ? 2 : 3;
     var L = { en: ['Good morning', 'Good afternoon', 'Good evening', 'Good night', 'Opening your schedule…'], ru: ['Доброе утро', 'Добрый день', 'Добрый вечер', 'Доброй ночи', 'Открываю расписание…'], ka: ['დილა მშვიდობისა', 'გამარჯობა', 'საღამო მშვიდობისა', 'ღამე მშვიდობისა', 'განრიგი იხსნება…'] }[h.l] || null;
     if (!L) L = ['Good morning', 'Good afternoon', 'Good evening', 'Good night', 'Opening your schedule…'];
     var now = new Date(), key = now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2) + '-' + ('0' + now.getDate()).slice(-2), day = (h.d || {})[key] || {};

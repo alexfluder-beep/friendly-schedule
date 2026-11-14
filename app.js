@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.87';
+  const APP_VERSION = '3.88';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -1615,13 +1615,16 @@
   const carsOf = p => { const a = Array.isArray(p && p.cars) ? p.cars.filter(c => c && (c.model || c.plate || c.photo)) : []; if (a.length) return a; return p && (p.car_plate || p.car_photo) ? [{ model: '', color: '', plate: p.car_plate || '', seats: '', photo: p.car_photo || null }] : []; };
   // Delica drivers and drivers with their own car are different groups; one driver with several cars can be in both.
   const carKinds = p => { const k = new Set(), cs = carsOf(p); if (p.vehicle === 'delica') k.add('delica'); if (p.vehicle === 'own') k.add('own'); cs.forEach(c => { k.add(/delica/i.test(c.model || '') ? 'delica' : 'own'); }); if (!k.size && p.role === 'driver') k.add('own'); return k; };
-  const carLine = c => [c.model, c.color, c.plate, c.seats ? T('car_seats_n', { n: c.seats }) : ''].filter(Boolean).join(' · ');
-  function carsSync() { const m = state.modal, f = document.querySelector('#modal form[data-form=cars]'); if (!m || !m.cars || !f) return; m.cars.forEach((c, i) => { const g = k => { const e = f.querySelector(`[data-car="${i}.${k}"]`); return e ? e.value : c[k]; }; c.model = g('model').trim(); c.color = g('color').trim(); c.plate = g('plate').trim().toUpperCase(); c.seats = g('seats').trim(); }); }
+  const CAR_COLORS = [['white', '#ffffff'], ['black', '#20242a'], ['silver', '#c3c8cf'], ['grey', '#7b838d'], ['red', '#c0392b'], ['blue', '#2f5fa8'], ['green', '#2f7d4f'], ['yellow', '#f2c230'], ['orange', '#e0762b'], ['brown', '#7a5233'], ['beige', '#d8c3a0'], ['gold', '#b99a45']];
+  const carColorName = v => (CAR_COLORS.some(x => x[0] === v) ? T('carc_' + v) : v || '');
+  const carLine = c => [c.model, carColorName(c.color), c.plate, c.seats ? T('car_seats_n', { n: c.seats }) : ''].filter(Boolean).join(' · ');
+  function carsSync() { const m = state.modal, f = document.querySelector('#modal form[data-form=cars]'); if (!m || !m.cars || !f) return; m.cars.forEach((c, i) => { const g = k => { const e = f.querySelector(`[data-car="${i}.${k}"]`); return e ? e.value : c[k]; }; c.model = g('model').trim(); { const r = f.querySelector(`input[name="carcolor-${i}"]:checked`); c.color = r ? r.value : (c.color || ''); } c.plate = g('plate').trim().toUpperCase(); c.seats = g('seats').trim(); }); }
   function carsModalHtml(m) {
     const p = person(m.id) || {}, boxes = m.cars.map((c, i) => `<div class="card f carbox"><div class="row"><b>${T('car_n', { n: i + 1 })}</b><span class="spacer"></span>${m.cars.length > 1 || c.model || c.plate || c.photo ? `<button type="button" class="btn sm" data-act="cardel" data-i="${i}">${msi('delete')}${T('car_remove')}</button>` : ''}</div>
       <div class="carphoto">${c.photo ? `<img src="${esc(c.photo)}" alt="">` : `<span class="carnoph">${msi('directions_car')}</span>`}<label class="btn sm">${msi('photo_camera')}${T('car_photo')}<input type="file" accept="image/*" data-ch="carphoto" data-i="${i}" hidden></label>${c.photo ? `<button type="button" class="btn sm" data-act="carphotodel" data-i="${i}">${T('car_photo_del')}</button>` : ''}</div>
       <label>${T('car_model')}<input data-car="${i}.model" value="${esc(c.model || '')}" placeholder="Mitsubishi Delica" autocomplete="off"></label>
-      <div class="two"><label>${T('car_color')}<input data-car="${i}.color" value="${esc(c.color || '')}" placeholder="${esc(T('car_color_ph'))}" autocomplete="off"></label><label>${T('car_plate')}<input data-car="${i}.plate" value="${esc(c.plate || '')}" placeholder="AB-123-CD" autocomplete="off" autocapitalize="characters"></label></div>
+      <div class="carcol"><span class="small muted">${T('car_color')}</span><div class="swatches" role="radiogroup" aria-label="${esc(T('car_color'))}">${[...CAR_COLORS, ...(c.color && !CAR_COLORS.some(x => x[0] === c.color) ? [[c.color, '#9aa1a9']] : [])].map(([k, hex]) => `<label class="sw"><input type="radio" name="carcolor-${i}" value="${esc(k)}" ${c.color === k ? 'checked' : ''}><i style="background:${hex}"></i>${esc(carColorName(k))}</label>`).join('')}</div></div>
+      <label>${T('car_plate')}<input data-car="${i}.plate" value="${esc(c.plate || '')}" placeholder="AB-123-CD" autocomplete="off" autocapitalize="characters"></label>
       <label>${T('car_seats')}<input data-car="${i}.seats" type="number" min="1" max="20" inputmode="numeric" value="${esc(c.seats || '')}" placeholder="6"></label></div>`).join('');
     return `<div class="hdr"><h2>${T('cars_title')}: ${esc(p.name || '')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>
       <form class="f" data-form="cars">${boxes}${m.cars.length < 2 ? `<button type="button" class="btn" data-act="caradd">+ ${T('car_add2')}</button><span class="muted small">${T('car_add2_note')}</span>` : ''}
