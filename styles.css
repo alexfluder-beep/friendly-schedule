@@ -1651,17 +1651,49 @@ a.phl{color:var(--accent);font-weight:600;text-decoration:underline;white-space:
   .calsplit{display:grid;grid-template-columns:264px minmax(0,1fr);grid-template-rows:auto 1fr;column-gap:16px;transition:grid-template-columns .28s cubic-bezier(.2,0,0,1)}
   .calsplit.shut{grid-template-columns:0 minmax(0,1fr);column-gap:0}
   .sidebar-top{grid-column:1 / -1}
-  .sidepanel{grid-column:1;grid-row:2;min-width:0;overflow:hidden;align-self:start;position:sticky;top:12px;max-height:calc(100vh - 24px)}
-  .sidepanel .spin{width:264px;max-height:calc(100vh - 24px);overflow:auto;padding-bottom:16px;transition:opacity .2s}
+  .sidepanel{grid-column:1;grid-row:2;min-width:0;overflow:hidden;align-self:start;position:sticky;top:calc(var(--toph,0px) + 12px);max-height:calc(100vh - var(--toph,0px) - 24px)}
+  .sidepanel .spin{width:264px;max-height:calc(100vh - var(--toph,0px) - 24px);overflow:auto;padding-bottom:16px;transition:opacity .2s}
   .calsplit.shut .sidepanel .spin{opacity:0}
   .calmain{grid-column:2;grid-row:2;min-width:0}
   .calsplit .whosel{display:none}
 }
 @media (max-width:899px){
   .calsplit{display:block}
-  .sidepanel{position:fixed;left:0;top:0;bottom:0;width:min(86vw,320px);z-index:80;background:var(--surface);box-shadow:2px 0 24px rgba(0,0,0,.22);transform:translateX(-104%);transition:transform .28s cubic-bezier(.2,0,0,1);overflow:auto;padding-top:max(8px,env(safe-area-inset-top,0px))}
-  .calsplit.open .sidepanel{transform:none}
-  .sideback{display:block;position:fixed;inset:0;z-index:79;background:rgba(32,37,31,.4);opacity:0;pointer-events:none;transition:opacity .28s}
-  .calsplit.open .sideback{opacity:1;pointer-events:auto}
+  .sidepanel{position:static;max-height:0;overflow:hidden;margin:0;border:0 solid var(--line);border-radius:var(--r-m);background:var(--surface);transition:max-height .28s cubic-bezier(.2,0,0,1),margin .28s}
+  .calsplit.open .sidepanel{max-height:min(70vh,560px);overflow:auto;border-width:1px;margin:0 0 10px}
+  .sideback{display:none}
 }
 @media (prefers-reduced-motion:reduce){.calsplit,.sidepanel,.sidepanel .spin,.sideback{transition:none!important}}
+
+.tnotebox{display:flex;flex-direction:column;gap:2px;margin:8px 0;padding:12px 14px;border-radius:var(--r-m);background:var(--surface2);border-left:4px solid var(--ink);font-size:var(--t-body,15px);line-height:1.4;white-space:pre-wrap}.tnotebox b{font-size:var(--t-sm);text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+
+.gcx{opacity:.85}.gcx b{text-decoration:line-through;text-decoration-thickness:1px}.gcxform{margin:10px 0}
+
+/* Several-day tours: one bar across the days of the week (computer month view) */
+@media (min-width:900px){
+  .mgrid button{position:relative}
+  .mrow.lane{height:20px;flex:none;padding:0;overflow:visible;cursor:default}.mrow.lane:hover{background:none}
+  .mbar{position:absolute;left:6px;z-index:2;height:20px;display:flex;align-items:center;gap:6px;padding:0 8px;box-sizing:border-box;border-radius:var(--r-s);border-left:4px solid var(--k);background:color-mix(in srgb,var(--k) 20%,var(--surface));font-size:var(--t-cap);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+  .mbar:hover{background:color-mix(in srgb,var(--k) 32%,var(--surface))}.mbar.cx{text-decoration:line-through;color:var(--muted)}
+}
+
+/* Settings fine tuning: languages as ticks, segmented buttons only as wide as their buttons */
+.langpick{border:0;padding:0;margin:0;min-width:0;display:flex;flex-direction:column;gap:8px}.langpick legend{padding:0;margin-bottom:6px;color:var(--muted);font-weight:600;font-size:var(--t-sm)}
+.langpick .checks label{min-height:40px}.langpick .checks input{width:20px;height:20px;flex:none}.langpick .checks label:has(input:checked){background:var(--surface2);border-color:var(--ink)}
+.langpick .lother{max-width:360px}
+.f .seg.wrap,.card .seg.wrap{align-self:flex-start;max-width:100%}
+/* Choice buttons that can wrap (text size, colours, contrast, pay currency): separate pills, so a second line never looks cut off */
+.seg.wrap{border:0;background:none;gap:6px;overflow:visible;border-radius:0}
+.seg.wrap button{border:1px solid var(--line);background:var(--surface);min-height:40px;padding:8px 16px;border-radius:var(--r-pill)}
+.seg.wrap button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent);color:var(--accent-ink)}
+
+/* Languages: an open list with ticks (like a select that allows several) */
+.langpick{border:1px solid var(--line);border-radius:var(--r-m);background:var(--surface);padding:0}
+.langpick>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;min-height:48px;padding:6px 14px}.langpick>summary::-webkit-details-marker{display:none}
+.langpick .lt{font-weight:600;color:var(--muted);flex:none}.langpick .lsum{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
+.langpick>summary .msi{width:24px;height:24px;color:var(--muted);flex:none;transition:transform .2s}.langpick[open]>summary .msi{transform:rotate(180deg)}
+.langpick .lbody{border-top:1px solid var(--line);padding:10px 14px 14px;display:flex;flex-direction:column;gap:10px}
+.langpick .checks{gap:2px}.langpick .checks label{border:0;border-radius:var(--r-s);padding:6px 4px;min-height:40px;background:none}.langpick .checks label:has(input:checked){background:var(--surface2);border:0}
+.langpick .checks input{width:22px;height:22px;flex:none}
+
+.verchip{margin-left:8px;padding:2px 9px;border-radius:var(--r-pill);background:var(--accent-soft,var(--surface2));border:1px solid var(--line);color:var(--ink);font-size:var(--t-sm);font-weight:700;letter-spacing:.01em;white-space:nowrap;vertical-align:middle}

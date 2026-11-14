@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.81';
+  const APP_VERSION = '3.82';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -233,7 +233,7 @@
     if (memo.cagg) return memo.cagg;
     const tm = {}, out = {}, td = today(); db.tours.forEach(t => { tm[t.id] = t; });
     const get = c => (out[c] = out[c] || { total: 0, mine: 0, ys: new Set(), addons: 0, noshow: 0, good: 0, bad: 0 });
-    for (const b of db.bookings) { const t = tm[b.tour_id]; if (!t || !b.client_id || !live(t) || endOf(t) >= td) continue; const o = get(b.client_id); o.total++; if (involves(t, me().id)) o.mine++; o.ys.add(t.date.slice(0, 4)); if ((b.marks || []).length) o.addons++; if (b.attendance === 'noshow') o.noshow++; }
+    for (const b of liveB()) { const t = tm[b.tour_id]; if (!t || !b.client_id || !live(t) || endOf(t) >= td) continue; const o = get(b.client_id); o.total++; if (involves(t, me().id)) o.mine++; o.ys.add(t.date.slice(0, 4)); if ((b.marks || []).length) o.addons++; if (b.attendance === 'noshow') o.noshow++; }
     for (const r of db.client_ratings) { const o = out[r.client_id]; if (!o) continue; if (r.rating === 'good' || r.rating === 'like') o.good++; else if (r.rating === 'bad' || r.rating === 'trouble' || r.rating === 'dislike') o.bad++; }
     Object.values(out).forEach(o => { o.years = o.ys.size; });
     return memo.cagg = out;
@@ -247,18 +247,34 @@
   const cleanName = v => String(v || '').replace(/\s+x\s*\d+(\s*\+\s*\d+)?/i, '').replace(/\s*\+\S+/g, '').replace(/\b(RUS|ENG|GER|FRA)\b/g, '').trim();
   const clientRating = id => idx().rat[id];
   // Lookup tables rebuilt once per screen draw, so thousands of tours and guests stay fast.
+  // A guest who cancelled stays in the list of the tour (marked "cancelled") but is not counted, paid or shown as a guest.
+  const isCx = b => Array.isArray(b.marks) && b.marks.includes('cancelled');
+  const liveB = () => memo.live || (memo.live = db.bookings.filter(b => !isCx(b)));
   function idx() {
     if (memo.idx) return memo.idx;
-    const byDate = {}, bk = {}, rat = {}, cx = {}, hid = {}, adm = isAdmin();
+    const byDate = {}, bk = {}, rat = {}, cx = {}, hid = {}, adm = isAdmin(), cxb = {};
     for (const t of db.tours) { if (!adm && guestsHidden(t)) hid[t.id] = 1; if (t.status === 'cancelled') { if (adm || involves(t, me().id)) for (const d of tourDays(t)) (cx[d] = cx[d] || []).push(t); continue; } for (const d of tourDays(t)) (byDate[d] = byDate[d] || []).push(t); }
     const lim = {}; if (isDrv()) for (const t of db.tours) if (drvLimited(t)) lim[t.id] = 1;   // a driver next to a guide sees only the guests who need a pick-up or drop-off
-    for (const b of db.bookings) { if (hid[b.tour_id]) continue; if (lim[b.tour_id] && !(b.pickup_addr || needsAddr(b))) continue; (bk[b.tour_id] = bk[b.tour_id] || []).push(b); }
+    for (const b of db.bookings) { if (hid[b.tour_id]) continue; if (isCx(b)) { if (!lim[b.tour_id]) (cxb[b.tour_id] = cxb[b.tour_id] || []).push(b); continue; } if (lim[b.tour_id] && !(b.pickup_addr || needsAddr(b))) continue; (bk[b.tour_id] = bk[b.tour_id] || []).push(b); }
     for (const r of db.client_ratings) { if (!['good', 'fine', 'bad', 'trouble'].includes(r.rating)) continue; const c = rat[r.client_id]; if (!c || (r.created_at || '') > (c.created_at || '')) rat[r.client_id] = r; }
-    return memo.idx = { byDate, bk, rat, cx };
+    return memo.idx = { byDate, bk, rat, cx, cxb };
   }
   const toursOnDay = d => idx().byDate[d] || [];
   const cancelledOnDay = d => idx().cx[d] || [];
   const tourBookings = id => idx().bk[id] || [];
+  const cxGuests = id => idx().cxb[id] || [];
+  // Languages a guide speaks: ticked from a list (stored as "EN, RU"); codes that are not in the list go into a small extra field.
+  const LANG_LIST = GUEST_LANGS;
+  const langList = v => [...new Set(String(v || '').toUpperCase().split(/[\s,;/]+/).filter(Boolean))];
+  const langSum = list => (list.length ? list.map(c => langName(c)).join(', ') : T('lang_none'));
+  function langPick(value, draft) {
+    const have = langList(value), other = have.filter(x => !LANG_LIST.includes(x)), ch = draft ? ' data-ch="langpick"' : '';
+    return `<details class="langpick"><summary><span class="lt">${T('md_langs')}</span><span class="lsum">${esc(langSum(have))}</span>${msi('keyboard_arrow_down')}</summary><div class="lbody"><div class="checks col">${LANG_LIST.map(c => `<label><input type="checkbox" name="languages" value="${c}"${have.includes(c) ? ' checked' : ''}${ch}>${esc(langName(c))} <b class="num">${c}</b></label>`).join('')}</div><label class="lother">${T('lang_other')}<input name="languages_other" value="${esc(other.join(', '))}" placeholder="EN, RU"${ch} autocomplete="off"></label></div></details>`;
+  }
+  // The line under "Languages I speak" shows what is ticked, also while the list is open.
+  document.addEventListener('change', ev => { const root = ev.target.closest && ev.target.closest('.langpick'); if (!root) return; const sm = root.querySelector('.lsum'); if (sm) sm.textContent = langSum(langList([...root.querySelectorAll('input[type=checkbox]:checked')].map(x => x.value).join(' ') + ' ' + ((root.querySelector('[name=languages_other]') || {}).value || ''))); });
+  async function recountTour(tid) { const t = db.tours.find(x => x.id === tid); if (!t) return; const rest = db.bookings.filter(x => x.tour_id === tid && !isCx(x)); await S.save('tours', { ...t, adults: rest.reduce((n, x) => n + (+x.adults || 0), 0), children: rest.reduce((n, x) => n + (+x.children || 0), 0), pax: rest.reduce((n, x) => n + (+x.pax || 0), 0) }); }
+  async function gcxMark(b, why) { const note = `${T('gcx_note')} ${fmtDay(today())}${why ? ': ' + why : ''}`; await S.save('bookings', { ...b, marks: [...new Set([...(b.marks || []), 'cancelled'])], notes: [b.notes, note].filter(Boolean).join(' · '), attendance: null }); await recountTour(b.tour_id); const t = db.tours.find(x => x.id === b.tour_id) || {}; logAct(`Guest cancelled: ${b.guest} ${t.title || ''} ${t.date || ''}`.replace(/\s+/g, ' ').trim()); memo = {}; }
   // Drivers: the group size, time and meeting point are always shown. Names and phones only for guests who need a pick-up or drop-off
   // (a transfer is only the guest, and a tour without a guide is run by the driver alone, so both show every guest).
   const drvLimited = t => isDrv() && !!t.guide_id && twin(t.guide_id) !== twin(me().id) && t.kind !== 'transfer';
@@ -693,7 +709,9 @@
   function offMark(d) {
     const mine = offOn(me().id, d), n = state.mine ? 0 : offCount(d);
     if (!mine && !n) return '';
-    return `<span class="offm ${mine ? 'me' : ''}" title="${esc(mine ? T(mine.type === 'sick' ? 'sick' : 'off_mine') : T('off_today'))}">${msi(mine && mine.type === 'sick' ? 'sick' : 'beach_access')}${mine ? esc(T(mine.type === 'sick' ? 'sick_short' : 'off_short')) : n}</span>`;
+    const who = [...new Map(db.time_off.filter(o => o.status !== 'declined' && o.date_from <= d && o.date_to >= d).map(o => [o.user_id, o])).values()].map(o => `${pname(o.user_id)} (${T(o.type === 'sick' ? 'sick' : 'dayoff')})`).sort((a, b) => a.localeCompare(b));
+    const tip = mine && state.mine ? T(mine.type === 'sick' ? 'sick' : 'off_mine') : [T('off_today') + ':', ...who].join('\n');
+    return `<span class="offm ${mine ? 'me' : ''}" title="${esc(tip)}">${msi(mine && mine.type === 'sick' ? 'sick' : 'beach_access')}${mine ? esc(T(mine.type === 'sick' ? 'sick_short' : 'off_short')) : n}</span>`;
   }
   // Under each date of the week strip: how many tours (a dot and the number; amber when a tour still needs a guide or driver)
   // and how many people are off (the same umbrella as on the Day off card). For one person: their own tours and their own day off.
@@ -886,7 +904,7 @@
   let fxBusy = false;
   async function fxRefresh() {
     if (fxBusy || !isAdmin() || !navigator.onLine) return; const td = today(), fx = fxData(), tdate = {}; db.tours.forEach(t => { tdate[t.id] = t.date; });
-    let need = td; db.bookings.forEach(b => { const d = tdate[b.tour_id]; if (d && d < need && Number(b.price) && FX_CUR.includes(b.currency || guestCur())) need = d; });
+    let need = td; liveB().forEach(b => { const d = tdate[b.tour_id]; if (d && d < need && Number(b.price) && FX_CUR.includes(b.currency || guestCur())) need = d; });
     const keys = FX_CUR.flatMap(c => Object.keys(fx[c] || {})).sort(), first = keys[0], last = keys[keys.length - 1];
     if (fx.upd === td && first && first <= need) return;
     const from = !first || need < first ? (need < addDays(td, -30) ? need : addDays(td, -30)) : last;
@@ -920,7 +938,7 @@
   const netOf = b => (Number(b.price) || 0) * (1 - commOf(b) / 100);
   function periodStats(from, to) {
     const ts = db.tours.filter(t => live(t) && t.date >= from && t.date <= to), ids = new Set(ts.map(t => t.id)), cur = rules().currency || 'GEL';
-    let rev = 0, noPrice = 0, noRate = new Set(); const bks = db.bookings.filter(b => ids.has(b.tour_id)), tdOf = {}; ts.forEach(t => { tdOf[t.id] = t.date; });
+    let rev = 0, noPrice = 0, noRate = new Set(); const bks = liveB().filter(b => ids.has(b.tour_id)), tdOf = {}; ts.forEach(t => { tdOf[t.id] = t.date; });
     let comm = 0; bks.forEach(b => { const p = Number(b.price) || 0; if (!p) { noPrice++; return; } const r = rateOf(b.currency || guestCur(), tdOf[b.tour_id]); if (!r) { noRate.add(b.currency); return; } rev += p * r; comm += (p - netOf(b)) * r; });
     const pay = ts.reduce((n, t) => n + (t.guide_id ? payFor(t, 'guide') : 0) + (t.driver_id ? payFor(t, 'driver') : 0), 0), cost = ts.reduce((n, t) => n + costOf(t.id).total, 0);
     return { tours: ts.length, guests: ts.reduce((n, t) => n + (Number(t.pax) || 0), 0), bookings: bks.length, rev, comm, pay, cost, profit: rev - comm - pay - cost, noPrice, noRate: [...noRate], cur, unassigned: ts.filter(t => !t.guide_id).length };
@@ -1042,11 +1060,20 @@
     const first = state.date.slice(0, 8) + '01', start = monday(first), td = today(), mo = state.date.slice(0, 7), sel = state.date, my = me().id;
     const wd = `<div class="hd wkh"></div>` + [...Array(7)].map((_, i) => `<div class="hd">${esc(fmt(addDays('2024-01-01', i), { weekday: PHONE() ? 'narrow' : 'short' }))}</div>`).join('');
     const isoWk = d => { const x = D(d); x.setHours(12); x.setDate(x.getDate() + 3 - ((x.getDay() + 6) % 7)); const y = new Date(x.getFullYear(), 0, 4); return 1 + Math.round(((x - y) / 86400000 - 3 + ((y.getDay() + 6) % 7)) / 7); };   // week numbers, shown on phones only
-    let cells = '';
+    let cells = '', wkl = null;
+    // A tour of several days is drawn once, as a bar across its days (computer view), not as a separate chip in every day.
+    const weekLanes = i0 => {
+      const mt = new Map(); for (let k = 0; k < 7; k++) for (const t of toursOnDay(addDays(start, i0 + k)).filter(seen)) if (tourDays(t).length > 1) { const o = mt.get(t.id) || { t, a: k, b: k }; o.b = k; mt.set(t.id, o); }
+      const list = [...mt.values()].sort((x, y) => x.a - y.a || String(x.t.title).localeCompare(String(y.t.title))), ends = [];
+      list.forEach(o => { let l = ends.findIndex(e => e < o.a); if (l < 0) { l = ends.length; ends.push(o.b); } else ends[l] = o.b; o.lane = l; });
+      return { list, n: ends.length };
+    };
     for (let i = 0; i < 42; i++) {
       const d = addDays(start, i); if (i % 7 === 0 && i >= 28 && d.slice(0, 7) !== mo) break;
-      const all = toursOnDay(d), ts = all.filter(seen), myOff = offOn(my, d), ho = holidayOn(d);
-      cells += `${i % 7 === 0 ? `<span class="wk num" aria-hidden="true">${isoWk(d)}</span>` : ''}<button class="${d.slice(0, 7) !== mo ? 'out' : ''} ${i % 7 > 4 ? 'we' : ''} ${i % 7 === 6 ? 'sun' : ''} ${d === td ? 'today' : ''} ${d === sel ? 'sel' : ''} ${offCls(myOff)} ${ho ? 'hol' : ''} ${pubHolOn(d) ? 'pub' : ''}" title="${esc(pubHolOn(d) ? T(pubHolOn(d)) : '')}" data-act="pickday" data-date="${d}" data-drop="${d}" aria-pressed="${d === sel}" aria-label="${esc(fmtDay(d))}: ${ts.length} ${T('tours_n')}"><b class="num">${D(d).getDate()}</b><span class="dots">${ts.slice(0, 4).map(t => `<i style="background:${esc(tourStyle(t.title).color)}"></i>`).join('')}${ts.length > 4 ? `<span class="num">+${ts.length - 4}</span>` : ''}</span><span class="mrows">${ts.slice().sort((x, y) => (x.start_time || '').localeCompare(y.start_time || '')).slice(0, 4).map(t => `<span class="mrow${live(t) ? '' : ' cx'}" data-act="tour" data-id="${t.id}"${isAdmin() && live(t) ? ` data-drag="${t.id}"` : ''}><i style="background:${esc(tourStyle(t.title).color)}"></i><span class="num">${esc(t.start_time || '')}</span> ${esc(t.title)} <span class="num muted">${paxText(t)}</span></span>`).join('')}${ts.length > 4 ? `<span class="mrow more">${T('more_n', { n: ts.length - 4 })}</span>` : ''}</span>${offMark(d)}</button>`;
+      if (i % 7 === 0) wkl = weekLanes(i);
+      const all = toursOnDay(d), ts = all.filter(seen), myOff = offOn(my, d), ho = holidayOn(d), single = ts.filter(t => tourDays(t).length < 2);
+      const lanes = [...Array(wkl.n).keys()].map(l => { const o = wkl.list.find(x => x.lane === l), sp = o ? o.b - o.a + 1 : 0; return `<span class="mrow lane">${o && o.a === i % 7 ? `<span class="mbar${live(o.t) ? '' : ' cx'}" data-act="tour" data-id="${o.t.id}" style="--k:${esc(tourStyle(o.t.title).color)};width:calc(${sp}*100% + ${sp - 1}px - 12px)"><span class="num">${esc(o.t.start_time || '')}</span> ${esc(o.t.title)}</span>` : ''}</span>`; }).join('');
+      cells += `${i % 7 === 0 ? `<span class="wk num" aria-hidden="true">${isoWk(d)}</span>` : ''}<button class="${d.slice(0, 7) !== mo ? 'out' : ''} ${i % 7 > 4 ? 'we' : ''} ${i % 7 === 6 ? 'sun' : ''} ${d === td ? 'today' : ''} ${d === sel ? 'sel' : ''} ${offCls(myOff)} ${ho ? 'hol' : ''} ${pubHolOn(d) ? 'pub' : ''}" title="${esc(pubHolOn(d) ? T(pubHolOn(d)) : '')}" data-act="pickday" data-date="${d}" data-drop="${d}" aria-pressed="${d === sel}" aria-label="${esc(fmtDay(d))}: ${ts.length} ${T('tours_n')}"><b class="num">${D(d).getDate()}</b><span class="dots">${ts.slice(0, 4).map(t => `<i style="background:${esc(tourStyle(t.title).color)}"></i>`).join('')}${ts.length > 4 ? `<span class="num">+${ts.length - 4}</span>` : ''}</span><span class="mrows">${lanes}${single.slice().sort((x, y) => (x.start_time || '').localeCompare(y.start_time || '')).slice(0, 4).map(t => `<span class="mrow${live(t) ? '' : ' cx'}" data-act="tour" data-id="${t.id}"${isAdmin() && live(t) ? ` data-drag="${t.id}"` : ''}><i style="background:${esc(tourStyle(t.title).color)}"></i><span class="num">${esc(t.start_time || '')}</span> ${esc(t.title)} <span class="num muted">${paxText(t)}</span></span>`).join('')}${single.length > 4 ? `<span class="mrow more">${T('more_n', { n: single.length - 4 })}</span>` : ''}</span>${offMark(d)}</button>`;
     }
     const legend = `<div class="row small muted lgrow"><span class="lg"><i class="dotk"></i>${T('lg_tour')}</span><span class="lg"><i class="sq myoff"></i>${T('lg_myoff')}</span><span class="lg"><i class="sq myoff mysick"></i>${T('sick')}</span><span class="lg"><i class="sq hol"></i>${T('holidays')}</span><span class="lg"><i class="sq pub"></i>${T('ph_legend')}</span></div>`;
     const mAt = n => { const d = D(first); d.setMonth(d.getMonth() + n); return fmt(iso(d), { month: 'short' }); };
@@ -1093,12 +1120,14 @@
     const can = (involves(t, me().id) || isAdmin()) && t.date <= today() && live(t);
     const row = (icon, label, attrs) => `<${attrs.href ? 'a' : 'button'} class="arow" ${Object.entries(attrs).map(([k, v]) => `${k}="${esc(v)}"`).join(' ')}>${icon ? ico(icon) : '<span style="width:16px"></span>'}<span>${esc(label)}</span></${attrs.href ? 'a' : 'button'}>`;
     return `${m.back ? `<div class="hdr backrow">${backBtn(m)}</div>` : ''}<div class="hdr"><span class="avatar big ini">${esc(initials(cleanName(b.guest) || b.guest))}</span><h2>${esc(b.guest)}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>
-      <div class="muted small">${esc([acText(b), phoneFlag(b.phone), b.lang && T('guest_lang') + ' ' + b.lang, sourceOf(b), b.ref, b.booked_at && T('bk_booked', { d: fmtDay(String(b.booked_at).slice(0, 10)) }), b.notes].filter(Boolean).join(' · '))}</div>${isVip(b.client_id) ? (v => `<div class="banner small">${vipTag(b.client_id)}<span>${T('vip_text', { n: v.total, y: v.years || 1, a: v.addons || 0 })}</span></div>`)(guestStats(b.client_id)) : ''}${isFree(b) ? `<div class="banner small">${freeTag(b)}<span>${T('free_text')}</span>${tipUrl(t) ? `<button class="btn sm" data-act="tipqr" data-id="${t.id}">${T('tip_btn')}</button>` : ''}</div>` : ''}
+      <div class="muted small">${[acText(b), phoneFlag(b.phone), b.lang && T('guest_lang') + ' ' + b.lang, sourceOf(b)].filter(Boolean).map(esc).join(' · ')}${b.ref ? ` · <code class="ref">${esc(b.ref)}</code>` : ''}${[b.booked_at && T('bk_booked', { d: fmtDay(String(b.booked_at).slice(0, 10)) }), b.notes].filter(Boolean).map(x => ' · ' + esc(x)).join('')}</div>${isVip(b.client_id) ? (v => `<div class="banner small">${vipTag(b.client_id)}<span>${T('vip_text', { n: v.total, y: v.years || 1, a: v.addons || 0 })}</span></div>`)(guestStats(b.client_id)) : ''}${isFree(b) ? `<div class="banner small">${freeTag(b)}<span>${T('free_text')}</span>${tipUrl(t) ? `<button class="btn sm" data-act="tipqr" data-id="${t.id}">${T('tip_btn')}</button>` : ''}</div>` : ''}
       ${isAdmin() && Number(b.price) ? `<div class="small num">${T('bk_price')}: <b>${esc(b.price)} ${esc(b.currency || guestCur())}</b>${commOf(b) ? ` · ${T('net_after', { src: srcName(sourceOf(b) || b.source), p: commOf(b), v: Math.round(netOf(b) * 100) / 100, c: b.currency || guestCur() })}` : ''}</div>` : ''}
       ${!can && live(t) && t.date > today() && (involves(t, me().id) || isAdmin()) ? `<div class="muted small">${T('att_later', { date: fmtDay(t.date) })}</div>` : ''}
       ${can ? `<div class="att"><button class="${b.attendance === 'arrived' ? 'on ok' : ''}" data-act="attend" data-id="${b.id}" data-s="arrived" aria-pressed="${b.attendance === 'arrived'}">${T('att_arrived')}</button><button class="${b.attendance === 'noshow' ? 'on no' : ''}" data-act="attend" data-id="${b.id}" data-s="noshow" aria-pressed="${b.attendance === 'noshow'}">${T('att_noshow')}</button></div>` : ''}
       <div class="alist">${b.client_id ? row('', T('open_client') + ' ›', { 'data-act': 'client', 'data-id': b.client_id }) : ''}
         ${reviewPlaces(b).map(([name, url]) => { const tx = T('review_msg') + ' ' + url; return (b.phone ? row('wa', T('review_wa_on', { place: name }), { href: waLink(b.phone, tx), target: '_blank', rel: 'noopener' }) : '') + row('copy', T('review_copy_on', { place: name }), { 'data-act': 'copy', 'data-v': tx }); }).join('')}
+        ${isAdmin() && live(t) && !isCx(b) ? `<form class="f gcxform" data-form="gcx"><input type="hidden" name="id" value="${esc(b.id)}"><label>${T('gcx_why')}<input name="why" placeholder="${esc(T('gcx_ph'))}" autocomplete="off"></label><button class="btn danger">${T('gcx_btn')}</button></form>` : ''}
+      ${b.ref ? row('copy', T('copy') + ' ' + b.ref, { 'data-act': 'copy', 'data-v': b.ref }) : ''}
         ${b.pickup_addr ? row('pin', T('guest_addr') + ': ' + b.pickup_addr, { href: mapFor(b.pickup_addr, b.pickup_url), target: '_blank', rel: 'noopener' }) : ''}
         ${b.phone ? row('wa', 'WhatsApp ' + b.phone, { href: waLink(b.phone), target: '_blank', rel: 'noopener' }) + row('call', T('call') + ' ' + b.phone, { href: 'tel:' + b.phone }) + row('copy', T('copy') + ' ' + b.phone, { 'data-act': 'copy', 'data-v': b.phone }) : ''}
         ${(em => (em ? row('mail', em, { href: 'mailto:' + em }) : ''))(shownEmail(b.email) || shownEmail(cl.email))}
@@ -1174,12 +1203,13 @@
         ${wxLine(d, true)}
         ${d.status === 'cancelled' && d.cancel_reason ? `<div class="warnline">${msi('warning')}<span>${T('cancel_info', { reason: cxWhy(d.cancel_reason) })}</span></div>` : ''}
         ${d.pickup ? `<div class="meet">${ico('pin')}<span class="grow-l">${esc(placeName(d.pickup))}</span><a class="btn sm" href="${esc(tourMap(d))}" target="_blank" rel="noopener" aria-label="${T('open_map')}">${T('map')}</a></div>` : ''}
-        ${d.notes ? `<div class="small sel"><span class="muted">${T('notes')}:</span> ${withPhones(d.notes)}</div>` : ''}
         ${d.bookings.length ? `<div class="tsum num"><div>${esc(acText(d))}${d.bookings.some(isFree) ? ' · <span class="tag t-free">' + esc(T('free_n', { n: d.bookings.filter(isFree).reduce((n, b) => n + (Number(b.pax) || 1), 0) })) + '</span>' : ''}</div>${staysN(d.bookings) ? `<div>${T('stay_line', { n: staysN(d.bookings), back: Math.max(0, (d.pax || 0) - staysN(d.bookings)) })}</div>` : ''}${cashDue(d.bookings) ? `<div class="due">${T('cash_collect')}: ${esc(cashText(d.bookings))}</div>` : ''}</div>` : ''}
+        ${d.notes ? `<div class="tnotebox sel"><b>${T('notes')}</b><span>${withPhones(d.notes)}</span></div>` : ''}
         ${isAdmin() ? warnHtml : ''}${isAdmin() && live(d) && (d.pax || 0) > (rules().carSeats || 6) && kmOf(d.title) > 0 ? `<div><button class="btn sm" data-act="car2" data-id="${d.id}">${ico('car')}${T('car2_btn')}</button></div>` : ''}${isAdmin() && costOf(d.id).total ? `<div class="muted small num">${T('cost_title')}: <b>${nf(costOf(d.id).total)} ${esc(rules().currency || 'GEL')}</b></div>` : ''}
-        <div class="glist crew">${[['guide', d.guide_id], ['driver', d.driver_id]].filter(x => x[1]).map(([r, id]) => `<div class="grow" style="--k:${esc((person(id) || {}).color || '#66737f')}"><span class="row nw">${avatar(id)}<span class="grow-l" style="flex-direction:column;align-items:flex-start;gap:0"><b>${esc(pname(id))}</b><span class="muted small">${esc([T('role_' + r), ...titlesOf(id).slice(0, 1)].join(' · '))}</span></span>${staffBtns(person(id))}</span></div>`).join('') || `<div class="grow"><span class="tag t-warn">${T('unassigned')}</span></div>`}</div>
         <h3>${T(drvLimited(d) ? 'pickups_title' : 'guests_title')} (${d.bookings.length})</h3>${drvNote(d)}${canCheck && d.bookings.some(b => b.attendance) ? `<div class="muted small num">${T('att_sum', { a: d.bookings.filter(b => b.attendance === 'arrived').length, n: d.bookings.length, x: d.bookings.filter(b => b.attendance === 'noshow').length })}</div>` : ''}
         ${d.bookings.length ? `<div class="glist">${d.bookings.map(b => guestRow(b, d.bookings.some(x => x.pickup_addr), d)).join('')}</div>` : drvLimited(d) ? '' : guestsHidden(d) ? `<div class="empty">${T('pv_hidden', { n: pv().guideDays })}</div>` : `<div class="empty">${T('no_guests')}${isAdmin() ? ` <button class="btn sm" data-act="touredit">${T('add_guests')}</button>` : ''}</div>`}
+        <div class="glist crew">${[['guide', d.guide_id], ['driver', d.driver_id]].filter(x => x[1]).map(([r, id]) => `<div class="grow" style="--k:${esc((person(id) || {}).color || '#66737f')}"><span class="row nw">${avatar(id)}<span class="grow-l" style="flex-direction:column;align-items:flex-start;gap:0"><b>${esc(pname(id))}</b><span class="muted small">${esc([T('role_' + r), ...titlesOf(id).slice(0, 1)].join(' · '))}</span></span>${staffBtns(person(id))}</span></div>`).join('') || `<div class="grow"><span class="tag t-warn">${T('unassigned')}</span></div>`}</div>
+        ${cxGuests(d.id).length && !drvLimited(d) ? `<h3>${T('gcx_title')} (${cxGuests(d.id).length})</h3><div class="glist">${cxGuests(d.id).map(b => `<div class="grow gcx"><span class="grow-l" style="flex-direction:column;align-items:flex-start"><b>${esc(b.guest)}</b><span class="muted small">${esc([acText(b), b.notes].filter(Boolean).join(' · '))}</span></span>${isAdmin() ? `<button class="btn sm" data-act="gcxback" data-id="${b.id}">${T('gcx_back')}</button>` : ''}</div>`).join('')}</div>` : ''}
         ${canCheck && d.bookings.length && d.bookings.every(b => b.attendance === 'noshow') ? `<div class="nhbox"><span>${msi('event_busy')}${T('nh_ask')}</span><button class="btn" data-act="nohappen" data-id="${d.id}">${T('nh_btn')}</button></div>` : ''}
         ${mine && d.date <= today() && live(d) ? `<button class="btn exptour" data-act="expnew" data-tour="${d.id}" data-date="${d.date}">${msi('receipt_long')} ${T('ex_tour')}</button>` : ''}
         <details class="sect"><summary>${T('more')}</summary><div class="f">
@@ -1342,7 +1372,7 @@
       br.history = bookHistory(db.bookings.find(x => x.id === br.id), br, old, row);
       keep.add(br.id); await S.save('bookings', br);
     }
-    for (const b of db.bookings.filter(b => b.tour_id === row.id && !keep.has(b.id))) await S.remove('bookings', b.id);
+    for (const b of liveB().filter(b => b.tour_id === row.id && !keep.has(b.id))) await S.remove('bookings', b.id);
     if (d.costs) { const items = {}; COSTS.forEach(k => { if (Number(d.costs[k]) > 0) items[k] = Number(d.costs[k]); }); await S.save('tour_costs', { id: row.id, items, note: (d.costNote || '').trim() || null }); }
     const before = old && live(old) ? [old.guide_id, old.driver_id].filter(Boolean) : [], after = live(row) ? [row.guide_id, row.driver_id].filter(Boolean) : [];
     const np = { title: row.title, date: row.date, time: row.start_time || '' };
@@ -1575,7 +1605,7 @@
       <form class="f" data-form="person"><label>${T('name')}<input id="pe-name" data-f="name" value="${esc(d.name || '')}" required autocomplete="off"></label>
       <label>${T('role')}<select id="pe-role" data-f="role" ${self ? 'disabled' : ''}>${['guide', 'driver', 'admin'].map(x => opt(x, T('role_' + x), d.role)).join('')}</select></label>
       ${!old && S.mode !== 'demo' ? `<label>${T('email_login')}<input id="pe-email" data-f="email" type="email" value="${esc(d.email || '')}" required autocomplete="off" inputmode="email"></label><span class="muted small">${T('invite_text')}</span>` : ''}
-      <div class="two"><label>${T('phone')}<input id="pe-phone" data-f="phone" type="tel" value="${esc(d.phone || '')}" placeholder="+995…" autocomplete="off"></label><label>${T('languages')}<input id="pe-langs" data-f="languages" value="${esc(d.languages || '')}" placeholder="EN, RU" autocomplete="off"></label></div>${d.role !== 'driver' ? `<label>${T('promo_own')}<input id="pe-promo" data-f="promo" value="${esc(d.promo ?? ((rules().promos || {})[d.id] || ''))}" placeholder="ANNA10" autocomplete="off"><span class="muted small">${T('promo_own_hint')}</span></label>` : ''}
+      <div class="two"><label>${T('phone')}<input id="pe-phone" data-f="phone" type="tel" value="${esc(d.phone || '')}" placeholder="+995…" autocomplete="off"></label></div>${langPick(d.languages, true)}${d.role !== 'driver' ? `<label>${T('promo_own')}<input id="pe-promo" data-f="promo" value="${esc(d.promo ?? ((rules().promos || {})[d.id] || ''))}" placeholder="ANNA10" autocomplete="off"><span class="muted small">${T('promo_own_hint')}</span></label>` : ''}
       <label>Telegram<input id="pe-tg" data-f="telegram" value="${esc(d.telegram ? '@' + d.telegram : '')}" placeholder="@username" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
       <label>${T('colour')}<input id="pe-color" data-f="color" type="color" value="${esc(d.color || '#66737f')}" style="max-width:90px"></label>
       ${old && d.email ? `<div class="muted small">${T('email')}: ${esc(d.email)}</div>` : ''}
@@ -1839,7 +1869,7 @@
   function totem(id) {
     const wk0 = monday(today()), from = addDays(wk0, -14), to = addDays(wk0, -1), ts = db.tours.filter(t => live(t) && involves(t, id) && t.date >= from && t.date <= to);
     const n = ts.length, d = new Set(ts.map(t => t.date)).size, k = new Set(ts.map(t => statKey(t.title))).size, early = ts.filter(t => t.start_time && t.start_time < '09:00').length, guests = ts.reduce((a, t) => a + (Number(t.pax) || 0), 0);
-    const hrs = ts.map(t => durOf(t)).filter(x => x > 0), long = hrs.length ? hrs.reduce((a, b) => a + b, 0) / hrs.length : 0, tids = new Set(ts.map(t => t.id)), bk = db.bookings.filter(b => tids.has(b.tour_id)), noshow = bk.filter(b => b.attendance === 'noshow').length, arrived = bk.filter(b => b.attendance === 'arrived').length;
+    const hrs = ts.map(t => durOf(t)).filter(x => x > 0), long = hrs.length ? hrs.reduce((a, b) => a + b, 0) / hrs.length : 0, tids = new Set(ts.map(t => t.id)), bk = liveB().filter(b => tids.has(b.tour_id)), noshow = bk.filter(b => b.attendance === 'noshow').length, arrived = bk.filter(b => b.attendance === 'arrived').length;
     const an = !n ? 'cat' : d >= 11 ? 'bear' : guests >= 40 ? 'bee' : k >= 4 ? 'butterfly' : long >= 9 && n >= 3 ? 'turtle' : early * 2 >= n && n >= 2 ? 'bird' : arrived >= 3 && !noshow ? 'ladybug' : k >= 3 ? 'fox' : 'owl';
     return { an, from, to, v: { n, d, r: 14 - d, k, g: guests, h: Math.round(long * 10) / 10, e: early, a: arrived }, steps: [['tt_s_tours', n], ['tt_s_days', d], ['tt_s_guests', guests], ['tt_s_kinds', k], ['tt_s_early', early], ['tt_s_rest', 14 - d]] };
   }
@@ -2098,8 +2128,8 @@
     const cxT = db.tours.filter(t => !live(t) && t.date.slice(0, 4) === String(y)), why = {}; let cxG = 0;
     cxT.forEach(t => { const k = statKey(t.title); if (by[k]) by[k].cx++; cxG += Number(t.pax) || 0; const w = cxWhy((t.cancel_reason || '').trim()) || T('ts_no_reason'); why[w] = (why[w] || 0) + 1; });
     const td = today(), tk = {}; ts.forEach(t => { tk[t.id] = t; }); let nsN = 0, nsAll = 0; const nsSrc = {};
-    db.bookings.forEach(b => { const t = tk[b.tour_id]; if (!t || t.date >= td) return; nsAll++; const s = srcName(sourceOf(b) || b.source) || T('ts_unknown'); nsSrc[s] = nsSrc[s] || [0, 0]; nsSrc[s][1]++; if (b.attendance === 'noshow') { nsN++; nsSrc[s][0]++; const k = statKey(t.title); if (by[k]) by[k].ns++; } });
-    const ids = new Set(ts.map(t => t.id)); db.bookings.forEach(b => { if (ids.has(b.tour_id)) { const s = srcName(sourceOf(b) || b.source) || T('ts_unknown'); src[s] = (src[s] || 0) + (Number(b.pax) || 0); } });
+    liveB().forEach(b => { const t = tk[b.tour_id]; if (!t || t.date >= td) return; nsAll++; const s = srcName(sourceOf(b) || b.source) || T('ts_unknown'); nsSrc[s] = nsSrc[s] || [0, 0]; nsSrc[s][1]++; if (b.attendance === 'noshow') { nsN++; nsSrc[s][0]++; const k = statKey(t.title); if (by[k]) by[k].ns++; } });
+    const ids = new Set(ts.map(t => t.id)); liveB().forEach(b => { if (ids.has(b.tour_id)) { const s = srcName(sourceOf(b) || b.source) || T('ts_unknown'); src[s] = (src[s] || 0) + (Number(b.pax) || 0); } });
     const top = Object.values(by).sort((p, q) => q.guests - p.guests);
     const days = [...Array(7)].map((_, w) => ({ w, guests: wd[w], top: Object.entries(wdT[w]).sort((p, q) => q[1] - p[1]).map(([k, n]) => [by[k] ? by[k].title : k, n])[0] }));
     const total = mon.reduce((s, x) => s + x, 0), totalP = monP.reduce((s, x) => s + x, 0);
@@ -2108,7 +2138,7 @@
   // The year in a few lines: best guests, busiest days, most profitable tour, busiest and best paid people. Money is after platform commission, in the main currency.
   function yearHighlights(y) {
     const Y = String(y), ts = db.tours.filter(t => live(t) && t.date.slice(0, 4) === Y), tk = {}; ts.forEach(t => { tk[t.id] = t; });
-    const net = b => (Number(b.price) ? netOf(b) * (rateOf(b.currency || guestCur(), (tk[b.tour_id] || {}).date) || 0) : 0), bks = db.bookings.filter(b => tk[b.tour_id]);
+    const net = b => (Number(b.price) ? netOf(b) * (rateOf(b.currency || guestCur(), (tk[b.tour_id] || {}).date) || 0) : 0), bks = liveB().filter(b => tk[b.tour_id]);
     const top = (o, f) => Object.entries(o).sort((p, q) => f(q[1]) - f(p[1]))[0];
     const cl = {}; bks.forEach(b => { if (!b.client_id) return; const c = cl[b.client_id] = cl[b.client_id] || { n: 0, m: 0 }; c.n++; c.m += net(b); });
     const loyal = top(cl, c => c.n * 1e9 + c.m), spend = top(cl, c => c.m), cname = id => esc((db.clients.find(c => c.id === id) || {}).name || T('guest'));
@@ -2154,7 +2184,7 @@
     const net = b => (Number(b.price) ? netOf(b) * (rateOf(b.currency || guestCur(), (tk[b.tour_id] || {}).date) || 0) : 0);
     const cget = id => (cl[id] = cl[id] || { id, n: 0, pax: 0, money: 0, last: '', ys: new Set(), noshow: 0, cx: 0, moved: 0, good: 0, bad: 0, iso: '' });
     let pax = 0, bn = 0; const lead = [];
-    for (const b of db.bookings) {
+    for (const b of liveB()) {
       const t = tk[b.tour_id], c = b.client_id ? cget(b.client_id) : null, hist = Array.isArray(b.history) ? b.history : [];
       if (c) c.moved += Math.max(hist.filter(x => x.w === 'moved').length, Number(b.moves) || 0);
       if (!t) { if (c && cx[b.tour_id]) c.cx++; continue; }
@@ -3034,8 +3064,8 @@
     return { rows, adj, base: Math.round(base * 100) / 100, total: Math.round((base + adj.reduce((a, x) => a + (Number(x.amount) || 0), 0)) * 100) / 100 };
   }
   // Personal expenses (meal, fuel, car service, accommodation, parking, other): each person adds their own, the admin marks what was paid back.
-  const EXP_KINDS = ['meal', 'fuel', 'service', 'stay', 'parking', 'other'];
-  const EXP_ICON = { meal: 'restaurant', fuel: 'local_gas_station', service: 'build', stay: 'hotel', parking: 'local_parking', other: 'receipt_long' };
+  const EXP_KINDS = ['meal', 'fuel', 'service', 'stay', 'parking', 'ticket', 'tasting', 'class', 'fine', 'other'];
+  const EXP_ICON = { meal: 'restaurant', fuel: 'local_gas_station', service: 'build', stay: 'hotel', parking: 'local_parking', ticket: 'confirmation_number', tasting: 'wine_bar', class: 'bakery_dining', fine: 'gavel', other: 'receipt_long' };
   function expensesHtml(id, from, to) {
     const xs = (db.expenses || []).filter(x => x.user_id === id && x.date >= from && x.date <= to).sort((a, b) => b.date.localeCompare(a.date)), base = rules().currency || 'GEL';
     const sum = xs.reduce((n, x) => n + (Number(x.amount) || 0) * (rateOf(x.currency, x.date) || 0), 0), open = xs.filter(x => !x.paid_back).reduce((n, x) => n + (Number(x.amount) || 0) * (rateOf(x.currency, x.date) || 0), 0);
@@ -3100,7 +3130,7 @@
     const td = today(), all = db.tours.filter(t => live(t) && t.date <= td), gOf = ts => ts.reduce((n, t) => n + (Number(t.pax) || 0), 0), inR = (a, b) => all.filter(t => t.date >= a && t.date <= b);
     const w1 = inR(addDays(td, -27), td), w0 = inR(addDays(td, -55), addDays(td, -28)), yAll = all.filter(t => t.date.startsWith(String(y)));
     const by = (ts, f) => { const m = {}; ts.forEach(t => { const k = f(t); if (k) m[k] = (m[k] || 0) + (Number(t.pax) || 0); }); return m; };
-    const ctyOf = ts => { const ids = new Set(ts.map(t => t.id)), m = {}; db.bookings.filter(b => ids.has(b.tour_id)).forEach(b => { const c = phoneIso(b.phone); if (c) m[c] = (m[c] || 0) + (Number(b.pax) || 1); }); return m; };
+    const ctyOf = ts => { const ids = new Set(ts.map(t => t.id)), m = {}; liveB().filter(b => ids.has(b.tour_id)).forEach(b => { const c = phoneIso(b.phone); if (c) m[c] = (m[c] || 0) + (Number(b.pax) || 1); }); return m; };
     const best = (n1, n0, k = 1) => Object.keys(n1).map(x => [x, n1[x] - (n0[x] || 0)]).filter(p => p[1] > 0).sort((p, q) => q[1] - p[1]).slice(0, k);
     const L = [];
     if (w1.length > w0.length) L.push(T('hl_tours', { n: w1.length - w0.length }));
@@ -3221,7 +3251,7 @@
       <div class="row">${avatar(m.id, true)}<div><b>${esc(m.name)}</b> <span class="tag t-muted">${T('role_' + m.role)}</span>${m.email ? `<div class="muted small">${esc(m.email)}</div>` : ''}</div></div>
       <div class="bar"><label class="btn filebtn">${msi('photo_camera')}${T('photo_upload')}<input type="file" id="me-photo" class="vh" accept="image/*" data-ch="avatar"></label></div>
       <details class="sect avpick" ${state.avOpen ? 'open' : ''}><summary>${T('av_choose')}</summary>${(() => { const cur = avLib(m.avatar) || { icon: '', color: state.avColor || m.color || AV_COLORS[0] }, col = state.avColor || cur.color; return `<b class="small">${T('av_pics')}</b><div class="avgrid art">${AV_ART.map(k => `<button type="button" class="avopt pic" data-act="avpick" data-v="art:${k}" aria-pressed="${m.avatar === 'art:' + k}" aria-label="${k}"><img src="art/avatars/${k}.webp" alt="" loading="lazy" decoding="async"></button>`).join('')}</div><b class="small">${T('av_icons')}</b><div class="avcols">${AV_COLORS.map(c => `<button type="button" class="avcol" data-act="avcolor" data-v="${c}" style="background:${c}" aria-pressed="${c === col}" aria-label="${c}"></button>`).join('')}</div><div class="avgrid">${AV_ICONS.map(k => `<button type="button" class="avopt" data-act="avpick" data-v="ms:${k}:${col}" aria-pressed="${cur.icon === k}" style="background:${col}">${msi(k)}</button>`).join('')}</div>${m.avatar ? `<button type="button" class="lnk" data-act="avpick" data-v="">${T('av_none')}</button>` : ''}`; })()}</details>
-      <form class="f" data-form="mydetails" id="me-details"><b>${T('md_title')}</b><div class="two"><label>${T('phone')}<input name="phone" type="tel" value="${esc(m.phone || '')}" placeholder="+995…" autocomplete="tel"></label><label>${T('md_langs')}<input name="languages" value="${esc(m.languages || '')}" placeholder="EN, RU, KA"></label></div><label>Telegram<input id="me-tg" name="telegram" value="${esc(m.telegram ? '@' + m.telegram : '')}" placeholder="@username" autocomplete="off" autocapitalize="off" spellcheck="false"><span class="muted small">${T('tg_mine_text')}</span></label>${(rules().promos || {})[m.id] ? `<div class="tsum">${T('promo_mine', { code: rules().promos[m.id] })}</div>` : ''}<div class="actions"><button class="btn primary qsave">${T('save')}</button></div></form>
+      <form class="f" data-form="mydetails" id="me-details"><b>${T('md_title')}</b><div class="two"><label>${T('phone')}<input name="phone" type="tel" value="${esc(m.phone || '')}" placeholder="+995…" autocomplete="tel"></label></div>${langPick(m.languages, false)}<label>Telegram<input id="me-tg" name="telegram" value="${esc(m.telegram ? '@' + m.telegram : '')}" placeholder="@username" autocomplete="off" autocapitalize="off" spellcheck="false"><span class="muted small">${T('tg_mine_text')}</span></label>${(rules().promos || {})[m.id] ? `<div class="tsum">${T('promo_mine', { code: rules().promos[m.id] })}</div>` : ''}<div class="actions"><button class="btn primary qsave">${T('save')}</button></div></form>
       ${/^https:\/\/t\.me\//.test(rules().botUrl || '') || m.telegram_id ? `<div class="f" id="me-tgbot"><b>${T('tg_title')}</b>${m.telegram_id ? `<span class="row"><span class="tag t-ok">${T('tg_on')}</span><span class="muted small">${T('tg_on_text')}</span></span>` : `<ol class="tgsteps"><li>${T('tgb_1')}</li><li>${T('tgb_2')}</li><li>${T('tgb_3')}</li></ol><span class="muted small">${T('tgb_after')}</span>${m.link_code ? `<div class="row nw tgline"><b class="num tgcode">/link ${esc(m.link_code)}</b><button class="iconbtn" data-act="copy" data-v="/link ${esc(m.link_code)}" aria-label="${T('copy')}" title="${T('copy')}">${ico('copy')}</button></div>` : ''}<div class="bar">${m.link_code && botOn() ? `<a class="btn" href="${esc(rules().botUrl)}" target="_blank" rel="noopener">${T('tg_open')}</a>` : m.link_code ? '' : `<button class="btn" data-act="tgcode">${T('tg_get')}</button>`}${m.link_code ? `<button class="lnk small" data-act="tgcode">${T('tg_new')}</button>` : ''}</div>`}</div>` : ''}
       </div>
       <div class="card f ctlist"><b>${T('contacts')}</b>${staff().filter(p => p.phone || tgUser(p.telegram)).map(p => `<div class="row nw">${avatar(p.id)}<span class="row grow-l"><span>${esc(p.name)}</span><span class="muted small">${T('role_' + p.role)}</span></span>${staffBtns(p, true)}</div>`).join('') || `<span class="muted small">${T('no_contacts')}</span>`}</div>
@@ -3254,7 +3284,7 @@
       ${ticketCardHtml()}${trafficHtml()}</div><div class="list">${installCardHtml(true)}<div class="card f">
       <button class="btn" data-act="welcome">${T('wl_again')}</button>
       <details class="sect"><summary>${T('privacy_link')}</summary><p class="muted small">${T('privacy_text', { n: pv().guideDays })}</p></details>
-      <button class="btn" data-act="signout">${T('signout')}</button>${testOn() ? `<button class="lnk" data-act="testinfo">${T('tb_chip')}: ${T('tb_title')}</button>` : ''}<span class="muted small num">${T('version')} ${APP_VERSION}${S.syncedAt ? ' · ' + T('updated_at', { time: new Intl.DateTimeFormat(LOCALES[lang()], { hour: '2-digit', minute: '2-digit' }).format(new Date(S.syncedAt)) }) : ''}</span></div></div></div>`;
+      <button class="btn" data-act="signout">${T('signout')}</button>${testOn() ? `<button class="lnk" data-act="testinfo">${T('tb_title')}</button>` : ''}<span class="muted small num">${T('version')} ${APP_VERSION}${S.syncedAt ? ' · ' + T('updated_at', { time: new Intl.DateTimeFormat(LOCALES[lang()], { hour: '2-digit', minute: '2-digit' }).format(new Date(S.syncedAt)) }) : ''}</span></div></div></div>`;
   }
   function bellHtml() {
     const ns = myNotes().slice(0, 40);
@@ -3334,7 +3364,7 @@
     const body = state.view === 'calendar' ? calendarHtml() : state.view === 'timeoff' ? timeoffHtml() : state.view === 'team' ? teamHtml() : state.view === 'tasks' ? tasksHtml() : state.view === 'admin' ? adminHtml() : meHtml();
     const demo = S.mode === 'demo' ? `<div class="banner slim"><b>${T('demo_title')}</b><span class="small only-wide">${T('demo_text')}</span><label class="small" for="demo-as">${T('demo_as')}</label><select id="demo-as" data-ch="demoas">${db.profiles.filter(p => p.active !== false).map(p => opt(p.id, `${p.name} · ${T('role_' + p.role)}`, me().id)).join('')}</select></div>` : '';
     const upd = S.syncedAt ? T('updated_at', { time: new Intl.DateTimeFormat(LOCALES[lang()], { hour: '2-digit', minute: '2-digit' }).format(new Date(S.syncedAt)) }) : T('refresh');
-    const shell = `<header class="top"><div class="brand"><i class="sdot s-${syncState()}" title="${esc(upd)}"></i>${T('brand')}</div><nav class="nav" aria-label="Main">${nav}</nav><span class="spacer only-phone"></span>
+    const shell = `<header class="top"><div class="brand"><i class="sdot s-${syncState()}" title="${esc(upd)}"></i>${T('brand')}${isAdmin() ? `<span class="verchip num" title="${esc(T('version'))} ${APP_VERSION}">v${APP_VERSION}</span>` : ''}</div><nav class="nav" aria-label="Main">${nav}</nav><span class="spacer only-phone"></span>
       
       <button class="iconbtn ${state.refreshing ? 'spin' : ''}" data-act="refresh" aria-label="${T('refresh')}" title="${esc(upd)}">${ico('refresh')}</button>
       <button class="iconbtn" data-act="bell" aria-label="${T('notifications')}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>${unread ? `<span class="badge">${unread}</span>` : ''}</button>${syncRow()}</header>
@@ -3695,6 +3725,7 @@
     dupmore() { if (state.dup) state.dup.n += 25; render(); },
     dupall() { const st = state.dup || { k: 't' }, list = dupModel()[st.k].filter(g => g.b === 'safe'); if (!list.length) return; confirmDo(T('dup_all_ask', { n: list.length }), T('dup_all', { n: list.length }), () => run(async () => { for (const g of list) { const ids = g.ms.map(x => x.m.id).filter(x => x !== g.keep); if (st.k === 'c') await mergeClients(g.keep, ids); else await mergeTours(g.keep, ids); } }, T('dups_done'))); },
     dupdelt(el) { const t = db.tours.find(x => x.id === el.dataset.id); if (!t || db.bookings.some(b => b.tour_id === t.id)) return; confirmDo(T('confirm_remove'), T('remove'), () => run(async () => { await S.remove('tours', t.id); logAct(`Removed an empty duplicate tour ${t.title} ${t.date}`); }, T('dups_done'))); },
+    gcxback(el) { const b = db.bookings.find(x => x.id === el.dataset.id); if (!b) return; run(async () => { await S.save('bookings', { ...b, marks: (b.marks || []).filter(x => x !== 'cancelled'), notes: String(b.notes || '').split(' · ').filter(x => !x.startsWith(T('gcx_note'))).join(' · ') || null }); await recountTour(b.tour_id); logAct(`Guest restored: ${b.guest}`); memo = {}; }, T('saved')); },
     pastemail() { if (!isAdmin()) return; state.pb = null; state.rv = null; state.modal = { type: 'paste' }; renderModal(); },
     pbclear() { state.pb = null; state.rv = null; render(); },
     revreq(el) { if (!isAdmin()) return; state.modal = { type: 'revreq', id: el.dataset.id }; renderModal(); },
@@ -3706,7 +3737,7 @@
     async rvwrong() { const rv = state.rv; if (!rv) return; const m = rvMatch(rv), body = `${T('rv_report_head')}\n${T('rv_report_read')}: ${JSON.stringify({ ...rv, raw: undefined })}\n${T('rv_report_match')}: ${m.how}${m.tour ? ' ' + m.tour.title + ' ' + m.tour.date : ''}\n\n${T('rv_report_raw')}:\n${String(rv.raw || '').slice(0, 1500)}`; try { const now = new Date().toISOString(); await S.addTicket({ id: S.uid(), user_id: me().id, source: 'app', body: body.slice(0, 2000), status: 'new', created_at: now, updated_at: now }, []); state.rv = null; render(); toast(T('rv_reported')); } catch (e) { toast(T('tk_fail')); } },
     pbgo(el) {
       const pb = state.pb; if (!pb) return; const mt = pbMatch(pb);
-      if (el.dataset.m === 'cancel') { run(async () => { const b = mt.old; await S.remove('bookings', b.id); const t = mt.oldTour; if (t) { const rest = db.bookings.filter(x => x.tour_id === t.id); await S.save('tours', { ...t, adults: rest.reduce((n, x) => n + (+x.adults || 0), 0), children: rest.reduce((n, x) => n + (+x.children || 0), 0), pax: rest.reduce((n, x) => n + (+x.pax || 0), 0) }); } logAct(`Booking cancelled from email: ${pb.ref} (${b.guest})`); state.pb = null; }, T('pb_cancelled')); return; }
+      if (el.dataset.m === 'cancel') { run(async () => { const b = mt.old; await gcxMark(b, T('gcx_email')); logAct(`Booking cancelled from email: ${pb.ref} (${b.guest})`); state.pb = null; }, T('pb_cancelled')); return; }
       const bk = { id: mt.old ? mt.old.id : S.uid(), client_id: mt.old ? mt.old.client_id : null, guest: pb.guest || (mt.old || {}).guest || '', adults: pb.adults, children: pb.children, phone: pb.phone || (mt.old || {}).phone || '', email: pb.email || (mt.old || {}).email || '', ref: pb.ref, lang: pb.lang, source: pb.src || null, marks: [...new Set([...((mt.old || {}).marks || []), ...pb.marks])], pickup_addr: pb.marks.includes('pickup') ? pb.pickup : '', notes: [(mt.old || {}).notes, pb.others ? T('pb_others') + ': ' + pb.others : ''].filter(Boolean).join(' · '), payment: (mt.old || {}).payment || 'prepaid', currency: pb.pcur || (mt.old || {}).currency || guestCur(), price: pb.pnum ?? (mt.old || {}).price ?? null, history: (mt.old || {}).history || [] };
       const target = mt.old && mt.oldTour && (!pb.date || pb.date === mt.oldTour.date) && (!pb.time || pb.time === mt.oldTour.start_time) ? mt.oldTour : mt.tour;
       logAct(`Email booking opened to save: ${pb.ref || ''} ${pb.guest || ''} ${pb.date || ''}`.replace(/\s+/g, ' ').trim()); state.pb = null; state.view = 'calendar';
@@ -3800,6 +3831,7 @@
     gckind(el) { const s2 = state.gcOff || (state.gcOff = new Set()); el.checked ? s2.delete(el.dataset.v) : s2.add(el.dataset.v); render(); },
     mytour(el) { const m = me(), list = catalog().filter(c => c.id), base = (m.skills || []).length ? m.skills : list.map(c => String(c.id)), st = state.myTours || new Set(base); el.checked ? st.add(el.dataset.v) : st.delete(el.dataset.v); state.myTours = st; render(); },
     jump(el) { if (el.value) { state.date = el.value; needOlder(state.date); render(); } },
+    langpick(el) { const root = el.closest('.langpick'), m = state.modal; if (!root || !m || !m.draft) return; m.draft.languages = langList([...root.querySelectorAll('input[type=checkbox]:checked')].map(x => x.value).join(' ') + ' ' + (root.querySelector('[name=languages_other]') || {}).value).join(', '); m.touched = true; },
     cxshow(el) { state.cxOff = !el.checked; render(); },
     who(el) { state.who = el.value || ''; render(); },
     cattitle(el) {
@@ -3854,6 +3886,7 @@
   };
   const stripEmail = p => { const { email, ...rest } = p; return rest; };
   const forms = {
+    async gcx(fd) { const b = db.bookings.find(x => x.id === fd.get('id')); if (!b || !isAdmin()) return; await gcxMark(b, String(fd.get('why') || '').trim()); state.modal = null; renderModal(); render(); toast(T('gcx_done')); },
     ...MONEY.forms,
     async signin(fd) { await S.signIn(fd.get('email'), fd.get('password')); displayFromAccount(); state.mine = !isAdmin(); state.mode = 'week'; state.view = 'calendar'; checkBadges(); weekCheck(); setTimeout(xcNudge, 4000); },
     async signup(fd) { const inside = await S.signUp(fd.get('name'), fd.get('email'), fd.get('password')); if (!inside) { state.auth = 'signin'; state.authMsg = T('check_email'); } },
@@ -3894,7 +3927,7 @@
     async move() { await moveSubmit(); },
     async cedit(fd, form) { const cl = db.clients.find(x => x.id === (form || document.querySelector('form[data-form=cedit]')).dataset.id); if (!cl) return; const em = cleanEmail(fd.get('email')) || String(fd.get('email') || '').trim().toLowerCase(); if (em && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { toast(T('err_email')); return; } await S.save('clients', { ...cl, name: String(fd.get('name') || '').trim() || cl.name, phone: normPhone(fd.get('phone')) || null, email: em || null, notes: String(fd.get('notes') || '').trim() || null }); logAct(`Edited guest: ${cl.name}`); toast(T('saved')); },
     async bugnote(fd) { const n = String(fd.get('note') || '').trim(); if (!n) return; logErr('report', n, ''); toast(T('pr_thanks')); closeModal(); },
-    async mydetails(fd) { const ph = normPhone(String(fd.get('phone') || '').trim()), lg = String(fd.get('languages') || '').toUpperCase().split(/[\s,;/]+/).filter(Boolean).join(', '), raw = String(fd.get('telegram') || '').trim(), u = tgUser(raw); if (raw && !u) { toast(T('tg_bad')); return; } await S.save('profiles', { ...stripEmail(me()), phone: ph || null, languages: lg || null, telegram: fd.has('telegram') ? (u || null) : (me().telegram || null) }); toast(T('saved')); },
+    async mydetails(fd) { const ph = normPhone(String(fd.get('phone') || '').trim()), lg = langList([...fd.getAll('languages'), fd.get('languages_other') || ''].join(' ')).join(', '), raw = String(fd.get('telegram') || '').trim(), u = tgUser(raw); if (raw && !u) { toast(T('tg_bad')); return; } await S.save('profiles', { ...stripEmail(me()), phone: ph || null, languages: lg || null, telegram: fd.has('telegram') ? (u || null) : (me().telegram || null) }); toast(T('saved')); },
     async mytg(fd) { const raw = String(fd.get('telegram') || '').trim(), u = tgUser(raw); if (raw && !u) { toast(T('tg_bad')); return; } await S.save('profiles', { ...stripEmail(me()), telegram: u || null }); toast(T('saved')); },
     async cancel(fd) { await cancelSubmit((fd.get('reason') || '').trim()); },
     async bulkteam(fd) {

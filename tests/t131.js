@@ -1,0 +1,30 @@
+// Admin marks a guest as cancelled: the guest leaves the count, stays in a "Cancelled guests" list with the reason, and can be restored. Invented data only.
+const { chromium } = require('playwright');
+(async () => { const b = await chromium.launch(); const errs = []; let bad = 0; const ok = (c, m) => { console.log(c ? '  ok  ' : '  FAIL', m); if (!c) bad = 1; };
+  const p = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage(); p.on('pageerror', e => errs.push(e.message));
+  await p.addInitScript(() => { window.__noCelebrate = true; try { localStorage.setItem('fs-test-seen', '1'); } catch (e) {} });
+  await p.goto('http://localhost:8765/index.html'); await p.waitForFunction(() => window.__test); await p.waitForTimeout(800);
+  const ids = await p.evaluate(async () => { const S = window.Store, d = new Date(Date.now() + 5 * 864e5).toISOString().slice(0, 10), g = S.db.profiles.find(x => x.role === 'guide').id;
+    const t = { id: S.uid(), date: d, date_to: null, start_time: '08:30', title: 'Cx Group Test', kind: 'group', capacity: 6, pax: 3, adults: 3, children: 0, status: 'confirmed', guide_id: g, driver_id: null, language: 'EN' };
+    await S.save('tours', t); const a = S.uid(), c = S.uid();
+    await S.save('bookings', { id: a, tour_id: t.id, guest: 'Atul Testcase', adults: 1, children: 0, pax: 1, marks: [] });
+    await S.save('bookings', { id: c, tour_id: t.id, guest: 'Bea Keeper', adults: 2, children: 0, pax: 2, marks: [] });
+    return { t: t.id, a, c }; });
+  await p.evaluate(() => document.querySelector('.nav [data-v=calendar]').click()); await p.waitForTimeout(500);
+  await p.evaluate(i => window.__test.openTour ? window.__test.openTour(i) : null, ids.t);
+  const open = async () => { await p.evaluate(i => { const c = document.querySelector('[data-act=tour][data-id="' + i + '"]'); if (c) c.click(); }, ids.t); await p.waitForTimeout(500); };
+  if (!(await p.evaluate(() => !!document.querySelector('.sheet')))) await open();
+  if (!(await p.evaluate(() => !!document.querySelector('.sheet')))) { await p.evaluate(() => { const d = document.querySelector('[data-act=mode][data-m=agenda]'); d && d.click(); }); await p.waitForTimeout(400); await open(); }
+  const txt = () => p.evaluate(() => (document.querySelector('.sheet') || {}).innerText || '');
+  ok(/Atul Testcase/.test(await txt()), 'tour opens with both guests');
+  await p.evaluate(() => [...document.querySelectorAll('.sheet [data-act=guest]')].find(e => /Atul/.test(e.innerText)).click()); await p.waitForTimeout(500);
+  ok(await p.evaluate(() => !!document.querySelector('.gcxform')), 'guest card has the cancel form');
+  await p.fill('.gcxform input[name=why]', 'flight changed'); await p.click('.gcxform button'); await p.waitForTimeout(900);
+  const row = await p.evaluate(i => ({ pax: window.Store.db.tours.find(t => t.id === i).pax, mark: (window.Store.db.bookings.find(x => x.guest === 'Atul Testcase').marks || []).join() }), ids.t);
+  ok(row.pax === 2 && /cancelled/.test(row.mark), 'tour now counts 2 guests, guest is marked cancelled (' + row.pax + ')');
+  await open(); const s = await txt();
+  ok(/Cancelled guests \(1\)/.test(s) && /flight changed/.test(s), 'cancelled list shows the guest with the reason');
+  ok(/Guests on this tour \(1\)/.test(s), 'guest list shows only the active guest');
+  await p.evaluate(() => document.querySelector('[data-act=gcxback]').click()); await p.waitForTimeout(900);
+  const r2 = await p.evaluate(i => window.Store.db.tours.find(t => t.id === i).pax, ids.t); ok(r2 === 3, 'restore brings the count back to 3');
+  ok(!errs.length, 'errors ' + errs.join('|')); await b.close(); process.exit(bad); })();

@@ -31,7 +31,7 @@ const { chromium, devices } = require('playwright');
   ok(await p.evaluate(() => Store.db.tours.some(t => t.title.startsWith('Kakheti') && t.status === 'cancelled' && t.cancel_reason === 'Guest is ill')), 'approval cancels the tour and keeps the reason');
   // --- team: add, edit, working hours, skills, delete
   await p.click('.admmain [data-act=admintab][data-v=""]'); await p.click('.admmain [data-act=admintab][data-v=team]'); await p.screenshot({ path: S + '/v13-team.png', fullPage: true });
-  await p.click('[data-act=pnew]'); await p.fill('#pe-name', 'Test Guide'); await p.fill('#pe-phone', '+995500111222'); await p.fill('#pe-langs', 'EN'); await p.screenshot({ path: S + '/v13-person.png' }); await p.click('form[data-form=person] button.primary'); await p.waitForTimeout(250);
+  await p.click('[data-act=pnew]'); await p.fill('#pe-name', 'Test Guide'); await p.fill('#pe-phone', '+995500111222'); await p.click('.langpick > summary'); await p.check('.langpick input[value=EN]'); await p.screenshot({ path: S + '/v13-person.png' }); await p.click('form[data-form=person] button.primary'); await p.waitForTimeout(250);
   ok((await txt('main')).includes('Test Guide'), 'admin adds a person');
   await p.click('.prow:has-text("Test Guide") [data-act=pedit]'); await p.fill('#pe-name', 'Test Guide Two'); await p.click('.sheet details:has-text("Tours this person leads") summary'); await p.locator('.sheet [data-sk]').first().check(); await p.click('form[data-form=person] button.primary'); await p.waitForTimeout(250);
   ok(await p.evaluate(() => { const x = Store.db.profiles.find(q => q.name === 'Test Guide Two'); return x && x.skills.length === 1 && x.phone === '+995500111222'; }), 'admin edits a person and sets the tours they lead');

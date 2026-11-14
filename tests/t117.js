@@ -12,7 +12,7 @@ const { chromium } = require('playwright');
   // review request from a past tour
   await p.evaluate(() => { const t = window.__test; }); 
   // phone: no panel
-  p = await mk(375); ok(await p.evaluate(() => !document.querySelector('#sidepanel') || document.querySelector('#sidepanel').getBoundingClientRect().right <= 0), 'panel is off screen on phone');
+  p = await mk(375); ok(await p.evaluate(() => !document.querySelector('#sidepanel') || document.querySelector('#sidepanel').getBoundingClientRect().height <= 2), 'panel is closed on phone');
   // driver view
   const drv = await p.evaluate(() => { const o = [...document.querySelectorAll('#demo-as option')].find(x => /driver/i.test(x.textContent)); return o ? o.value : null; });
   ok(!!drv, 'demo has a driver');
