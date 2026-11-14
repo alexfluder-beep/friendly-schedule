@@ -115,8 +115,10 @@
   // Only the last 13 months and everything ahead are loaded at start; older tours are fetched when asked for.
   const windowStart = () => { const d = new Date(); d.setMonth(d.getMonth() - 13); d.setDate(1); return iso(d); };
   function query(t, since) {
-    if (t === 'tours' && since) return sb.from('tours').select('*').gte('date', since);
-    if (t === 'bookings' && since) return sb.from('bookings').select('*, tours!inner(date)').gte('tours.date', since);
+    // Pages of 1000 need a fixed order, or rows get skipped or repeated between pages (guides then miss tours in their stats).
+    if (t === 'tours' && since) return sb.from('tours').select('*').gte('date', since).order('id');
+    if (t === 'bookings' && since) return sb.from('bookings').select('*, tours!inner(date)').gte('tours.date', since).order('id');
+    if (t === 'tours' || t === 'bookings' || t === 'clients' || t === 'client_ratings') return sb.from(t).select('*').order('id');
     if (t === 'usage') return sb.from('usage').select('*').gte('day', iso(new Date(Date.now() - 45 * 864e5)));
     if (t === 'log') return sb.from('log').select('*').order('at', { ascending: false }).limit(500);
     if (t === 'notifications') return sb.from('notifications').select('*').order('created_at', { ascending: false }).limit(200);
@@ -130,6 +132,7 @@
       if (error) { if (isNetErr(error)) throw error; console.error(t, error.message); return null; }
       rows = rows.concat(data); if (data.length < 1000) break; from += 1000;
     }
+    if (rows.length > 1000 && rows[0] && rows[0].id != null) { const seen = new Set(); rows = rows.filter(r => !seen.has(r.id) && seen.add(r.id)); }
     if (t === 'bookings') rows.forEach(r => { delete r.tours; });
     return rows;
   }

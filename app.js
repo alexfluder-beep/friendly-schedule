@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.75';
+  const APP_VERSION = '3.76';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -265,11 +265,18 @@
   const availOf = (p, date) => { const a = p && p.display && p.display.avail; return a && date ? a[monday(date)] || null : null; };
   const weekOf = (p, date) => { const av = availOf(p, date); if (av && Array.isArray(av.w) && av.w.length === 7) return av.w; if (p && Array.isArray(p.work_week) && p.work_week.length === 7) return p.work_week; const ds = String((p && p.work_days) || '').split(',').filter(x => x !== '').map(Number); return [0, 1, 2, 3, 4, 5, 6].map(i => (!ds.length || ds.includes(i) ? [(p && p.work_from) || '', (p && p.work_to) || ''] : null)); };
   const workDaysOf = (p, date) => { const w = weekOf(p, date), on = w.map((x, i) => (x ? i : -1)).filter(i => i >= 0); return on.length === 7 ? [] : on; };
+  // One short line for the weekly hours: "Mon–Sun · any time", "Mon–Fri · 09:00–18:00".
+  function wsSummary(m) {
+    const w = weekOf(m), on = w.map((x, i) => (x ? i : -1)).filter(i => i >= 0); if (!on.length) return '—';
+    const nm = i => fmt(addDays('2024-01-01', i), { weekday: 'short' }), runs = []; on.forEach(i => { const l = runs[runs.length - 1]; if (l && l[1] === i - 1) l[1] = i; else runs.push([i, i]); });
+    const days = runs.map(([s, e]) => (s === e ? nm(s) : e === s + 1 ? nm(s) + ', ' + nm(e) : nm(s) + '–' + nm(e))).join(', ');
+    const hrs = [...new Set(on.map(i => ((w[i] || [])[0] || '') + '|' + ((w[i] || [])[1] || '')))];
+    return days + ' · ' + (hrs.length === 1 ? (hrs[0] === '|' ? T('ws_any') : hrs[0].replace('|', '–')) : T('ws_varies'));
+  }
   const weekEditor = (p, date) => `<div class="wweek">${weekOf(p, date).map((x, i) => `<div class="wrow"><label class="wday"><input type="checkbox" name="wd${i}" ${x ? 'checked' : ''}>${esc(fmt(addDays('2024-01-01', i), { weekday: 'short' }))}</label>${hmIn('wf' + i, (x || [])[0], T('ws_from'), '--:--')}<span class="muted">–</span>${hmIn('wt' + i, (x || [])[1], T('ws_to'), '--:--')}</div>`).join('')}<div class="bar"><button type="button" class="lnk" data-act="wsame">${T('ws_same')}</button><span class="muted small">${T('ws_hint')}</span></div></div>`;
   // Hours are typed as 24-hour text ("9", "930", "09:30" all become 09:30), so every phone shows the same format.
   const hmNorm = v => { const d = String(v || '').replace(/\D/g, ''); if (!d) return ''; const h = d.length <= 2 ? d : d.slice(0, d.length - 2), m = d.length <= 2 ? '00' : d.slice(-2); return Number(h) < 24 && Number(m) < 60 ? String(Number(h)).padStart(2, '0') + ':' + m : ''; };
   // Dates typed day first: "24.11.2026", "24/11/26", "24.11" (this year). Returns 2026-11-24 or ''.
-  const dmyNorm = v => { const m = /^\s*(\d{1,2})[./\-\s](\d{1,2})(?:[./\-\s](\d{2,4}))?\s*$/.exec(String(v || '')) || /^\s*(\d{2})(\d{2})(\d{4}|\d{2})?\s*$/.exec(String(v || '')); if (!m) return ''; let y = m[3] ? Number(m[3]) : Number(today().slice(0, 4)); if (y < 100) y += 2000; const iso = `${y}-${String(m[2]).padStart(2, '0')}-${String(m[1]).padStart(2, '0')}`, dt = new Date(iso + 'T12:00:00Z'); return !isNaN(dt) && dt.toISOString().slice(0, 10) === iso ? iso : ''; };
   const PD_KINDS = ['birthday', 'anniversary', 'family', 'private', 'doctor', 'service', 'trip'];
   const PD_ICON = { birthday: 'cake', anniversary: 'favorite', family: 'family_restroom', private: 'lock', doctor: 'medical_services', service: 'build', trip: 'luggage' };
   const pdKind = title => { const t = String(title || '').trim().toLowerCase(); return PD_KINDS.find(k => ['en', 'ru', 'ka'].some(l => t.includes(window.I18N.t(l, 'pdk_' + k).toLowerCase()))) || ''; };
@@ -351,7 +358,7 @@
     bk.forEach(b => L.push(`- ${b.guest} (${acText(b)})${(b.marks || []).length ? ' · ' + b.marks.map(markLabel).join(', ') : ''}`));
     bk.filter(b => b.pickup_addr).forEach(b => L.push(`  ${b.guest}: ${b.pickup_addr}`));
     if (staysN(bk)) L.push(T('stay_line', { n: staysN(bk), back: Math.max(0, (t.pax || 0) - staysN(bk)) }));
-    if (cashDue(bk)) L.push(`${T('cash_collect')}: ${cashText(bk)}`);
+    if (cashDue(bk) && !isDrv()) L.push(`${T('cash_collect')}: ${cashText(bk)}`);
     if (t.notes) L.push(`${T('notes')}: ${t.notes}`);
     return L.join('\n');
   }
@@ -623,12 +630,6 @@
     }
     return T('pay_how_rate', { kind: T('kind_' + (t.kind || 'private')).toLowerCase() });
   }
-  const pairHtml = t => {
-    const parts = [];
-    if (t.guide_id) parts.push(`<span class="p">${avatar(t.guide_id)}${esc(pname(t.guide_id))}</span>`);
-    if (t.driver_id) parts.push(`<span class="p">${avatar(t.driver_id)}${esc(pname(t.driver_id))}</span>`);
-    return parts.length ? `<span class="pair">${parts.join('<span class="plus">+</span>')}</span>` : `<span class="tag t-warn">${T('unassigned')}</span>`;
-  };
   const paxText = t => t.capacity > 0 ? `${t.pax || 0}/${t.capacity}` : `${t.pax || 0}`;
   // A day off, half day or sick day on the calendar can be tapped to change or remove it (office: anyone's; a person: their own, not past ones). The office can also drag it to another day.
   const offCan = o => isAdmin() || (twin(o.user_id) === me().id && o.date_to >= today());
@@ -686,7 +687,7 @@
   function offMark(d) {
     const mine = offOn(me().id, d), n = state.mine ? 0 : offCount(d);
     if (!mine && !n) return '';
-    return `<span class="offm ${mine ? 'me' : ''}" title="${esc(T('off_today'))}">${msi('beach_access')}${mine ? esc(T('off_mine')) : n}</span>`;
+    return `<span class="offm ${mine ? 'me' : ''}" title="${esc(mine ? T(mine.type === 'sick' ? 'sick' : 'off_mine') : T('off_today'))}">${msi(mine && mine.type === 'sick' ? 'sick' : 'beach_access')}${mine ? esc(T(mine.type === 'sick' ? 'sick_short' : 'off_short')) : n}</span>`;
   }
   // Under each date of the week strip: how many tours (a dot and the number; amber when a tour still needs a guide or driver)
   // and how many people are off (the same umbrella as on the Day off card). For one person: their own tours and their own day off.
@@ -725,7 +726,7 @@
   // Agenda: one long list by date, like a printed schedule. Thirty days from the chosen date; days with nothing are left out.
   function agendaHtml() {
     const from = state.date, td = today(), who = seenBy(); let rows = '', any = 0;
-    for (let i = 0; i < 30; i++) { const d = addDays(from, i), ts = toursOnDay(d).filter(seen).sort((x, y) => (x.start_time || '').localeCompare(y.start_time || '')), offs = db.time_off.filter(o => o.status !== 'declined' && o.date_from <= d && o.date_to >= d && (!who || twin(o.user_id) === who)), cx = cancelledOnDay(d).filter(seen), ho = holidayOn(d);
+    for (let i = 0; i < 30; i++) { const d = addDays(from, i), ts = toursOnDay(d).filter(seen).sort((x, y) => (x.start_time || '').localeCompare(y.start_time || '')), offs = db.time_off.filter(o => o.status !== 'declined' && o.date_from <= d && o.date_to >= d && (!who || twin(o.user_id) === who)), cx = state.cxOff ? [] : cancelledOnDay(d).filter(seen), ho = holidayOn(d);
       const tkd = tasksOnDay(d); if (!ts.length && !offs.length && !cx.length && !tkd.length && d !== td) continue; any++;
       const line = (time, dot, body, right, cls, attr) => `<${attr ? 'button' : 'div'} class="agr ${cls || ''}" ${attr || ''}><i class="agdot" style="${dot}"></i><span class="agb"><span class="agtt">${body}</span>${time ? `<span class="agt num">${time}</span>` : ''}</span><span class="agw">${right}</span></${attr ? 'button' : 'div'}>`;
       const pe = id => { const x = person(id); return x ? `<span class="agp">${avatar(id)}<span>${esc(x.name)}</span></span>` : ''; };
@@ -825,16 +826,17 @@
       <div class="row"><b>${T('guests_title')} (${bks.length})</b><span class="muted small num">${esc(acText(t))}${bks.length ? ' · ' + T('att_sum', { a: bks.filter(b => b.attendance === 'arrived').length, n: bks.length, x: bks.filter(b => b.attendance === 'noshow').length }) : ''}</span></div>
       ${guestRowsHtml(t)}
       ${op ? `<div class="row nw">${avatar(other)}<span class="grow-l"><b>${esc(op.name)}</b>&nbsp;<span class="muted small">${T('role_' + (t.guide_id === other ? 'guide' : 'driver'))}</span></span>${staffBtns(op)}</div>` : ''}
-      ${cashDue(bks) ? `<div><span class="tag t-warn num">${T('cash_collect')}: ${esc(cashText(bks))}</span></div>` : ''}</div>`;
+      ${cashDue(bks) && !isDrv() ? `<div><span class="tag t-warn num">${T('cash_collect')}: ${esc(cashText(bks))}</span></div>` : ''}</div>`;
   }
   function myDayHtml(d) {
     const td = today(), id = me().id, ho = holidayOn(d), ev = eventOn(d), o = offOn(id, d);
     const ts = toursOnDay(d).filter(t => involves(t, id)).sort((x, y) => (x.start_time || '').localeCompare(y.start_time || '')), cxs = cancelledOnDay(d).filter(t => involves(t, id));
     const card = t => { const off = !live(t), other = t.guide_id === id ? t.driver_id : t.guide_id, fr = tourBookings(t.id).filter(isFree).reduce((n, b) => n + (Number(b.pax) || 1), 0), vip = tourBookings(t.id).some(b => isVip(b.client_id));
       return `<button class="acard mycard ${off ? 'cancelled' : ''}" data-key="t${t.id}" style="--k:${esc(tourStyle(t.title).color)}" data-act="tour" data-id="${t.id}"><span class="ttl">${t.start_time ? `<span class="num st">${esc(t.start_time)}</span> ` : ''}<span class="tname">${esc(t.title)}</span> <span class="num cnt">(${paxText(t)})</span>${off ? ` <span class="tag t-danger">${T('cancelled')}</span>` : ''}${vip ? ` <span class="tag t-vip">${T('vip')}</span>` : ''}${!off && staysN(tourBookings(t.id)) ? ` <span class="tag t-stay num">${T('stay_n', { n: staysN(tourBookings(t.id)) })}</span>` : ''}${fr ? ` <span class="tag t-free num">${T('free_n', { n: fr })}</span>` : ''}</span>${off ? '' : metaHtml(t)}${endOf(t) !== t.date || other ? `<span class="num tm muted">${esc([endOf(t) !== t.date ? fmtRange(t.date, endOf(t)) : '', other ? pname(other) : ''].filter(Boolean).join(' · '))}</span>` : ''}${off ? '' : wxLine(t)}</button>`; };
-    return `<div class="dayhd my ${d === td ? 'tdy' : ''}" id="day-${d}"><b>${d === td ? T('today') + ' · ' : ''}${esc(fmt(d, { weekday: 'long', day: 'numeric', month: 'long' }))}</b>${dayCountHtml(d, id)}${ho ? `<span class="tag t-hol">${esc(trName(ho.name))}</span>` : ''}${ev ? `<span class="tag t-group">${esc(trName(ev.name))}</span>` : ''}</div>
+    const quiet = !ts.length && !cxs.length && !o && !tasksOnDay(d).length;
+    return `<section class="daycard ${d === td ? 'tdy' : ''} ${quiet ? 'quiet' : ''}"><div class="dayhd my ${d === td ? 'tdy' : ''}" id="day-${d}"><b>${d === td ? T('today') + ' · ' : ''}${esc(fmt(d, { weekday: 'long', day: 'numeric', month: 'long' }))}</b>${dayCountHtml(d, id)}${ho ? `<span class="tag t-hol">${esc(trName(ho.name))}</span>` : ''}${ev ? `<span class="tag t-group">${esc(trName(ev.name))}</span>` : ''}</div>
       ${ts.map(card).join('')}${cxs.map(card).join('')}${tasksOnDay(d).map(taskLineHtml).join('')}${o ? offLineHtml([o], d) : ''}
-      ${!ts.length && !cxs.length && !o && !tasksOnDay(d).length ? `<div class="nothing2"><span class="muted">${T('nothing_planned')}</span>${d > td ? `<button class="lnk" data-act="offnew" data-date="${d}">${T('ask_dayoff')}</button>` : ''}</div>` : ''}`;
+      ${!ts.length && !cxs.length && !o && !tasksOnDay(d).length ? `<div class="nothing2"><span class="muted">${T('nothing_planned')}</span>${d > td ? `<button class="lnk" data-act="offnew" data-date="${d}">${T('ask_dayoff')}</button>` : ''}</div>` : ''}</section>`;
   }
   // The round "+" on phones opens a short menu: a tour (admins), a day off or a sick day.
   const PHONE = () => !!(window.matchMedia && window.matchMedia('(max-width:760px)').matches);
@@ -970,7 +972,11 @@
   }
   function calendarHtml() {
     const wide = isAdmin() && state.mode === 'week' && state.wgrid && !state.mine;
-    return `<div class="calframe ${wide ? 'calwide' : ''}">${calendarInner()}</div>`;
+    const panel = isAdmin() && !PHONE() && !state.mine && state.mode !== 'time' && !wide;
+    if (!panel) return `<div class="calframe ${wide ? 'calwide' : ''}">${calendarInner()}</div>`;
+    // Computer view: a team panel on the left (who to show, cancelled on or off), the calendar on the right.
+    const who = state.who || '', cr = crew(), btn = (id, label, ic) => `<button class="cpp${who === id ? ' on' : ''}" data-act="whoset" data-v="${id}" aria-pressed="${who === id}">${ic}<span>${esc(label)}</span></button>`;
+    return `<div class="calsplit"><aside class="calpanel" aria-label="${T('v_who')}"><b class="cph">${T('nav_team')}</b>${btn('', T('v_allteam', { n: cr.length }), msi('groups'))}${cr.map(p => btn(p.id, p.name, avatar(p.id))).join('')}<label class="cpp cxsw"><input type="checkbox" data-ch="cxshow" ${state.cxOff ? '' : 'checked'}><span>${T('cancelled')}</span></label></aside><div class="calframe calmain">${calendarInner()}</div></div>`;
   }
   function calendarInner() {
     const wk = monday(state.date), days = [...Array(7)].map((_, i) => addDays(wk, i)), td = today();
@@ -1009,7 +1015,6 @@
       ${people.map(p => rowFor(p.name, T('role_' + p.role), p.id, t => involves(t, p.id))).join('')}</div></div>`;
     // phone: day strip + agenda
     const sel = state.date;
-    const mineDay = d => toursOnDay(d).some(t => involves(t, me().id));
     h += `<div class="ghome ${state.wgrid ? 'only-phone' : ''}"><div class="list home"><div class="strip">${days.map(d => `<button data-act="day" data-date="${d}" data-drop="${d}" aria-pressed="${d === sel}" class="${d === td ? 'tdy' : ''} ${offCls(offOn(me().id, d))} ${holidayOn(d) ? 'hol' : ''}"><span>${esc(fmt(d, { weekday: 'short' }))}</span><b class="num">${D(d).getDate()}</b>${dayMarks(d, state.mine ? me().id : '')}</button>`).join('')}</div>${stripLegend(!!state.mine)}`;
     for (const d of days) h += dayBlock(d);
     h += `</div></div>`;
@@ -1172,7 +1177,7 @@
           ${live(d) ? '' : `<button class="btn" data-act="tourrestore" data-id="${d.id}">${msi('event_available')}${T('restore')}</button>`}
           <button class="btn" data-act="tourclone" data-id="${d.id}" title="${esc(T('clone'))}">${msi('content_copy')}${T('clone_short')}</button>
           <button class="btn tmore" data-act="tmore" aria-expanded="${!!m.more}" aria-controls="tmore">${T('t_other')}${msi('keyboard_arrow_down')}</button>
-          ${m.more ? `<div class="tmorebody" id="tmore">${live(d) ? `<button class="btn danger" data-act="cancelask" data-id="${d.id}">${msi('event_busy')}${T('cancel_tour')}</button>` : ''}<button class="btn danger" data-act="tourdelask" data-id="${d.id}">${msi('delete')}${T('del_tour')}</button></div>` : ''}</div>` : ''}`;
+          ${m.more ? `<div class="tmorebody" id="tmore">${d.date <= today() ? `<button class="btn" data-act="revreq" data-id="${d.id}">${msi('rate_review')}${T('rr_btn')}</button>` : ''}${live(d) ? `<button class="btn danger" data-act="cancelask" data-id="${d.id}">${msi('event_busy')}${T('cancel_tour')}</button>` : ''}<button class="btn danger" data-act="tourdelask" data-id="${d.id}">${msi('delete')}${T('del_tour')}</button></div>` : ''}</div>` : ''}`;
     }
     const titles = [...new Set([...catalog().map(c => c.title), ...db.tours.map(t => t.title)])].sort(), marks = allMarks(), r = rules().pay || {};
     return `<div class="hdr"><h2>${T(m.isNew ? 'new_tour' : 'edit_tour')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>
@@ -1585,7 +1590,6 @@
   const RIBBON = { guide: '#f0901e', all: '#f0901e', master: '#a8500e', driver: '#3b5bbd', delica: '#3b5bbd', own: '#3b5bbd', geo: '#2f6b48', fun: '#6243bd', new: '#0f766e', now: '#0f766e', titles: '#20251f', secret: '#20251f' };
   const mPoly = (n, r1, r2, rot) => [...Array(n * 2)].map((_, i) => { const a = Math.PI * i / n + (rot || 0), r = i % 2 ? r2 : r1; return (48 + r * Math.sin(a)).toFixed(1) + ',' + (62 - r * Math.cos(a)).toFixed(1); }).join(' ');
   const M_SHAPE = { seal: mPoly(16, 37, 33.5), burst: mPoly(12, 38, 31), hex: mPoly(3, 38, 38), shield: null };
-  const mShapeOf = t => (t === 'geo' || t === 'titles' ? 'shield' : t === 'driver' || t === 'delica' || t === 'own' ? 'hex' : t === 'fun' || t === 'secret' || t === 'now' || t === 'new' ? 'burst' : 'seal');
   // Bronze, silver or gold: the place of a badge on its own ladder (50 / 100 / 250 tours), or how far a tour mastery has gone.
   function tierOf(b, list) {
     if (b.track === 'titles' || b.track === 'secret') return 'gold';
@@ -1879,18 +1883,19 @@
     const holRows = hol.length ? hol.map(x => `<div class="card lrow nohead"><span class="lmain"><span class="tag ${x.kind === 'event' ? 't-group' : 't-hol'}">${esc(trName(x.name))}</span></span><span class="num ldate">${esc(fmtRange(x.date_from, x.date_to))}</span>${x.notes ? `<div class="muted small">${esc(x.notes)}</div>` : ''}</div>`).join('') : `<div class="empty">${T('no_holidays')}</div>`;
     const fold = (k, title, body, extra) => `<details class="sect bpmore tofold" data-keep="${k}" ${(state.keep || {})[k] ? 'open' : ''}><summary data-s="${T('show')}" data-h="${T('hide')}"><span>${title}${extra || ''}</span></summary>${body}</details>`;
     const count = n => ` <span class="tag t-muted num">${n}</span>`;
+    const oldBody = adm => { const by = {}; old.forEach(o => { (by[o.date_from.slice(0, 4)] = by[o.date_from.slice(0, 4)] || []).push(o); }); return Object.keys(by).sort().reverse().map((y, i) => `<details class="sect bpmore tofold" data-keep="req-old-${y}" ${(state.keep || {})['req-old-' + y] ? 'open' : ''}><summary data-s="${T('show')}" data-h="${T('hide')}"><span>${y}${count(by[y].length)}</span></summary><div class="list">${by[y].map(o => offRow(o, adm)).join('')}</div></details>`).join(''); };
     if (admin) {
       // The office keeps its order: what waits for a decision first.
       return `${head}${tiles}<h3>${T('to_approve')} (${pending.length})</h3><div class="list">${pending.length ? pending.map(o => offRow(o, true)).join('') : `<div class="empty">${T('nothing_pending')}</div>`}</div>
-        <div class="cols tocols"><div class="list"><h3>${T('my_requests')}</h3>${reqNow}${old.length ? fold('req-old', T('req_old'), `<div class="list">${old.map(o => offRow(o, true)).join('')}</div>`, count(old.length)) : ''}</div>
+        <div class="cols tocols"><div class="list"><h3>${T('my_requests')}</h3>${reqNow}</div>
         <div class="list"><h3>${T('team_off')}</h3>${!upcoming.length ? `<div class="empty">${T('nobody_off')}</div>` : upcoming.map(o => `<div class="card lrow">${avatar(o.user_id)}<span class="lmain"><b>${esc(pname(o.user_id))}</b>${offTag(o)}</span><span class="num ldate">${esc(fmtRange(o.date_from, o.date_to))}</span></div>`).join('')}
-        <h3>${T('holidays')}</h3>${holRows}</div></div>`;
+        <h3>${T('holidays')}</h3>${holRows}</div></div>${old.length ? fold('req-old', T('req_old'), oldBody(true), count(old.length)) : ''}`;
     }
     // Guides and drivers (3.60): the request button and their own requests first, then the three numbers and the Team ready calendar. Everything else is folded.
     const wr = workRestParts(), sug = (suggestDaysOff(4)[me().id] || []).filter(x => x.st === 'sug').map(x => x.d), vac = vacationWeeks(), earned = (vac[0] || {}).earned || '';
     const vc = `<div class="card f vccard">${vac.length ? `<span class="muted small">${T('vc_text')}</span>${earned ? `<span class="muted small">${esc(earned.charAt(0).toUpperCase() + earned.slice(1))}</span>` : ''}<div class="list vclist">${vac.map(v => `<button class="card lrow nohead vcrow" data-act="offnew" data-date="${v.from}" data-to="${v.to}"><span class="lmain"><b class="nw num">${esc(fmtRangeShort(v.from, v.to))}</b></span><span class="ldate"><span class="lnk">${T('vc_ask')} ›</span></span></button>`).join('')}</div>` : `<span class="muted small">${T('vc_none')}</span>`}${sug.length ? `<span class="muted small">${T('vc_days')}</span><div class="bar">${sug.map(d => `<button class="btn sm" data-act="offnew" data-date="${d}">${esc(fmtDay(d))}</button>`).join('')}</div>` : ''}<span class="muted small wrnote">${T('wr_note')}</span></div>`;
     return `${head}<div class="cols tocols"><div class="list"><h3>${T('my_requests')}</h3>${reqNow}${tiles}</div><div class="list"><h3>${T('tc_title')}</h3>${teamOffCounts(upcoming)}</div></div>
-      <div class="tofolds">${wr ? fold('wr', T('wr_title'), wr.body) + fold('wr-q', T('wr_q_title'), wr.wishes, wr.sum ? ` <span class="muted small wrqsum">${esc(wr.sum)}</span>` : '') : ''}${fold('vc', T('vc_title'), vc)}${old.length ? fold('req-old', T('req_old'), `<div class="list">${old.map(o => offRow(o, false)).join('')}</div>`, count(old.length)) : ''}${fold('hol', T('holidays'), `<div class="list">${holRows}</div>`, hol.length ? count(hol.length) : '')}</div>`;
+      <div class="tofolds">${wr ? fold('wr', T('wr_title'), wr.body) + fold('wr-q', T('wr_q_title'), wr.wishes, wr.sum ? ` <span class="muted small wrqsum">${esc(wr.sum)}</span>` : '') : ''}${fold('vc', T('vc_title'), vc)}${fold('hol', T('holidays'), `<div class="list">${holRows}</div>`, hol.length ? count(hol.length) : '')}${old.length ? fold('req-old', T('req_old'), oldBody(false), count(old.length)) : ''}</div>`;
   }
   function offModalHtml(m) {
     const d = m.draft;
@@ -2152,7 +2157,7 @@
   const tasksBadge = () => db.tasks.filter(k => k.status === 'open' && (k.assignees || []).includes(me().id)).length;
   function unstaffedHtml() {
     const list = unstaffed(); if (!list.length) return '';
-    return `<div class="card f xcard"><b>${T('us_title', { n: list.length })}</b><span class="muted">${T('us_text')}</span>${list.slice(0, 15).map(t => { const who = pendingTakes().filter(q => q.tour_id === t.id); return `<div class="xrow"><button class="grow-l arow" data-act="tour" data-id="${t.id}">${emblem(t)}<span><b class="num">${esc(fmt(t.date, { weekday: 'short', day: 'numeric', month: 'short' }))} ${esc(t.start_time || '')}</b> ${esc(aliasOf(t.title))}${langTags(t)}${who.length ? `<span class="xwho">${who.map(q => `<span class="xw">${avatar(q.user_id)}${esc(pname(q.user_id))}</span>`).join('')}</span>` : ''}</span></button><span class="tag t-warn">${T(!t.guide_id && !t.driver_id && kmOf(t.title) > 0 ? 'us_both' : !t.guide_id ? 'us_guide' : 'us_driver')}</span></div>`; }).join('')}${list.length > 15 ? `<span class="muted small">+ ${list.length - 15}</span>` : ''}</div>`;
+    return `<div class="card f xcard"><b>${T('us_title', { n: list.length })}</b><span class="muted">${T('us_text')}</span>${list.slice(0, 15).map(t => { const who = pendingTakes().filter(q => q.tour_id === t.id); return `<div class="xrow"><button class="grow-l arow" data-act="tour" data-id="${t.id}">${emblem(t)}<span><b class="num">${esc(fmt(t.date, { weekday: 'short', day: 'numeric', month: 'short' }))} ${esc(t.start_time && t.start_time !== '00:00' ? t.start_time : '--:--')}</b> ${esc(aliasOf(t.title))}${langTags(t)}${who.length ? `<span class="xwho">${who.map(q => `<span class="xw">${avatar(q.user_id)}${esc(pname(q.user_id))}</span>`).join('')}</span>` : ''}</span></button><span class="tag t-warn">${T(!t.guide_id && !t.driver_id && kmOf(t.title) > 0 ? 'us_both' : !t.guide_id ? 'us_guide' : 'us_driver')}</span></div>`; }).join('')}${list.length > 15 ? `<span class="muted small">+ ${list.length - 15}</span>` : ''}</div>`;
   }
   function exchangeHtml() {
     const list = openTours(true); if (!list.length) return '';
@@ -2165,7 +2170,7 @@
     const nOpen = admin ? adminOpenN() : openTours().length, sec = (state.taskSec || 'tours') === 'tours' && nOpen ? 'tours' : 'tasks', nTasks = tasksBadge();
     const head = `<div class="bar thead"><h2>${T('tasks')}</h2><span class="spacer"></span>${admin ? `<button class="btn primary only-wide" data-act="tasknew">+ ${T('task')}</button>` : ''}${helpBtn()}</div>${helpBox('tasks')}
       ${nOpen ? `<div class="seg tsec"><button data-act="tasksec" data-v="tours" aria-pressed="${sec === 'tours'}">${T(admin ? 'ts_tours' : 'ts_take')} <span class="segn num">${nOpen}</span></button><button data-act="tasksec" data-v="tasks" aria-pressed="${sec === 'tasks'}">${T('tasks')}${nTasks ? ` <span class="segn num">${nTasks}</span>` : ''}</button></div>` : ''}`;
-    if (sec === 'tours') return head + takeReqHtml() + exchangeHtml() + unstaffedHtml();
+    if (sec === 'tours') return head + unstaffedHtml() + takeReqHtml() + exchangeHtml();
     return head + `<div class="bar tfilt"><div class="seg">${['open', 'done', 'all'].map(x => `<button data-act="taskfilter" data-v="${x}" aria-pressed="${f === x}">${T('f_' + x)}</button>`).join('')}</div>
       ${admin ? `<div class="seg"><button data-act="mine" data-v="0" aria-pressed="${!state.mine}">${T('team')}</button><button data-act="mine" data-v="1" aria-pressed="${!!state.mine}">${T('mine')}</button></div>` : ''}</div>
       ${admin && !state.viewAs ? `<button class="btn primary fab xfab only-phone" data-act="tasknew">${msi('add_task')}${T('task_new')}</button>` : ''}
@@ -2257,7 +2262,8 @@
   // Names the admin joined in Back office > Tour statistics > Join tour names: { key of a name: the name it counts as }.
   const tourAlias = () => rules().tourAlias || {};
   const aliasOf = t => tourAlias()[tourKey(t)] || t;
-  const statKey = t => tourKey(aliasOf(t));
+  // Same tour under different names (owner, 14 Nov): the two walking tours of the old town, the two New Tiflis names, 4x4 / 4WD (tourKey already joins those two). Names joined by hand in Tour names still win.
+  const statKey = t => { const k = tourKey(aliasOf(t)); return /^(?:old )?tbilisi walking tour$/.test(k) ? 'tbilisi walking tour' : /\bnew tiflis\b|^alternative walking tour\b/.test(k) ? 'alternative walking tour' : k; };
   // Similar names: same place words (also with a typo or in Russian letters), and both private or both not.
   const CYR = { а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'i', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'kh', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sh', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya' };
   const TN_STOP = /^(tour|tours|from|tbilisi|to|day|days|one|trip|small|group|private|guided|half|full|georgia|the|and|of|in|a|an|eng|en|ru|4x4|by|with|ancient|capital|real|life|excursion|walking)$/;
@@ -2275,6 +2281,19 @@
     const mains = [], groups = new Map();
     units.forEach(u => { let best = null, bs = 0; mains.forEach(m => { const sc = tnScore(m.main, u.main); if (sc > bs) { bs = sc; best = m; } }); if (best && bs >= 0.5) groups.get(best).push({ u, strong: bs >= 0.67 }); else { mains.push(u); groups.set(u, []); } });
     return [...groups].filter(([, l]) => l.length).map(([m, l]) => ({ m, l }));
+  }
+
+  // ---------- review request: a thank-you draft per guest. The owner sends it himself; the app never sends. ----------
+  const RRMSG = {
+    en: (n, tour, pf) => `Hello ${n}! Thank you for joining us on "${tour}". We hope you enjoyed it. If you have a minute, a short review on ${pf} would help our small local team a lot. Thank you, and we hope to see you again in Georgia! Friendly.ge`,
+    ru: (n, tour, pf) => `Здравствуйте, ${n}! Спасибо, что были с нами на туре «${tour}». Надеемся, вам понравилось. Если найдётся минутка, короткий отзыв на ${pf} очень поможет нашей небольшой местной команде. Спасибо и до новых встреч в Грузии! Friendly.ge`
+  };
+  function revreqModalHtml(m) {
+    const t = db.tours.find(x => x.id === m.id); if (!t) return '';
+    const ru = /^ru/i.test(t.language || ''), bks = tourBookings(t.id).filter(b => b.guest);
+    const items = bks.map(b => { const pf = sourceOf(b) || 'Google', first = (cleanName(b.guest) || b.guest).split(/\s+/)[0], c = db.clients.find(x => x.id === b.client_id), phone = (c && c.phone) || b.phone || '', txt = RRMSG[ru ? 'ru' : 'en'](first, t.title, pf), skip = /free\s*tour/i.test(pf);
+      return `<div class="card f"><b>${esc(cleanName(b.guest) || b.guest)}</b><span class="muted small">${esc(pf)}${skip ? ' · ' + T('rr_free') : ''}</span><pre class="pre">${esc(txt)}</pre><div class="actions"><button class="btn" data-act="copy" data-v="${esc(txt)}">${T('copy')}</button>${phone ? `<a class="btn" target="_blank" rel="noopener" href="${esc(waLink(phone, txt))}">${msi('chat')}WhatsApp</a>` : ''}</div></div>`; });
+    return `<div class="hdr"><h2>${T('rr_title')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div><div class="f"><span class="muted small">${T('rr_text')}</span>${items.join('') || `<div class="empty">${T('rr_none')}</div>`}</div>`;
   }
   function tnamesHtml() {
     const units = tnUnits(), sug = tnSuggest(units), joined = units.filter(u => Object.keys(u.names).length > 1 && Object.keys(u.names).some(n => tourAlias()[tourKey(n)]));
@@ -2553,7 +2572,7 @@
   }
   function ticketCardHtml() {
     if (!me() || state.viewAs) return ''; const mine = db.tickets.filter(x => x.user_id === me().id).sort((x, y) => String(y.created_at || '').localeCompare(String(x.created_at || ''))).slice(0, 5);
-    return `<div class="card f"><b>${T('tk_title')}</b><span class="muted small">${T('tk_text')}</span><div><button class="btn" data-act="tkopen">${msi('flag')}${T('tk_title')}</button></div>${mine.length ? `<b class="small">${T('tk_mine')}</b>${mine.map(t => `<div class="small"><div class="row nw"><span class="grow-l">${esc(String(t.body).slice(0, 80))}</span>${tkTag(t.status)}</div>${t.reply ? `<span class="muted">${esc(t.reply)}</span>` : ''}</div>`).join('')}` : ''}</div>`;
+    return `<div class="card f"><b>${T('tk_title')}</b><span class="muted small">${T('tk_text')}</span><div><button class="btn" data-act="tkopen">${msi('flag')}${T('tk_title')}</button></div><span class="muted small">${T('tk_tg')}</span>${mine.length ? `<b class="small">${T('tk_mine')}</b>${mine.map(t => `<div class="small"><div class="row nw"><span class="grow-l">${esc(String(t.body).slice(0, 80))}</span>${tkTag(t.status)}</div>${t.reply ? `<span class="muted">${esc(t.reply)}</span>` : ''}</div>`).join('')}` : ''}</div>`;
   }
   function ticketModalHtml(m) {
     const sh = m.shots || [];
@@ -2933,22 +2952,44 @@
     return t;
   }
   function parseBooking(raw) {
-    const t = mailText(raw).replace(/\[[^\]]*\]\([^)]*\)/g, ' ').replace(/https?:\/\/\S+/g, ' ').replace(/\|/g, '\n').replace(/[ \t\u00a0]+/g, ' ').replace(/\n\s*\n+/g, '\n').replace(/^\s*(ticket-booking|calendar|users|single-person|globe|pin|currency)\s*$/gim, '').replace(/^(Booking time|Booked (?:at|on)|Please confirm the booking before)[^\n]*\n?[^\n]*$/gim, '').replace(/\n\s*([AaPp]\.?[Mm]\.?)(?=\s*(?:\n|$))/g, ' $1');
+    const t = mailText(raw).replace(/\[[^\]]*\]\([^)]*\)/g, ' ').replace(/https?:\/\/\S+/g, ' ').replace(/\|/g, '\n').replace(/[ \t\u00a0]+/g, ' ').replace(/\n\s*\n+/g, '\n').replace(/^\s*(ticket-booking|calendar|users|single-person|globe|pin|currency)\s*$/gim, '').replace(/^(Booking time|Booking notification sent|Booked (?:at|on)|Please confirm the booking before)[^\n]*\n?[^\n]*$/gim, '').replace(/\n\s*([AaPp]\.?[Mm]\.?)(?=\s*(?:\n|$))/g, ' $1');
     const get = re => { const m = t.match(re); return m ? m[1].trim() : ''; };
     const src = /get\s?your\s?guide|\bGYG[A-Z0-9]{8,}\b/i.test(t) ? 'GetYourGuide' : /viator|tripadvisor/i.test(t) ? 'Viator' : /klook/i.test(t) ? 'Klook' : /trip\.com|ctrip|VBK system/i.test(t) ? 'Trip.com' : /airbnb|booked your experience|Hosted by/i.test(t) ? 'Airbnb' : /civitatis/i.test(t) ? 'Civitatis' : /freetour/i.test(t) ? 'FreeTour' : /tourradar/i.test(t) ? 'TourRadar' : /trekksoft/i.test(t) ? 'Website' : '';
-    const ref = get(/\b(GYG[A-Z0-9]{8,})\b/) || get(/\b(BR-\d{6,})\b/) || get(/Booking reference ID\s*:?\s*([A-Z0-9-]{5,})/i) || get(/Confirmation code\s*:?\s*([A-Z0-9]{6,})/i) || get(/(?:Booking (?:Reference|ID|number|No\.?|code)|Reference (?:number|no\.?)|Order (?:number|ID|No\.?)|Confirmation (?:number|code)|Voucher (?:number|code))\s*[:#]?\s*([A-Z0-9][A-Z0-9-]{4,})/i) || get(/order[^#\n]{0,80}#\s?(\d{6,})/i);
-    let title = get(/following booking has\s+(?:changed|been (?:cancell?ed|updated|amended))\.?\s*\n([^\n]{6,160})/i) || get(/(?:Tour Name|Activity name|Product name)\s*:\s*([^\n]+)/i) || get(/(?:^|\n)([^\n:]{6,120})\n\s*Tour Reservation\b/i) || get(/Booked product\s*\n\s*([^\n]+)/i) || get(/has been booked:?\s*\n\s*([^\n]+)/i) || get(/new reservation for ([^.\n]+)/i) || get(/order for (.+?) and issued/i) || get(/\n([^\n]+)\n\s*Hosted by/i) || get(/(?:Activity|Product|Experience)\s*:\s*([^\n]+)/i);
+    let ref = get(/\b(GYG[A-Z0-9]{8,})\b/) || get(/\b(BR-[0-9A-Z]{6,})\b/) || get(/\b(\d{4,6}-\d{12,14}-[A-Z0-9]{3,})\b/) || get(/Booking reference ID\s*:?\s*([A-Z0-9-]{5,})/i) || get(/Confirmation code\s*:?\s*([A-Z0-9]{6,})/i) || get(/(?:RESERVATION|BOOKING) NUMBER\s*:?\s*([A-Z0-9-]{5,})/i) || get(/(?:Booking (?:Reference\b|ID\b|number\b|No\b\.?|code\b)|Reference (?:number\b|no\b\.?)|Order (?:number\b|ID\b|No\b\.?)|Confirmation (?:number|code)|Voucher (?:number|code))\s*[:#]?\s*#?\s*([A-Z0-9][A-Z0-9-]{4,})/i) || get(/basket\s*#\s*(\d{5,}[A-Z0-9]*)/i) || get(/New order[^\n]*\n\s*#(\d{5,}[A-Z0-9]*)/i) || get(/(?:Ctrip )?order No\.?\s*:?\s*(\d{9,}[A-Z]*)/i) || get(/Booking Request\s*#(\d{4,}[A-Z0-9]*)/i) || get(/order[^#\n]{0,80}#\s?(\d{6,})/i);
+    if (src === 'Viator' && /^\d{6,}[A-Z]*$/.test(ref)) ref = 'BR-' + ref;   // "Tripadvisor Experiences" mails drop the BR- prefix; the saved booking has it
+    let title = get(/following booking has\s+(?:changed|been (?:cancell?ed|updated|amended))\.?\s*\n(?!\s*Reference)([^\n]{6,160})/i) || get(/following booking for (.+?) on (?:[A-Z][a-z]{2}, )?[A-Z][a-z]{2} \d{1,2}, \d{4}/) || get(/\n\s*(?:Canceled|Cancelled)\s*\n([^\n]{6,160})/) || get(/Customer:[^\n]*? Tour:\s*(.+?)\s+Date:/) || get(/(?:^|\n)\s*(?:Tour Name|Activity name|Product name|ACTIVITY|Tour|Product)\s*:[ \t]*\n?[ \t]*([^\n]+)/i) || get(/\n([^\n]{8,200})\n\s*Reference number\b/i) || get(/\n([^\n]{8,200})\n\s*Package\s*:/i) || get(/Tour Grade Description\s*:\s*([^\n]+)/i) || get(/^([^\n]{6,140}?) (?:Edited )?Tour Reservation (?:Previous )?Date of the Tour/m) || get(/booking\s*\(#[^)]*\)\s*for\s+(.+?)(?=\s+at \d{1,2}:\d{2}\s*[AP]M on|\s+Date of|\s*$)/i) || get(/\d+(?:&nbsp;|\s)*day tour\s*\n([^\n]+)/i) || get(/(?:^|\n)([^\n:]{6,120})\n\s*Tour Reservation\b/i) || get(/Booked product\s*\n\s*([^\n]+)/i) || get(/has been booked:?\s*\n\s*([^\n]+)/i) || get(/new reservation for ([^.\n]+)/i) || get(/order for (.+?) and issued/i) || get(/\n([^\n]+)\n\s*Hosted by/i) || get(/(?:Activity|Product|Experience)\s*:\s*([^\n]+)/i);
     title = title.replace(/\s+Reference number.*$/i, '').replace(/^\d{5,}-/, '').replace(/\t.*$/, '').trim();
     // GetYourGuide change mail: "Date  New" then the new date, then the old date struck through. The first date is the one that counts; the second is what it was.
     const dm = t.match(/(?:^|\n)\s*Date\s*\n\s*(?:New\s*\n\s*)?([^\n]*\d{4}[^\n]*)(?:\n\s*([^\n]*\d{4}[^\n]*))?/i), was = dm && dm[2] && parseWhen(dm[2]).date ? parseWhen(dm[2]) : null;
-    let when = dm && parseWhen(dm[1]).date ? parseWhen(dm[1]) : parseWhen(get(/(?:Travel Date|Activity Date|Tour date|Date of (?:the )?(?:tour|activity|use)|Departure date|Date Request|Date and time)\s*:?\s*([^\n]+)/i) || get(/\bDate\s*:?\s*([^\n]+)/));
-    if (!when.time) when.time = parseWhen(get(/(?:Tour Grade|Start time|Time|Option)\s*:?\s*([^\n]*\d{1,2}:\d{2}[^\n]*)/i)).time;
-    let guest = get(/(?:Booking Name|Lead Traveler Name|Lead traveller(?: name)?|Lead participant|Main customer|Customer name|Contact (?:name|person)|Guest name|Booked by|Traveler name)\s*:?\s*([^\n]+)/i) || get(/^\s*([^\n]{2,40}?) booked your experience/im);
-    guest = guest.replace(/\S+@\S+.*$/, '').replace(/\s*(Phone|Tel|Mobile)\b.*$/i, '').replace(/^\((?:MR|MRS|MS|MISS|DR)\)\s*/i, '').trim();
+    let when = dm && parseWhen(dm[1]).date ? parseWhen(dm[1]) : parseWhen(get(/(?:Travel Date|Activity Date|Tour date|Date of (?:the )?(?:tour|activity|use)|Departure date|Date Request|Date and time)\s*:?\s*([^\n]+)/i) || get(/\bDate\s*:?\s*([^\n]+)/i) || get(/\bon (\d{4}-\d{2}-\d{2})\b/));
+    if (!when.time) when.time = parseWhen(get(/(?:Tour Grade|Start time|Time|Hour|Option)\s*:?\s*([^\n]*\d{1,2}:\d{2}[^\n]*)/i)).time || parseWhen(get(/\bat (\d{1,2}:\d{2}\s*[AP]M) on \d{4}-/i)).time;
+    // FreeTour change: "Previous Date of the Tour: ... New Date of the Tour: ..."; Klook change: "Date Request: <new> <old>".
+    let was2 = was;
+    const nd = parseWhen(get(/New Date of the Tour\s*:\s*([^\n]*)/i)), pd = parseWhen(get(/Previous Date of the Tour\s*:\s*([^\n]*)/i));
+    if (nd.date) { when = nd; if (pd.date) was2 = pd; }
+    else { const kd = t.match(/Date Request\s*:?\s*(\d{4}-\d{2}-\d{2})\s+(\d{4}-\d{2}-\d{2})/i); if (kd) { when = Object.assign({}, when, { date: kd[1] }); was2 = { date: kd[2], time: '' }; } }
+    // No year in the mail (Airbnb: "Thursday, November 12", "10:30 AM"): take the year in which that weekday fits, nearest to today. No weekday-and-date line (TourRadar "Friday, 25 Sep 2026") is read as a plain date.
+    if (!when.date) {
+      const wd = t.match(/\b(Mon|Tues|Wednes|Thurs|Fri|Satur|Sun)day,?\s+(?:([A-Z][a-z]+)\s+(\d{1,2})|(\d{1,2})\s+([A-Z][a-z]+))(?:,?\s*(\d{4}))?/);
+      if (wd) {
+        const mon = String(wd[2] || wd[5]).slice(0, 3).toLowerCase(), mi = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'].indexOf(mon), dd = Number(wd[3] || wd[4]), wi = ['Sun', 'Mon', 'Tues', 'Wednes', 'Thurs', 'Fri', 'Satur'].indexOf(wd[1]);
+        if (mi >= 0 && dd >= 1 && dd <= 31) {
+          const ty = new Date().getFullYear(), ys = wd[6] ? [Number(wd[6])] : [ty - 1, ty, ty + 1].filter(y => new Date(y, mi, dd).getDay() === wi).sort((a, b) => Math.abs(new Date(a, mi, dd) - Date.now()) - Math.abs(new Date(b, mi, dd) - Date.now()));
+          if (ys[0]) {
+            when = Object.assign({}, when, { date: `${ys[0]}-${String(mi + 1).padStart(2, '0')}-${String(dd).padStart(2, '0')}` });
+            if (!when.time) { const tm = t.slice(wd.index).match(/\b(\d{1,2}):(\d{2})\s*([AaPp][Mm])?/); if (tm) { let h = Number(tm[1]); if (/p/i.test(tm[3] || '') && h < 12) h += 12; if (/a/i.test(tm[3] || '') && h === 12) h = 0; when.time = `${String(h).padStart(2, '0')}:${tm[2]}`; } }
+          }
+        }
+      }
+    }
+    let guest = get(/Lead travell?er(?: name)?\s*:?\s*([^\n]+)/i) || get(/(?:Booking Name|Lead participant|Main customer|Customer name|Customer(?=\s*:)|Contact (?:name|person)|Guest name|Booked by)\s*:?\s*([^\n]+)/i) || get(/^\s*([^\n]{2,40}?) booked your experience/im) || get(/^\s*([^\n]{2,40}?) (?:CANCELED|CANCELLED|RESCHEDULED|UPDATED) THEIR RESERVATION/m) || get(/\n([^\n]{2,40})\n\s*Identity verified/i) || get(/Your customer:\s*(.+?) has (?:cancell?ed|edited)/i) || get(/Traveler names?\s*:?\s*([^\n]+)/i);
+    guest = guest.replace(/\s+(?:Booking E-?mail|E-?mail|Phone|Tel|Language|Adults|Tour:|Date:|Price)\b.*$/i, '').replace(/^\(\s*\)\s*/, '').replace(/^[\/\s-]+$/, '').replace(/\S+@\S+.*$/, '').replace(/\s*(Phone|Tel|Mobile)\b.*$/i, '').replace(/^\((?:MR|MRS|MS|MISS|DR)\)\s*/i, '').trim();
     if (/^[A-Z' -]+\/[A-Z' -]+$/.test(guest)) { const [sn, gn] = guest.split('/'); const cap = s => s.toLowerCase().replace(/\b\w/g, x => x.toUpperCase()); guest = `${cap(gn)} ${cap(sn)}`.trim(); }
+    if (!guest) guest = get(/(?:^|\n)\s*Name\s*:\s*([^\n]+)/i);
     const native = get(/\bName\s*:\s*([^\n]+)/); if (native && /[^\u0000-\u024f]/.test(native) && !guest.includes(native)) guest = guest ? `${guest} (${native.trim()})` : native.trim();
     const num = re => { const m = t.match(re), n = m ? Number(m[1]) : 0; return n >= 1 && n <= 99 ? n : 0; };   // a head count is 1-99; a longer number is a booking code, not people
     let adults = num(/(\d+)\s*x?\s*Adults?\b/i) || num(/\bAdults?\s*:\s*(\d+)/i), children = num(/\b(?:Children|Kids|Minors)\s*:\s*(\d+)/i) + num(/(\d+)\s*x?\s*(?:Child|Children|Kids?)\b/i) + num(/(\d+)\s*x?\s*Youths?\b/i) + num(/(\d+)\s*x?\s*Infants?\b/i);
+    if (!adults && !children && src === 'Airbnb') adults = num(/(\d+)\s+guests?\b/i);
     if (!adults && !children) adults = num(/(?:Travell?ers|Participants|Persons|People|Guests|Number of (?:participants|people|guests)|Booking Quantity|Quantity)\s*:?\s*(\d+)/i) || 1;
     const phs = [...t.matchAll(/(?:Phone|Mobile|Tel(?:ephone)?|WhatsApp)\s*(?:number)?\s*:?\s*(?:\([^)]*\))?\s*(?:[A-Z]{2}\s*)?(\+?\d[\d\s()*-]{6,}\d)/gi)].map(m => m[1]).filter(x => !x.includes('*')).map(x => x.replace(/[\s()-]/g, ''));
     const phone = normPhone(phs.find(x => x.startsWith('+')) || (phs[0] ? (phs[0].length > 10 && !/^5/.test(phs[0]) ? '+' + phs[0] : phs[0]) : ''));
@@ -2961,9 +3002,10 @@
     const marks = []; if (/non[\s-]?refundable|no refund/i.test(t)) marks.push('nonref'); if (/wine tasting/i.test(t)) marks.push('wine'); if (/front seat/i.test(t)) marks.push('front_seat'); if (/\bPick-?up\b/i.test(t) && pickup && !/Meeting Point/i.test(t)) marks.push('pickup'); if (src === 'FreeTour') marks.push('freetour');
     const price = get(/Total \((?:USD|EUR|GEL)\)\s*:?\s*([^\n]+)/i) ? get(/Total \(((?:USD|EUR|GEL))\)/i) + ' ' + get(/Total \((?:USD|EUR|GEL)\)\s*:?\s*\$?€?([\d,.]+)/i) : get(/(?:Price|Net Rate|Total(?: price)?|Amount(?: paid)?|Sales Price)\s*:?\s*((?:USD|EUR|GEL|\$|€|₾)\s*\$?\s*[\d,.]+)/i);
     const pnum = Number(String(price).replace(/[^\d.,]/g, '').replace(/,(?=\d{3}\b)/g, '').replace(',', '.')) || null, pcur = /EUR|€/.test(price) ? 'EUR' : /GEL|₾/.test(price) ? 'GEL' : price ? 'USD' : '';
-    const status = /cancell?ed|cancellation/i.test(t.slice(0, 600)) ? 'cancel' : /amended|changed|modified|rescheduled|has been updated/i.test(t.slice(0, 600)) ? 'change' : 'new';
+    // Only an explicit past-tense cancel counts: policy text such as "you can cancel" or "CANCELLATIONS" on a new booking must not.
+    const head = t.slice(0, 700), status = /\bcancell?ed\b|cancel request|取消申请|已提交取消/i.test(head) ? 'cancel' : /(?:^|\n)\s*New booking\b|booked your experience|great news|You've received a/i.test(head) ? 'new' : /amend|reschedul|\bchanged\b|modif|has been updated|unable to update|Edited Tour Reservation|UPDATED THEIR RESERVATION|改期/i.test(head) ? 'change' : 'new';
     const kind = /private/i.test(title) ? 'private' : /group|shared|small-group|join-in/i.test(title) ? 'group' : /private tour/i.test(t) ? 'private' : /join-in|small group/i.test(t) || src === 'FreeTour' ? 'group' : '';
-    const res = { src, ref, title, date: when.date, time: when.time, was, guest, adults, children, phone, email: email.toLowerCase(), lang, pickup, marks, price, pnum, pcur, status, kind };
+    const res = { src, ref, title, date: when.date, time: when.time, was: was2, guest, adults, children, phone, email: email.toLowerCase(), lang, pickup, marks, price, pnum, pcur, status, kind };
     // Website (TrekkSoft) order lines: "2 x Tour name (24 November, 2026, 10:30)", then "Guest 1 / First name / Last name / phone" blocks.
     const tk = t.match(/^\s*(\d{1,2})\s*x\s+(.+?)\s*\(([^()]*\d{4}[^()]*)\)\s*$/m);
     if (tk) {
@@ -2998,12 +3040,27 @@
   const RV_LABELS = [['guide', /^(?:the )?guide(?:'s)?(?: knowledge| quality)?$/i], ['language', /^language(?: skills)?$/i], ['value', /^value(?: for money)?$/i], ['pace', /^pace(?: of the tour)?$/i], ['accuracy', /^(?:accuracy|organi[sz]ation|as described|accuracy of (?:the )?(?:description|information))$/i], ['transport', /^transport(?:ation)?$/i]];
   function isReview(raw) {
     const t = String(raw || ''); const hits = RV_LABELS.filter(([, re]) => t.split('\n').some(l => re.test(l.replace(/[:\d★☆.\s/]+$/g, '').trim()))).length;
+    if (/received a new review for your product|gave your experience [1-5] stars?/i.test(t)) return true;   // notification e-mails
     return /replied on|getyourguide traveler|show details|traveler type|travel date/i.test(t) && hits >= 2 || hits >= 4 || (/\bGYG[A-Z0-9]{8,}\b/.test(t) && hits >= 2);
   }
   function parseReview(raw) {
     const lines = mailText(String(raw || '')).replace(/https?:\/\/\S+/g, ' ').split('\n').map(x => x.replace(/[ \t ]+/g, ' ').trim()).filter(Boolean);
     const t = lines.join('\n'), get = re => { const m = t.match(re); return m ? m[1].trim() : ''; };
     const stars = x => { const n = (String(x).match(/★/g) || []).length; if (n) return n; const m = String(x).match(/\b([1-5](?:\.\d)?)\b/); return m ? Number(m[1]) : null; };
+    // Notification e-mails. Airbnb: "<name> gave your experience 5 stars", stars, an optional quoted comment, the tour, "November 11 at 8:30 AM". GetYourGuide: "You have received a new review for your product <tour>." (no star rating in the mail).
+    const monthDay = x => { const m = String(x).match(/([A-Z][a-z]+)\.? (\d{1,2})\b/); if (!m) return ''; const mi = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'].indexOf(m[1].slice(0, 3).toLowerCase()); if (mi < 0) return ''; const n = new Date(), y = new Date(n.getFullYear(), mi, Number(m[2])) > new Date(n.getTime() + 2 * 864e5) ? n.getFullYear() - 1 : n.getFullYear(); return `${y}-${String(mi + 1).padStart(2, '0')}-${String(m[2]).padStart(2, '0')}`; };
+    const ab = t.match(/^(.+?) gave your experience ([1-5]) stars?/m);
+    if (ab) {
+      const i = lines.findIndex(l => l.startsWith(ab[0])), rest = lines.slice(i + 1).filter(l => !/^★+☆*$/.test(l)), q = /^["“]/;
+      let comment = '', k = 0; if (rest[0] && q.test(rest[0])) { const buf = []; while (k < rest.length) { buf.push(rest[k]); if (/["”]$/.test(rest[k])) { k++; break; } k++; } comment = buf.join(' ').replace(/^["“]|["”]$/g, '').trim(); }
+      const title = (rest[k] || '').replace(/\s*(?:\.\.\.|…)$/, '').trim(), dl = rest.find(l => /^[A-Z][a-z]+ \d{1,2} at \d/.test(l));
+      return { platform: 'Airbnb', ref: '', reviewer: ab[1].trim(), country: '', reviewed_on: null, rating: Number(ab[2]), ratings: {}, comment, tour_title: title, option_name: '', travel_date: dl ? monthDay(dl) || null : null, traveler_type: '', replied_on: null };
+    }
+    const gn = t.match(/new review for your product (.+?)\.?\s*(?:\n|$)/i);
+    if (gn) {
+      const i = lines.findIndex(l => /new review for your product/i.test(l)), end = lines.findIndex((l, j) => j > i && /best regards|the getyourguide team|getyourguide (?:deutschland|receives)|become a supply partner/i.test(l)), body = lines.slice(i + 1, end > i ? end : undefined).filter(l => l.length > 3 && !/^(?:-+|hi supply partner|reply|respond|view |read |see |log in|get started)/i.test(l));
+      return { platform: 'GetYourGuide', ref: get(/\b(GYG[A-Z0-9]{8,})\b/), reviewer: 'GetYourGuide traveler', country: '', reviewed_on: null, rating: null, ratings: {}, comment: body.join('\n'), tour_title: gn[1].trim(), option_name: '', travel_date: null, traveler_type: '', replied_on: null };
+    }
     const ratings = {};
     lines.forEach((l, i) => { const bare = l.replace(/\s*[:\-]?\s*(?:[1-5](?:\.\d)?(?:\s*\/\s*5)?|★+☆*)\s*$/, '').trim(); const found = RV_LABELS.find(([, re]) => re.test(bare)); if (!found || ratings[found[0]] != null) return; const same = bare !== l ? stars(l.slice(bare.length)) : null, nxt = same == null && lines[i + 1] && /^(?:[1-5](?:\.\d)?(?:\s*\/\s*5)?|★+☆*)$/.test(lines[i + 1]) ? stars(lines[i + 1]) : null; const v = same != null ? same : nxt; if (v != null) ratings[found[0]] = v; });
     const vals = Object.values(ratings);
@@ -3022,7 +3079,7 @@
     return { platform: 'GetYourGuide', ref, reviewer: reviewer || 'GetYourGuide traveler', country, reviewed_on: reviewed || null, rating, ratings, comment, tour_title: tour, option_name: option, travel_date: travel || null, traveler_type: type, replied_on: replied || null };
   }
   function rvMatch(rv) {
-    const old = rv.ref ? db.guest_reviews.find(x => (x.ref || '').toUpperCase() === rv.ref.toUpperCase()) : null;
+    const old = rv.ref ? db.guest_reviews.find(x => (x.ref || '').toUpperCase() === rv.ref.toUpperCase()) : db.guest_reviews.find(x => !x.ref && x.platform === rv.platform && x.reviewer === rv.reviewer && x.tour_title === rv.tour_title && (x.comment || '').slice(0, 40) === (rv.comment || '').slice(0, 40));
     const b = rv.ref ? db.bookings.find(x => (x.ref || '').toUpperCase() === rv.ref.toUpperCase()) : null;
     if (b) { const t = db.tours.find(x => x.id === b.tour_id); return { old, booking: b, tour: t || null, how: 'ref' }; }
     const c = rv.travel_date ? db.tours.filter(x => x.date === rv.travel_date && live(x)).map(x => ({ x, s: pbSim(rv.tour_title, x.title) })).filter(y => y.s >= 0.4).sort((p, q) => q.s - p.s) : [];
@@ -3336,7 +3393,7 @@
       for (let k = 1; k <= n; k++) { const d = `${y}-${mo}-${p2(k)}`; if (d > td) break; if (tourDays.has(d)) tr++; else free++; }   // a day off and a day without tours read the same in this chart (owner)
       return { mo, tr, off, free, n }; });
     if (!rows.some(r => r.tr)) return '';
-    return `<div class="card"><b>${T('st_days')}</b><div class="bars daysbars">${rows.map(r => `<div class="barcol dcol" aria-label="${esc(fmt(`2024-${r.mo}-01`, { month: 'long' }))}: ${r.tr}"><span class="num small">${r.tr || ''}</span><div class="dstack" style="height:${Math.round((r.tr + r.off + r.free) / 31 * 100)}%"><i class="dfree" style="flex:${r.free}"></i><i class="dtour" style="flex:${r.tr}"></i></div><span class="bm small muted" aria-hidden="true">${esc(fmt(`2024-${r.mo}-01`, { month: 'narrow' }))}</span></div>`).join('')}</div><div class="busykey small muted"><span><i class="dtour"></i>${T('st_d_tours')}</span><span><i class="dfree"></i>${T('st_d_free')}</span></div></div>`;
+    return `<div class="card"><b>${T('st_days')}</b><span class="muted small">${T('st_days_h')}</span><div class="bars daysbars">${rows.map(r => `<div class="barcol dcol" aria-label="${esc(fmt(`2024-${r.mo}-01`, { month: 'long' }))}: ${r.tr}"><span class="num small">${r.tr || ''}</span><div class="dstack" style="height:${Math.round((r.tr + r.off + r.free) / 31 * 100)}%"><i class="dfree" style="flex:${r.free}"></i><i class="dtour" style="flex:${r.tr}"></i></div><span class="bm small muted" aria-hidden="true">${esc(fmt(`2024-${r.mo}-01`, { month: 'narrow' }))}</span></div>`).join('')}</div><div class="busykey small muted"><span><i class="dtour"></i>${T('st_d_tours')}</span><span><i class="dfree"></i>${T('st_d_free')}</span></div></div>`;
   }
   function compareHtml(id, y) {
     const td = today(), all = db.tours.filter(t => live(t) && t.date <= td), gOf = ts => ts.reduce((n, t) => n + (Number(t.pax) || 0), 0), inR = (a, b) => all.filter(t => t.date >= a && t.date <= b);
@@ -3357,13 +3414,23 @@
     const perDay = {}; yAll.forEach(t => { perDay[t.date] = (perDay[t.date] || 0) + 1; }); const bd = Object.entries(perDay).sort((p, q) => q[1] - p[1] || q[0].localeCompare(p[0]))[0];
     if (bd && bd[1] > 1) L.push(T('hl_rec', { d: esc(fmtDay(bd[0])), n: bd[1] }));
     if (!L.length) L.push(T('hl_none', { n: w1.length, g: gOf(w1) }));
-    return `<div class="card hl"><b>${T('hl_title')}</b><div class="hllist">${L.slice(0, 8).map(x => `<div class="hlrow"><span class="up">▲</span><span>${x}</span></div>`).join('')}</div></div>`;
+    // What to do better, from the numbers only (everyone but drivers): open staffing, tours losing guests, thin group tours, empty days.
+    const N = [];
+    {
+      const to14 = addDays(td, 14), to7 = addDays(td, 7), up = db.tours.filter(t => live(t) && t.date >= td);
+      const open = up.filter(t => t.date <= to14 && (!t.guide_id || (!t.driver_id && kmOf(t.title) > 0))).length; if (open) N.push(T('hn_staff', { n: open }));
+      const g1 = by(w1, t => statKey(t.title)), g0 = by(w0, t => statKey(t.title)), nm = {}; w1.concat(w0).forEach(t => { nm[statKey(t.title)] = nm[statKey(t.title)] || t.title; });
+      const drop = Object.keys(g0).map(k => [k, (g0[k] || 0) - (g1[k] || 0)]).filter(p => p[1] >= 5 && g0[p[0]] >= 10).sort((p, q) => q[1] - p[1])[0]; if (drop) N.push(T('hn_down', { t: esc(nm[drop[0]]), n: drop[1] }));
+      const low = up.filter(t => t.kind === 'group' && t.date <= to7 && (Number(t.pax) || 0) <= 2).length; if (low) N.push(T('hn_low', { n: low }));
+      let empty = 0; for (let k = 1; k <= 7; k++) { const d = addDays(td, k); if (!up.some(t => t.date === d)) empty++; } if (empty) N.push(T('hn_empty', { n: empty }));
+    }
+    return `<div class="card hl"><b>${T('hl_title')}</b><div class="hllist">${L.slice(0, 8).map(x => `<div class="hlrow"><span class="up">▲</span><span>${x}</span></div>`).join('')}</div><b class="hnh">${T('hn_title')}</b><div class="hllist">${(N.length ? N : [T('hn_ok')]).map(x => `<div class="hlrow"><span class="up hn">▸</span><span>${x}</span></div>`).join('')}</div></div>`;
   }
   function statsHtml(id) {
     const y = state.year, s = personStats(id), inYear = s.ts.filter(t => t.date.startsWith(String(y)));
     const per = [...Array(12)].map((_, i) => inYear.filter(t => Number(t.date.slice(5, 7)) === i + 1).length), max = Math.max(1, ...per);
     const kinds = KINDS.map(k => [k, inYear.filter(t => t.kind === k).length]);
-    const top = Object.entries(inYear.reduce((a, t) => (a[t.title] = (a[t.title] || 0) + 1, a), {})).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const topG = inYear.reduce((a, t) => { const k = statKey(t.title), g = a[k] || (a[k] = { n: 0, names: {} }); g.n++; g.names[t.title] = (g.names[t.title] || 0) + 1; return a; }, {}), top = Object.values(topG).map(g => [Object.entries(g.names).sort((p, q) => q[1] - p[1])[0][0], g.n]).sort((a, b) => b[1] - a[1]).slice(0, 5);
     const sm = state.statMonth, mlist = sm ? inYear.filter(t => t.date.slice(5, 7) === sm) : [];
     const tot = totals(id, y), none = !s.ts.length, kindsOn = kinds.filter(x => x[1] > 0);
     return `<div class="bar">${isAdmin() ? `<select class="inp" id="stat-user" data-ch="statuser" style="max-width:220px" aria-label="${T('person')}">${crew().map(p => opt(p.id, p.name, id)).join('')}</select>` : ''}<div class="seg"><button data-act="year" data-d="-1" aria-label="${T('prev')}">‹</button><button disabled>${y}</button><button data-act="year" data-d="1" aria-label="${T('next')}">›</button></div></div>
@@ -3372,7 +3439,7 @@
         ${sm ? `<div class="list">${mlist.map(t => `<button class="card" data-act="tour" data-id="${t.id}"><span class="row"><b class="num">${esc(dateText(t))}</b><span class="tag t-${esc(t.kind)}">${T('kind_' + t.kind)}</span><span class="tag t-muted num">${esc(acText(t))}</span></span><span class="ttl">${esc(t.title)}</span></button>`).join('') || `<div class="empty">${T('no_tours')}</div>`}</div>` : ''}</div>
       ${daysChart(id, y)}
       <div class="cols">${kindsOn.length ? `<div class="card"><b>${T('st_kinds')}</b>${kindsOn.map(([k, n]) => `<div class="row"><span class="tag t-${k}">${T('kind_' + k)}</span><span class="meter"><i style="width:${inYear.length ? Math.round(n / inYear.length * 100) : 0}%"></i></span><b class="num">${n}</b></div>`).join('')}</div>` : ''}
-      ${top.length ? `<div class="card"><b>${T('st_top')}</b>${top.map(([t, n]) => `<div class="row"><span style="flex:1;min-width:0;overflow-wrap:anywhere">${esc(t)}</span><b class="num">${n}</b></div>`).join('')}</div>` : ''}</div>${(person(id) || {}).role !== 'driver' ? compareHtml(id, y) : ''}`}`;
+      ${top.length ? `<div class="card"><div class="bar"><b>${T('st_top')}</b><span class="spacer"></span>${isAdmin() ? `<button class="btn sm" data-act="tnames">${T('tn_btn')}</button>` : ''}</div>${top.map(([t, n]) => `<div class="row"><span style="flex:1;min-width:0;overflow-wrap:anywhere">${esc(t)}</span><b class="num">${n}</b></div>`).join('')}</div>` : ''}</div>${(person(id) || {}).role !== 'driver' ? compareHtml(id, y) : ''}`}`;
   }
   // ---------- Photo of the day: one photo per person per day, likes from the team, the best one leads; older days are the archive ----------
   // Only the team sees the photos (private storage, opened with short-lived links).
@@ -3539,7 +3606,7 @@
   function meHtml() {
     const m = me(), perm = ('Notification' in window) ? Notification.permission : 'unsupported', tab = state.meTab, mo = state.listMonth || today().slice(0, 7);
     const pd = db.payout_details.find(x => x.id === m.id) || {};
-    let h = `<div class="bar"><h2>${T('nav_me')}</h2><span class="spacer"></span>${helpBtn()}</div>${helpBox('me')}<div class="seg metabs">${['profile', 'settings', 'month', 'stats', 'badges'].filter(x => x !== 'badges' || gameOn()).map(x => `<button data-act="metab" data-v="${x}" aria-pressed="${tab === x}" title="${esc(T('me_' + x))}">${T('metab_' + x)}</button>`).join('')}</div>`;
+    let h = `<div class="bar"><h2>${T('nav_me')}</h2><span class="spacer"></span>${helpBtn()}</div>${helpBox('me')}<div class="seg metabs">${['profile', 'settings', 'month', 'stats', 'badges'].filter(x => (x !== 'badges' || gameOn()) && !(isDrv() && x === 'stats')).map(x => `<button data-act="metab" data-v="${x}" aria-pressed="${tab === x}" title="${esc(T('me_' + x))}">${T('metab_' + x)}</button>`).join('')}</div>`;
     if (tab === 'month') { const pr = payRange(); return h + rangeBar() + (pr.month ? statementHtml(m.id, pr.month, false) : payRangeHtml(m.id, pr.from, pr.to, false)) + expensesHtml(m.id, pr.from, pr.to) + adviceHtml(m.id); }
     if (tab === 'stats') return h + statsHtml(isAdmin() ? (state.statUser || m.id) : m.id);
     if (tab === 'badges') return h + (gameOn() ? badgesHtml(m.id) : `<div class="empty">${T('pf_off')}</div>`);
@@ -3551,9 +3618,6 @@
       <form class="f" data-form="mydetails" id="me-details"><b>${T('md_title')}</b><div class="two"><label>${T('phone')}<input name="phone" type="tel" value="${esc(m.phone || '')}" placeholder="+995…" autocomplete="tel"></label><label>${T('md_langs')}<input name="languages" value="${esc(m.languages || '')}" placeholder="EN, RU, KA"></label></div><label>Telegram<input id="me-tg" name="telegram" value="${esc(m.telegram ? '@' + m.telegram : '')}" placeholder="@username" autocomplete="off" autocapitalize="off" spellcheck="false"><span class="muted small">${T('tg_mine_text')}</span></label>${(rules().promos || {})[m.id] ? `<div class="tsum">${T('promo_mine', { code: rules().promos[m.id] })}</div>` : ''}<div class="actions"><button class="btn primary qsave">${T('save')}</button></div></form>
       ${/^https:\/\/t\.me\//.test(rules().botUrl || '') || m.telegram_id ? `<div class="f" id="me-tgbot"><b>${T('tg_title')}</b>${m.telegram_id ? `<span class="row"><span class="tag t-ok">${T('tg_on')}</span><span class="muted small">${T('tg_on_text')}</span></span>` : `<ol class="tgsteps"><li>${T('tgb_1')}</li><li>${T('tgb_2')}</li><li>${T('tgb_3')}</li></ol><span class="muted small">${T('tgb_after')}</span>${m.link_code ? `<div class="row nw tgline"><b class="num tgcode">/link ${esc(m.link_code)}</b><button class="iconbtn" data-act="copy" data-v="/link ${esc(m.link_code)}" aria-label="${T('copy')}" title="${T('copy')}">${ico('copy')}</button></div>` : ''}<div class="bar">${m.link_code && botOn() ? `<a class="btn" href="${esc(rules().botUrl)}" target="_blank" rel="noopener">${T('tg_open')}</a>` : m.link_code ? '' : `<button class="btn" data-act="tgcode">${T('tg_get')}</button>`}${m.link_code ? `<button class="lnk small" data-act="tgcode">${T('tg_new')}</button>` : ''}</div>`}</div>` : ''}
       </div>
-      <div class="card f"><b>${T('pd_title')}</b><span class="muted small">${T('pd_text')}</span>
-        <div class="pdlist">${db.personal_dates.filter(x => x.user_id === m.id).sort((x, y) => x.date.slice(5).localeCompare(y.date.slice(5))).map(x => `<div class="pdrow"><span class="pdic">${msi(PD_ICON[pdKind(x.title)] || 'event')}</span><span class="grow-l pdtx"><b>${esc(x.title)}</b><span class="muted small num">${esc(fmt(x.date, x.yearly ? { day: 'numeric', month: 'long' } : { day: 'numeric', month: 'long', year: 'numeric' }))}${x.yearly ? ' · ' + T('pd_yearly') : ''}</span></span><button class="iconbtn" data-act="pdedit" data-id="${x.id}" aria-label="${T('edit')}" title="${T('edit')}">${msi('edit')}</button><button class="iconbtn" data-act="pdel" data-id="${x.id}" aria-label="${T('remove')}" title="${T('remove')}">${msi('delete')}</button></div>`).join('') || `<div class="empty">${T('pd_none')}</div>`}</div>
-        <div class="actions"><button class="btn" data-act="pdnew">+ ${T('pd_add')}</button></div></div>
       <div class="card f ctlist"><b>${T('contacts')}</b>${staff().filter(p => p.phone || tgUser(p.telegram)).map(p => `<div class="row nw">${avatar(p.id)}<span class="row grow-l"><span>${esc(p.name)}</span><span class="muted small">${T('role_' + p.role)}</span></span>${staffBtns(p, true)}</div>`).join('') || `<span class="muted small">${T('no_contacts')}</span>`}</div>
       </div>
       <div class="list">${(() => { const acc = String(pd.account || ''), has = !!(pd.bank_name || pd.holder || acc), mask = acc ? '•••• ' + acc.replace(/\s/g, '').slice(-4) : '—';
@@ -3561,17 +3625,19 @@
         if (wait && !state.payEdit) return `<div class="card f bkcheck" id="pd-card"><b>${T('bk_check_title')}</b><span class="muted small">${T('bk_check_text')}</span><dl class="fields"><dt>${T('bank_name')}</dt><dd>${esc(pd.bank_name || '—')}</dd><dt>${T('holder')}</dt><dd>${esc(pd.holder || '—')}</dd><dt>${T('account')}</dt><dd class="num">${esc(acc || '—')}</dd></dl><div class="actions"><button class="btn" data-act="payshow">${T('edit')}</button><button class="btn primary" data-act="payconfirm">${T('bk_confirm')}</button></div></div>`;
         return has && !state.payEdit ? `<div class="card f" id="pd-card"><b>${T('payout')}</b><span class="muted small">${T('payout_safe')}</span><dl class="fields"><dt>${T('bank_name')}</dt><dd>${esc(pd.bank_name || '—')}</dd><dt>${T('holder')}</dt><dd>${esc(pd.holder || '—')}</dd><dt>${T('account')}</dt><dd class="num">${esc(mask)}</dd></dl><div class="actions"><button class="btn" data-act="payshow">${T('edit')}</button></div></div>`
         : `<form class="card f" data-form="payout"><b>${T('payout')}</b><span class="muted small">${T('payout_safe')}</span><label>${T('bank_name')}<input id="pd-bank" name="bank_name" value="${esc(pd.bank_name || '')}" autocomplete="off"></label><label>${T('holder')}<input id="pd-holder" name="holder" value="${esc(pd.holder || '')}" autocomplete="off"></label><label>${T('account')}<input id="pd-acc" name="account" value="${esc(acc)}" autocomplete="off" autocapitalize="characters" spellcheck="false"></label><div class="actions">${has ? `<button type="button" class="btn" data-act="payshow">${T('close')}</button>` : ''}<button class="btn qsave">${T('save')}</button></div></form>`; })()}
-      <form class="card f" data-form="worksched"><b>${T('ws_title')}</b><span class="muted small">${T('ws_text')}</span>${weekEditor(m)}<div class="actions"><button class="btn qsave">${T('save')}</button></div></form>
+      <div class="card f"><form class="f" data-form="worksched"><b>${T('ws_title')}</b><span class="muted small">${T('ws_text')}</span><span class="wssum"><b>${esc(wsSummary(m))}</b></span><details class="sect wsedit"><summary>${T('ws_edit')}</summary>${weekEditor(m)}</details><div class="actions"><button class="btn qsave">${T('save')}</button></div></form><hr class="sep"><div class="f pdsec"><b>${T('pd_title')}</b><span class="muted small">${T('pd_text')}</span>
+        <div class="pdlist">${db.personal_dates.filter(x => x.user_id === m.id).sort((x, y) => x.date.slice(5).localeCompare(y.date.slice(5))).map(x => `<div class="pdrow"><span class="pdic">${msi(PD_ICON[pdKind(x.title)] || 'event')}</span><span class="grow-l pdtx"><b>${esc(x.title)}</b><span class="muted small num">${esc(fmt(x.date, x.yearly ? { day: 'numeric', month: 'long' } : { day: 'numeric', month: 'long', year: 'numeric' }))}${x.yearly ? ' · ' + T('pd_yearly') : ''}</span></span><button class="iconbtn" data-act="pdedit" data-id="${x.id}" aria-label="${T('edit')}" title="${T('edit')}">${msi('edit')}</button><button class="iconbtn" data-act="pdel" data-id="${x.id}" aria-label="${T('remove')}" title="${T('remove')}">${msi('delete')}</button></div>`).join('') || `<div class="empty">${T('pd_none')}</div>`}</div>
+        <div class="actions"><button class="btn" data-act="pdnew">+ ${T('pd_add')}</button></div></div></div>
       ${m.role === 'guide' ? myToursHtml(m) : ''}</div></div>`;
   }
   // App settings, apart from the profile: how the app looks on this phone, language, notifications, install, privacy, sign out.
   function settingsHtml(m, perm) {
     return `<div class="cols"><div class="card f">
       <label>${T('language')}<select id="me-lang" data-ch="lang">${opt('en', 'English', lang())}${opt('ru', 'Русский', lang())}${opt('ka', 'ქართული', lang())}</select></label>
-      ${ticketCardHtml()}<div class="f" id="me-see"><b>${T('pf_title')}</b><div class="checks col"><label><input type="checkbox" data-ch="pref" data-k="game" ${gameOn() ? 'checked' : ''}>${T('pf_game')}</label>${gameOn() ? '' : `<span class="muted small" id="me-see-off">${T('pf_game_off')}</span>`}<label><input type="checkbox" data-ch="pref" data-k="photo" ${photoOn() ? 'checked' : ''}>${T('pf_photo')}</label><label><input type="checkbox" data-ch="pref" data-k="mood" ${pref('mood') !== 'off' ? 'checked' : ''}>${T('pf_mood')}</label><label><input type="checkbox" data-ch="pref" data-k="rate" ${pref('rate') !== 'off' ? 'checked' : ''}>${T('pf_rate')}</label></div><span class="muted small">${T('pf_note')}</span></div>
+      <div class="f" id="me-see"><b>${T('pf_title')}</b><div class="checks col"><label><input type="checkbox" data-ch="pref" data-k="game" ${gameOn() ? 'checked' : ''}>${T('pf_game')}</label>${gameOn() ? '' : `<span class="muted small" id="me-see-off">${T('pf_game_off')}</span>`}<label><input type="checkbox" data-ch="pref" data-k="photo" ${photoOn() ? 'checked' : ''}>${T('pf_photo')}</label><label><input type="checkbox" data-ch="pref" data-k="mood" ${pref('mood') !== 'off' ? 'checked' : ''}>${T('pf_mood')}</label><label><input type="checkbox" data-ch="pref" data-k="rate" ${pref('rate') !== 'off' ? 'checked' : ''}>${T('pf_rate')}</label></div><span class="muted small">${T('pf_note')}</span></div>
       <div class="f"><b>${T('ds_title')}</b>${displayHtml()}</div>
       ${notifCardHtml(perm)}<div class="checks col">${Object.keys(NOTE_GROUPS).map(g => `<label><input type="checkbox" id="mute-${g}" data-ch="mutepref" data-g="${g}" ${(m.mute || []).includes(g) ? '' : 'checked'}>${T('note_' + g)}</label>`).join('')}</div></div>
-      </div><div class="list">${installCardHtml(true)}<div class="card f">
+      ${ticketCardHtml()}</div><div class="list">${installCardHtml(true)}<div class="card f">
       <button class="btn" data-act="welcome">${T('wl_again')}</button>
       <details class="sect"><summary>${T('privacy_link')}</summary><p class="muted small">${T('privacy_text', { n: pv().guideDays })}</p></details>
       <button class="btn" data-act="signout">${T('signout')}</button>${testOn() ? `<button class="lnk" data-act="testinfo">${T('tb_chip')}: ${T('tb_title')}</button>` : ''}<span class="muted small num">${T('version')} ${APP_VERSION}${S.syncedAt ? ' · ' + T('updated_at', { time: new Intl.DateTimeFormat(LOCALES[lang()], { hour: '2-digit', minute: '2-digit' }).format(new Date(S.syncedAt)) }) : ''}</span></div></div></div>`;
@@ -3583,7 +3649,8 @@
   }
 
   // ---------- render ----------
-  const NAV = () => (isAdmin() ? [['calendar', T('nav_calendar')], ['team', T('nav_team')], ['tasks', T('tasks')], ['clients', T('nav_clients')], ['admin', T('nav_admin')], ['me', T('nav_me')]] : [['calendar', T('nav_calendar')], ['tasks', T('tasks')], ['timeoff', T('nav_timeoff')], ['me', T('nav_me')]]);
+  const isDrv = () => !isAdmin() && !!me() && me().role === 'driver';
+  const NAV = () => (isDrv() ? [['calendar', T('nav_calendar')], ['timeoff', T('nav_timeoff')], ['me', T('nav_me')]] : isAdmin() ? [['calendar', T('nav_calendar')], ['team', T('nav_team')], ['tasks', T('tasks')], ['clients', T('nav_clients')], ['admin', T('nav_admin')], ['me', T('nav_me')]] : [['calendar', T('nav_calendar')], ['tasks', T('tasks')], ['timeoff', T('nav_timeoff')], ['me', T('nav_me')]]);
   let rendering = false;
   // The screen is patched in place: only the parts that changed are touched, so nothing flashes,
   // scroll position and open fields are kept, and new items fade in.
@@ -3644,6 +3711,7 @@
     const app = $('#app');
     if (!me() || !me().active) { state.modal = null; morph(app, authHtml() + '<div id="toasts"></div>'); return; }
     if (state.view === 'admin' && !isAdmin()) state.view = 'calendar';
+    if (isDrv()) { if (state.view === 'tasks' || state.view === 'team') state.view = 'calendar'; if (state.meTab === 'stats' || state.meTab === 'badges') state.meTab = 'profile'; }
     const unread = myNotes().filter(n => !n.read).length;
     const cur = state.view === 'admin' && state.adminTab === 'clients' ? 'clients' : state.view;
     const tb = me() && me().active ? tasksBadge() : 0;
@@ -3701,7 +3769,6 @@
   }
   function maintScreen() { const m = maint(); return `<main><div class="status-screen"><span class="big-ico">${ico('clock')}</span><h2>${T('mt_title')}</h2><p>${esc(m.text || T('mt_text'))}</p><p class="muted small">${T('mt_hint')}</p><div class="bar"><button class="btn primary" data-act="mtskip">${T('mt_show')}</button><button class="btn" onclick="location.reload()">${T('refresh')}</button></div></div></main>`; }
   const testOn = () => CFG.testBanner !== false;
-  const testChip = () => (testOn() ? `<button class="testchip" data-act="testinfo">${T('tb_chip')}</button>` : '');
   function testModalHtml() {
     const who = CFG.reportTo || 'Alex', ph = String(CFG.reportWhatsApp || '').replace(/\D/g, '');
     const msg = `Friendly Schedule ${APP_VERSION} · ${state.view}${state.view === 'calendar' ? '/' + state.mode : ''} · ${lang()} · ${/Android/i.test(navigator.userAgent) ? 'Android' : /iPhone|iPad/i.test(navigator.userAgent) ? 'iPhone' : 'computer'} ${window.innerWidth}px\n`;
@@ -3724,7 +3791,7 @@
     const el = $('#modal'); if (!el) return; const m = state.modal;
     if (m && !modalHist) { modalHist = true; navPush(); } else if (!m && modalHist) { modalHist = false; navPop(); }
     if (!m) { el.innerHTML = ''; modalKey = ''; return; }
-    const inner = m.type === 'exp' ? expModalHtml(m) : m.type === 'tnames' ? tnamesHtml(m) : m.type === 'tour' ? tourModalHtml(m) : m.type === 'off' ? offModalHtml(m) : m.type === 'task' ? taskModalHtml(m) : m.type === 'client' ? clientModalHtml(m) : m.type === 'offer' ? offerModalHtml(m) : m.type === 'guest' ? guestSheetHtml(m) : m.type === 'creq' ? creqModalHtml(m) : m.type === 'cancel' ? cancelModalHtml(m) : m.type === 'person' ? personModalHtml(m) : m.type === 'invite' ? inviteModalHtml(m) : m.type === 'tip' ? tipModalHtml(m) : m.type === 'share' ? shareModalHtml(m) : m.type === 'test' ? testModalHtml() : m.type === 'display' ? `<div class="hdr"><h2>${T('ds_title')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div><div class="f">${displayHtml()}</div>` : m.type === 'ticket' ? ticketModalHtml(m) : m.type === 'move' ? moveModalHtml(m) : m.type === 'welcome' ? welcomeModalHtml(m) : m.type === 'totem' ? totemModalHtml(m) : m.type === 'photos' ? photosModalHtml(m) : m.type === 'thanks' ? thanksModalHtml() : m.type === 'recap' ? recapModalHtml() : m.type === 'celebrate' ? celebrateHtml(m) : m.type === 'cat' ? catModalHtml(m) : m.type === 'dispute' ? disputeModalHtml(m) : m.type === 'prange' ? payRangeHtml(m.id, payRange().from, payRange().to, true) : m.type === 'badge' ? badgeModalHtml(m) : m.type === 'summary' ? summaryHtml(m) : m.type === 'statement' ? statementHtml(m.id, m.month, true) : m.type === 'pstats' ? `<div class="hdr"><h2>${T(state.mode === 'month' ? 'inc_month' : 'inc_week')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>${periodStatsHtml(m.from, m.to).replace('<details class="wstats">', '<details class="wstats" open>')}` : m.type === 'addmenu' ? addMenuHtml() : m.type === 'pdate' ? pdModalHtml(m) : m.type === 'confirm' ? `<div class="hdr"><h2>${esc(m.text)}</h2></div><div class="actions"><button class="btn" data-act="close">${T('close')}</button><button class="btn ${m.plain ? 'primary' : 'danger'}" data-act="confirmyes">${esc(m.yes)}</button></div>` : bellHtml();
+    const inner = m.type === 'exp' ? expModalHtml(m) : m.type === 'tnames' ? tnamesHtml(m) : m.type === 'revreq' ? revreqModalHtml(m) : m.type === 'tour' ? tourModalHtml(m) : m.type === 'off' ? offModalHtml(m) : m.type === 'task' ? taskModalHtml(m) : m.type === 'client' ? clientModalHtml(m) : m.type === 'offer' ? offerModalHtml(m) : m.type === 'guest' ? guestSheetHtml(m) : m.type === 'creq' ? creqModalHtml(m) : m.type === 'cancel' ? cancelModalHtml(m) : m.type === 'person' ? personModalHtml(m) : m.type === 'invite' ? inviteModalHtml(m) : m.type === 'tip' ? tipModalHtml(m) : m.type === 'share' ? shareModalHtml(m) : m.type === 'test' ? testModalHtml() : m.type === 'display' ? `<div class="hdr"><h2>${T('ds_title')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div><div class="f">${displayHtml()}</div>` : m.type === 'ticket' ? ticketModalHtml(m) : m.type === 'move' ? moveModalHtml(m) : m.type === 'welcome' ? welcomeModalHtml(m) : m.type === 'totem' ? totemModalHtml(m) : m.type === 'photos' ? photosModalHtml(m) : m.type === 'thanks' ? thanksModalHtml() : m.type === 'recap' ? recapModalHtml() : m.type === 'celebrate' ? celebrateHtml(m) : m.type === 'cat' ? catModalHtml(m) : m.type === 'dispute' ? disputeModalHtml(m) : m.type === 'prange' ? payRangeHtml(m.id, payRange().from, payRange().to, true) : m.type === 'badge' ? badgeModalHtml(m) : m.type === 'summary' ? summaryHtml(m) : m.type === 'statement' ? statementHtml(m.id, m.month, true) : m.type === 'pstats' ? `<div class="hdr"><h2>${T(state.mode === 'month' ? 'inc_month' : 'inc_week')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>${periodStatsHtml(m.from, m.to).replace('<details class="wstats">', '<details class="wstats" open>')}` : m.type === 'addmenu' ? addMenuHtml() : m.type === 'pdate' ? pdModalHtml(m) : m.type === 'confirm' ? `<div class="hdr"><h2>${esc(m.text)}</h2></div><div class="actions"><button class="btn" data-act="close">${T('close')}</button><button class="btn ${m.plain ? 'primary' : 'danger'}" data-act="confirmyes">${esc(m.yes)}</button></div>` : bellHtml();
     const key = m.type + ':' + (m.id || (m.draft && m.draft.id) || '') + ':' + (m.edit ? 'e' : '');
     // On a computer the tour card opens as a small window next to the tour that was clicked (like a calendar popup), not in the middle of the screen.
     const pop = m.type === 'tour' && !m.edit && !m.back && m.at && !PHONE();
@@ -3978,6 +4045,8 @@
     dupall() { const st = state.dup || { k: 't' }, list = dupModel()[st.k].filter(g => g.b === 'safe'); if (!list.length) return; confirmDo(T('dup_all_ask', { n: list.length }), T('dup_all', { n: list.length }), () => run(async () => { for (const g of list) { const ids = g.ms.map(x => x.m.id).filter(x => x !== g.keep); if (st.k === 'c') await mergeClients(g.keep, ids); else await mergeTours(g.keep, ids); } }, T('dups_done'))); },
     dupdelt(el) { const t = db.tours.find(x => x.id === el.dataset.id); if (!t || db.bookings.some(b => b.tour_id === t.id)) return; confirmDo(T('confirm_remove'), T('remove'), () => run(async () => { await S.remove('tours', t.id); logAct(`Removed an empty duplicate tour ${t.title} ${t.date}`); }, T('dups_done'))); },
     pbclear() { state.pb = null; state.rv = null; render(); },
+    revreq(el) { if (!isAdmin()) return; state.modal = { type: 'revreq', id: el.dataset.id }; renderModal(); },
+    whoset(el) { state.who = el.dataset.v || ''; render(); },
     rvsave() { const rv = state.rv; if (!rv || !isAdmin()) return; const m = rvMatch(rv), row = { id: m.old ? m.old.id : S.uid(), platform: rv.platform, ref: rv.ref || null, reviewer: rv.reviewer, country: rv.country, reviewed_on: rv.reviewed_on, rating: rv.rating, ratings: rv.ratings, comment: rv.comment, tour_title: rv.tour_title, option_name: rv.option_name, travel_date: rv.travel_date, traveler_type: rv.traveler_type, replied_on: rv.replied_on, tour_id: m.tour ? m.tour.id : null, booking_id: m.booking ? m.booking.id : null, match_how: m.how, raw: rv.raw || '', created_by: me().id }; run(async () => { await S.save('guest_reviews', row); state.rv = null; }, T('rv_saved')); },
     async rvwrong() { const rv = state.rv; if (!rv) return; const m = rvMatch(rv), body = `${T('rv_report_head')}\n${T('rv_report_read')}: ${JSON.stringify({ ...rv, raw: undefined })}\n${T('rv_report_match')}: ${m.how}${m.tour ? ' ' + m.tour.title + ' ' + m.tour.date : ''}\n\n${T('rv_report_raw')}:\n${String(rv.raw || '').slice(0, 1500)}`; try { const now = new Date().toISOString(); await S.addTicket({ id: S.uid(), user_id: me().id, source: 'app', body: body.slice(0, 2000), status: 'new', created_at: now, updated_at: now }, []); state.rv = null; render(); toast(T('rv_reported')); } catch (e) { toast(T('tk_fail')); } },
     pbgo(el) {
@@ -4073,6 +4142,7 @@
     gckind(el) { const s2 = state.gcOff || (state.gcOff = new Set()); el.checked ? s2.delete(el.dataset.v) : s2.add(el.dataset.v); render(); },
     mytour(el) { const m = me(), list = catalog().filter(c => c.id), base = (m.skills || []).length ? m.skills : list.map(c => String(c.id)), st = state.myTours || new Set(base); el.checked ? st.add(el.dataset.v) : st.delete(el.dataset.v); state.myTours = st; render(); },
     jump(el) { if (el.value) { state.date = el.value; needOlder(state.date); render(); } },
+    cxshow(el) { state.cxOff = !el.checked; render(); },
     who(el) { state.who = el.value || ''; render(); },
     cattitle(el) {
       const m = state.modal, c = catFind(el.value); if (!m || !m.draft || !c || m.catApplied === c.title) return; m.catApplied = c.title;
@@ -4382,7 +4452,7 @@
   // Personal switches (Me > Settings): the game side of the app (badges, levels, challenges, totem animal) and Photo of the day can each be turned off.
   // Kept on the phone for speed and in the person's profile so it follows them to another phone.
   const pref = k => { try { const v = localStorage.getItem('fs-pref-' + k); if (v) return v; } catch (e) { /* private mode */ } const d = me() && me().display; return (d && typeof d === 'object' && d[k]) || 'on'; };
-  const gameOn = () => pref('game') !== 'off', photoOn = () => pref('photo') !== 'off';
+  const gameOn = () => !isDrv() && pref('game') !== 'off', photoOn = () => pref('photo') !== 'off';
   const DKEYS = { fs: 'fs-fsize', theme: 'fs-theme', contrast: 'fs-contrast', accent: 'fs-accent', cur: 'fs-paycur' };
   const ACCENTS = [['', '#314b3c'], ['sea', '#1f5f7a'], ['plum', '#5b3f7a'], ['terra', '#b8441c'], ['sky', '#5aa9e6'], ['mint', '#45b88a'], ['lilac', '#b39ddb'], ['rose', '#f28fad'], ['sun', '#f2c94c'], ['amber', '#f0901e']];
   const dget = k => { try { return localStorage.getItem(DKEYS[k]) || ''; } catch (e) { return ''; } };
@@ -4406,7 +4476,7 @@
     if (S.recall && window.showDirectoryPicker && isAdmin()) S.recall('offdir').then(async h => { if (h && h.queryPermission) { OFFDIR.handle = h; OFFDIR.ok = (await h.queryPermission({ mode: 'readwrite' })) === 'granted'; } }).catch(() => {});
     if (S.remember) S.remember('lang', lang()); if ((S.pending || 0) > 0) setTimeout(() => toast(T('st_waiting_open', { n: S.pending || 0 })), 600);
     if (S.warming) { let warm = true; S.onChange((t, r, type) => { if (warm && type === 'STATE' && !S.warming) { warm = false; PH.asked.clear(); displayFromAccount(); saveHello(); weekCheck(); setTimeout(xcNudge, 4000); } }); }
-    if (S.mode === 'demo') window.__test = { trackOpen, flushUsage, tourPhase, dupClients, dupTours, parseBooking, T: (k, v) => T(k, v), payFor, setGrid: v => { state.wgrid = !!v; render(); }, dayBlock, tasksOnDay, withPhones, taskLineHtml, pushBanner, xcNudge, relayEmail, guestEmail, parseBooking, badgeNote: () => { const b = game(me().id).list.find(x => x.done); if (b) badgeNote([b]); }, checkBadges, newVersion: v => { state.newVersion = !!v; render(); }, pageFor: (title, kind) => { const u = pageFor({ title, kind }), m = /\/activity\/(\d+)/.exec(u); return m ? { id: Number(m[1]) } : null; } };          // for the automatic tests only
+    if (S.mode === 'demo') window.__test = { parseReview, isReview, rrHtml: id => revreqModalHtml({ id }), rrTours: () => db.tours.filter(t => tourBookings(t.id).some(b => b.guest)).map(t => t.id), trackOpen, flushUsage, tourPhase, dupClients, dupTours, parseBooking, T: (k, v) => T(k, v), payFor, setGrid: v => { state.wgrid = !!v; render(); }, dayBlock, tasksOnDay, withPhones, taskLineHtml, pushBanner, xcNudge, relayEmail, guestEmail, parseBooking, badgeNote: () => { const b = game(me().id).list.find(x => x.done); if (b) badgeNote([b]); }, checkBadges, newVersion: v => { state.newVersion = !!v; render(); }, pageFor: (title, kind) => { const u = pageFor({ title, kind }), m = /\/activity\/(\d+)/.exec(u); return m ? { id: Number(m[1]) } : null; } };          // for the automatic tests only
     if (me() && !isAdmin()) state.mine = true;
     displayFromAccount();
     try { history.scrollRestoration = 'manual'; } catch (e) { /* old browser */ }
