@@ -7,7 +7,7 @@ Team scheduling for guides and drivers: tours (private, group, customised), days
 With `config.js` left empty the app runs in **demo mode**: sample data, stored only in that browser, no login.
 
 ## What is included
-- 3.74: one row per person in the tours list, booking source suggested from the booking reference or guest email, Klook statement check, guest reminder drafts and Day summary print, warnings (under minimum group, 31 Dec evening, Monday group walks, March Armenia), harder badges with 26 new stickers, analytics up-arrows and jump chips, coloured "How busy" card, weekly mood charts, Stats: days per month and Team highlights, language switch at top of Settings.
+- Reading guest reviews (3.75, admin only): Back office > Booking from email, paste a GetYourGuide review, check it, press Correct, save or Wrong, report. Also: movable analytics cards and sortable tables, Team highlights, new tour card layout, company holidays in the Time off calendar.
 - Pay in your own currency (3.73): Me > Settings > "Show my pay in" EUR, USD or GEL. Amounts stay stored in the agreed currency; the app converts with the National Bank rate of each tour day, shows "≈" and keeps the original amount. The monthly pay page shows all three currencies.
 - Calendar (week, month, day on phones), Monday first. Private, group, customised and multi-day tours.
 - Tour card: adults and children, guest list, guest marks (wine tasting, private room, front seat, food for bears, pick-up, drop-off elsewhere, your own marks), guide and driver on one card with their phone numbers.
