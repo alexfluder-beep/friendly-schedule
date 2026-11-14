@@ -1704,3 +1704,7 @@ body:has(.incbar) .tabs{border-top-color:transparent}
 /* 3.83: a cancelled tour card is red-tinted (not blue-grey), so it stands out from live tours */
 .acard.cancelled{--k:var(--danger);background:color-mix(in srgb,var(--danger) 8%,var(--surface));border-color:color-mix(in srgb,var(--danger) 40%,var(--line))}
 .mycard.cancelled{background:color-mix(in srgb,var(--danger) 8%,var(--surface))}
+
+/* 3.85: hover card on a name in the calendar side panel */
+.pcard{position:fixed;z-index:60;width:290px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-m);box-shadow:0 10px 30px rgba(20,30,50,.16);padding:12px 14px;font-size:var(--t-sm);pointer-events:none;display:flex;flex-direction:column;gap:8px}
+.pcard .pchead{display:flex;align-items:center;gap:10px}.pcard .pcrow{display:flex;gap:8px;align-items:flex-start;line-height:1.35}.pcard .pcrow .msi{width:18px;height:18px;flex:none;color:var(--muted);margin-top:1px}
