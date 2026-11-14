@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.82';
+  const APP_VERSION = '3.83';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -343,7 +343,7 @@
   // Booking source from the booking code. Only patterns we are sure about; anything else is set by hand.
   // The platform's own guest address tells the platform when the booking code is missing: Trip.com / Ctrip use @atguest.trip.com and @atguest.ctrip.com.
   const srcFromMail = e => { const m = String(e || '').toLowerCase().match(/@([a-z0-9.-]+)\s*$/), d = m ? m[1] : ''; return /(^|\.)c?trip\.com$/.test(d) ? 'Trip.com' : /(^|\.)getyourguide\.com$/.test(d) ? 'GetYourGuide' : /(^|\.)(viator|tripadvisor)\.com$/.test(d) ? 'Viator' : /(^|\.)klook\.com$/.test(d) ? 'Klook' : /(^|\.)tourradar\.com$/.test(d) ? 'TourRadar' : /(^|\.)airbnb\.com$/.test(d) ? 'Airbnb' : ''; };
-  const sourceOf = b => b.source || (/free\s*tour/i.test((b.ref || '') + ' ' + (b.guest || '')) ? 'FreeTour' : /GYG/i.test(b.ref || '') ? 'GetYourGuide' : /^BR-/i.test(b.ref || '') ? 'Viator' : /sputnik|спутник/i.test((b.ref || '') + ' ' + (b.notes || '')) ? 'Sputnik8' : /tripster|трипстер/i.test((b.ref || '') + ' ' + (b.notes || '')) ? 'Tripster' : srcFromMail(b.email) || (/^#?\d{7,9}$/.test((b.ref || '').trim()) ? 'Website' : ''));
+  const sourceOf = b => b.source || (/free\s*tour/i.test((b.ref || '') + ' ' + (b.guest || '')) ? 'FreeTour' : /GYG/i.test(b.ref || '') ? 'GetYourGuide' : /^BR-/i.test(b.ref || '') ? 'Viator' : /sputnik|спутник/i.test((b.ref || '') + ' ' + (b.notes || '')) ? 'Sputnik8' : /tripster|трипстер/i.test((b.ref || '') + ' ' + (b.notes || '')) ? 'Tripster' : srcFromMail(b.email) || (/^TA[A-Z0-9]{6}$/.test((b.ref || '').trim()) ? 'Airbnb' : /^№\s*\d+$/.test((b.ref || '').trim()) ? 'Sputnik8' : /^\d{10}$/.test((b.ref || '').trim()) ? 'Viator' : /^\d{16}$/.test((b.ref || '').trim()) ? 'Trip.com' : /^\d{5}-\d{14}-\d{3}$/.test((b.ref || '').trim()) ? 'FreeTour' : '') || (/^#?\d{7,9}$/.test((b.ref || '').trim()) ? 'Website' : ''));
   // Where a guest can leave a review: the platform they booked on first (GetYourGuide, Viator), then Google Maps, TripAdvisor, Trustindex.
   const reviewPlaces = b => { const r = rules(), src = sourceOf(b), out = []; if (src === 'GetYourGuide' && r.reviewGyg) out.push(['GetYourGuide', r.reviewGyg]); if (src === 'Viator' && r.reviewViator) out.push(['Viator', r.reviewViator]); if (r.reviewGoogle) out.push(['Google Maps', r.reviewGoogle]); if (r.reviewTripadvisor) out.push(['TripAdvisor', r.reviewTripadvisor]); if (r.reviewTrustindex) out.push(['Trustindex', r.reviewTrustindex]); return out; };
   const reviewLink = b => { const r = rules(), src = sourceOf(b); return (src === 'GetYourGuide' && r.reviewGyg) || (src === 'Viator' && r.reviewViator) || r.reviewGoogle || ''; };
@@ -497,7 +497,7 @@
     toast(T(ok ? 'tc_applied' : 'tc_declined')); renderModal();
   }
   // A notice can lead somewhere: the tour it is about, and for the office the request itself with Approve and Decline.
-  const NOTE_TOUR = ['tour_assigned', 'tour_changed', 'tour_removed', 'tour_cancelled', 'tour_restored', 'tour_tomorrow', 'creq_new', 'creq_approved', 'creq_declined', 'swap_ask', 'noshow'];
+  const NOTE_TOUR = ['tour_assigned', 'tour_changed', 'tour_removed', 'tour_cancelled', 'tour_restored', 'tour_tomorrow', 'creq_new', 'creq_approved', 'creq_declined', 'creq_tcx', 'swap_ask', 'noshow'];
   function noteTour(n) {
     const p = n.params || {}; if (!NOTE_TOUR.includes(n.kind)) return null;
     if (p.tour) return db.tours.find(x => String(x.id) === String(p.tour)) || null;
@@ -511,7 +511,7 @@
   function noteActs(n) {
     const t = noteTour(n); if (!t) return '';
     const q = isAdmin() && !state.viewAs ? noteReq(n, t) : null;
-    const ask = q ? (q.status === 'pending' ? `<div class="small">${esc(creqText(q))}</div><div class="bar nacts"><button class="btn sm danger" data-act="creqdecide" data-id="${q.id}" data-s="0">${msi('close')}${T('decline')}</button><button class="btn sm primary" data-act="creqdecide" data-id="${q.id}" data-s="1">${msi('check')}${T('approve')}</button></div>` : `<div><span class="tag ${q.status === 'approved' ? 't-ok' : 't-muted'}">${T(q.status)}</span></div>`) : '';
+    const ask = q ? (q.status === 'pending' ? `<div class="small">${esc(creqText(q))}</div><div class="bar nacts"><button class="btn sm" data-act="creqtcx" data-id="${q.id}">${msi('event_busy')}${T('creq_tcx')}</button><button class="btn sm danger" data-act="creqdecide" data-id="${q.id}" data-s="0">${msi('close')}${T('decline')}</button><button class="btn sm primary" data-act="creqdecide" data-id="${q.id}" data-s="1">${msi('check')}${T('approve')}</button></div>` : `<div><span class="tag ${q.status === 'approved' ? 't-ok' : 't-muted'}">${T(q.status)}</span></div>`) : '';
     return `${ask}<div class="bar nacts"><button class="btn sm" data-act="tour" data-id="${t.id}">${msi('open_in_new')}${T('nt_open')}</button></div>`;
   }
   function noteText(n) { const p = { ...(n.params || {}) }; if (p.date) p.date = fmtDay(p.date); if (p.from) p.range = fmtRange(p.from, p.to || p.from); if (n.kind === 'ticket_update' && p.status) p.status = T('tk_st_' + p.status); return T('n_' + n.kind, p); }
@@ -1463,6 +1463,14 @@
     await notify(admins(), 'creq_new', { name: me().name, title: t.title, date: t.date, tour: t.id });
     logAct(`Change suggested for ${t.title}, ${t.date}`); state.modal = null; toast(T('sent'));
   }
+  async function tourCxRequests(id) {
+    const q = db.change_requests.find(x => x.id === id), t = q && db.tours.find(x => x.id === q.tour_id);
+    if (!q || !t) return 0;
+    const all = db.change_requests.filter(x => x.tour_id === t.id && x.status === 'pending');
+    for (const r of all) { await S.save('change_requests', { ...r, status: 'declined', decided_by: me().id }); await notify([r.user_id], 'creq_tcx', { title: t.title, date: t.date }); }
+    logAct(`Tour cancelled, ${all.length} request(s) closed: ${t.title}, ${t.date}`);
+    return all.length;
+  }
   async function decideCreq(id, ok) {
     const q = db.change_requests.find(x => x.id === id), t = db.tours.find(x => x.id === q.tour_id);
     if (ok && t && (q.patch || {}).status === 'cancelled') await setCancelled(t, true, q.message || '');
@@ -1961,7 +1969,7 @@
   const pendingTakes = () => !isAdmin() ? [] : db.change_requests.filter(q => q.status === 'pending' && !q.swap_with && q.patch && (q.patch.guide_id === q.user_id || q.patch.driver_id === q.user_id) && db.tours.some(t => t.id === q.tour_id && live(t))).sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
   function takeReqHtml() {
     const list = pendingTakes(); if (!list.length) return '';
-    return `<div class="card f xcard xreqs"><b>${T('xc_req_title', { n: list.length })}</b><span class="muted small">${T('xc_req_text')}</span>${list.map(q => { const t = db.tours.find(x => x.id === q.tour_id), busy = dayWork(q.user_id, t); return `<div class="xrow xreq"><button class="grow-l arow" data-act="tour" data-id="${t.id}">${avatar(q.user_id)}<span><b>${esc(pname(q.user_id))}</b> <span class="muted">${esc(creqText(q))}</span><br><b class="num">${esc(fmt(t.date, { weekday: 'short', day: 'numeric', month: 'short' }))} ${esc(t.start_time || '')}</b> ${esc(aliasOf(t.title))}</span></button><span class="xbtns"><button class="btn sm danger" data-act="creqdecide" data-id="${q.id}" data-s="0">${msi('close')}${T('decline')}</button><button class="btn sm primary" data-act="creqdecide" data-id="${q.id}" data-s="1">${msi('check')}${T('approve')}</button></span>${busy.length ? `<div class="warnline soft xbusy">${msi('warning')}<span>${esc(T('xc_busy_adm', { name: pname(q.user_id), what: workText(busy) }))}</span></div>` : ''}</div>`; }).join('')}</div>`;
+    return `<div class="card f xcard xreqs"><b>${T('xc_req_title', { n: list.length })}</b><span class="muted small">${T('xc_req_text')}</span>${list.map(q => { const t = db.tours.find(x => x.id === q.tour_id), busy = dayWork(q.user_id, t); return `<div class="xrow xreq"><button class="grow-l arow" data-act="tour" data-id="${t.id}">${avatar(q.user_id)}<span><b>${esc(pname(q.user_id))}</b> <span class="muted">${esc(creqText(q))}</span><br><b class="num">${esc(fmt(t.date, { weekday: 'short', day: 'numeric', month: 'short' }))} ${esc(t.start_time || '')}</b> ${esc(aliasOf(t.title))}</span></button><span class="xbtns"><button class="btn sm" data-act="creqtcx" data-id="${q.id}">${msi('event_busy')}${T('creq_tcx')}</button><button class="btn sm danger" data-act="creqdecide" data-id="${q.id}" data-s="0">${msi('close')}${T('decline')}</button><button class="btn sm primary" data-act="creqdecide" data-id="${q.id}" data-s="1">${msi('check')}${T('approve')}</button></span>${busy.length ? `<div class="warnline soft xbusy">${msi('warning')}<span>${esc(T('xc_busy_adm', { name: pname(q.user_id), what: workText(busy) }))}</span></div>` : ''}</div>`; }).join('')}</div>`;
   }
   const adminOpenN = () => new Set([...unstaffed().map(t => t.id), ...pendingTakes().map(q => q.tour_id)]).size;
   // Admins: confirmed tours in the next 30 days that still have no guide, or no driver where one is needed.
@@ -2550,7 +2558,7 @@
     }
     if (tab === 'requests') {
       const qs = db.change_requests.slice().sort((x, y) => (x.status === 'pending' ? 0 : 1) - (y.status === 'pending' ? 0 : 1) || (y.created_at || '').localeCompare(x.created_at || '')).slice(0, 60);
-      h += `<div class="list">${qs.map(q => { const t = db.tours.find(x => x.id === q.tour_id); return `<div class="card"><div class="row">${avatar(q.user_id)}<b>${esc(pname(q.user_id))}</b><span class="tag ${q.status === 'approved' ? 't-ok' : q.status === 'declined' ? 't-danger' : 't-warn'}">${T(q.status)}</span>${t ? `<button class="btn sm" data-act="tour" data-id="${t.id}">${esc(t.title)} · ${esc(dateText(t))}</button>` : ''}</div><div class="small">${esc(creqText(q))}</div>${q.status === 'pending' ? `<div class="actions"><button class="btn sm danger" data-act="creqdecide" data-id="${q.id}" data-s="0">${msi('close')}${T('decline')}</button><button class="btn sm primary" data-act="creqdecide" data-id="${q.id}" data-s="1">${msi('check')}${T('approve')}</button></div>` : ''}</div>`; }).join('') || `<div class="empty">${T('creq_none')}</div>`}</div>`;
+      h += `<div class="list">${qs.map(q => { const t = db.tours.find(x => x.id === q.tour_id); return `<div class="card"><div class="row">${avatar(q.user_id)}<b>${esc(pname(q.user_id))}</b><span class="tag ${q.status === 'approved' ? 't-ok' : q.status === 'declined' ? 't-danger' : 't-warn'}">${T(q.status)}</span>${t ? `<button class="btn sm" data-act="tour" data-id="${t.id}">${esc(t.title)} · ${esc(dateText(t))}</button>` : ''}</div><div class="small">${esc(creqText(q))}</div>${q.status === 'pending' ? `<div class="actions"><button class="btn sm" data-act="creqtcx" data-id="${q.id}">${msi('event_busy')}${T('creq_tcx')}</button><button class="btn sm danger" data-act="creqdecide" data-id="${q.id}" data-s="0">${msi('close')}${T('decline')}</button><button class="btn sm primary" data-act="creqdecide" data-id="${q.id}" data-s="1">${msi('check')}${T('approve')}</button></div>` : ''}</div>`; }).join('') || `<div class="empty">${T('creq_none')}</div>`}</div>`;
     }
     if (tab === 'usage') {
       // Who: everyone, or one role, or one age group (age only where the person put a birthday with a year in their profile).
@@ -3364,9 +3372,9 @@
     const body = state.view === 'calendar' ? calendarHtml() : state.view === 'timeoff' ? timeoffHtml() : state.view === 'team' ? teamHtml() : state.view === 'tasks' ? tasksHtml() : state.view === 'admin' ? adminHtml() : meHtml();
     const demo = S.mode === 'demo' ? `<div class="banner slim"><b>${T('demo_title')}</b><span class="small only-wide">${T('demo_text')}</span><label class="small" for="demo-as">${T('demo_as')}</label><select id="demo-as" data-ch="demoas">${db.profiles.filter(p => p.active !== false).map(p => opt(p.id, `${p.name} · ${T('role_' + p.role)}`, me().id)).join('')}</select></div>` : '';
     const upd = S.syncedAt ? T('updated_at', { time: new Intl.DateTimeFormat(LOCALES[lang()], { hour: '2-digit', minute: '2-digit' }).format(new Date(S.syncedAt)) }) : T('refresh');
-    const shell = `<header class="top"><div class="brand"><i class="sdot s-${syncState()}" title="${esc(upd)}"></i>${T('brand')}${isAdmin() ? `<span class="verchip num" title="${esc(T('version'))} ${APP_VERSION}">v${APP_VERSION}</span>` : ''}</div><nav class="nav" aria-label="Main">${nav}</nav><span class="spacer only-phone"></span>
+    const shell = `<header class="top"><div class="brand"><i class="sdot s-${syncState()}" title="${esc(upd)}"></i>${T('brand')}</div><nav class="nav" aria-label="Main">${nav}</nav><span class="spacer only-phone"></span>
       
-      <button class="iconbtn ${state.refreshing ? 'spin' : ''}" data-act="refresh" aria-label="${T('refresh')}" title="${esc(upd)}">${ico('refresh')}</button>
+      ${isAdmin() ? `<span class="verchip num" title="${esc(T('version'))} ${APP_VERSION}">v${APP_VERSION}</span>` : ''}<button class="iconbtn ${state.refreshing ? 'spin' : ''}" data-act="refresh" aria-label="${T('refresh')}" title="${esc(upd)}">${ico('refresh')}</button>
       <button class="iconbtn" data-act="bell" aria-label="${T('notifications')}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>${unread ? `<span class="badge">${unread}</span>` : ''}</button>${syncRow()}</header>
       ${maintHtml() || ''}${state.newVersion && !state.viewAs ? `<button class="banner small setupban nvban" data-act="reload"><span>${T('nv_text')}</span><b>${T('nv_btn')} ›</b></button>` : ''}${state.viewAs ? `<div class="vabar" title="${esc(T('va_readonly'))}"><span class="vatxt" title="${esc(T('va_now', { name: me().name }))}">${T('va_now', { name: '\u0001' }).split('\u0001').map(x => (x ? `<span class="vapre">${esc(x)}</span>` : '')).join(`<span class="vaname">${esc(me().name)}</span>`)}</span><button class="btn sm" data-act="vaexit">${T('va_exit')}</button></div>` : ''}<main class="${/class="[^"]*\bfab\b/.test(body) ? 'hasfab' : ''} ${/class="[^"]*\bincbar\b/.test(body) ? 'hasinc' : ''}" data-key="v-${state.view}-${state.view === 'admin' ? (state.adminTab || '') : state.view === 'me' ? state.meTab : ''}">${demo}${body}</main><nav class="tabs" aria-label="Main">${nav}</nav>`;
     const t1 = performance.now(); morph(app, shell + '<div id="modal"></div><div id="toasts"></div>');
@@ -3527,6 +3535,7 @@
     },
     creq(el) { const t = db.tours.find(x => x.id === el.dataset.id); state.modal = { type: 'creq', draft: { tour_id: t.id, start_time: t.start_time || '', pickup: t.pickup || '', notes: t.notes || '', message: '', cant: false, swap_with: '' } }; renderModal(); },
     swapagree(el) { const q = db.change_requests.find(x => x.id === el.dataset.id), ok = el.dataset.s === '1', t = db.tours.find(x => x.id === q.tour_id) || {}; run(async () => { await S.save('change_requests', ok ? { ...q, agreed: true } : { ...q, status: 'declined' }); await notify([q.user_id, ...(ok ? admins() : [])], ok ? 'swap_yes' : 'swap_no', { name: me().name, title: t.title || '', date: t.date || '' }); }); },
+    creqtcx(el) { run(async () => { const n = await tourCxRequests(el.dataset.id); toast(T('creq_tcx_done', { n })); }); },
     creqdecide(el) { run(() => decideCreq(el.dataset.id, el.dataset.s === '1')); },
     summary(el) { state.modal = { type: 'summary', date: (el && el.dataset && el.dataset.date) || state.date }; renderModal(); },
     copy(el) {

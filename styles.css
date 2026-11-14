@@ -862,7 +862,7 @@ html[data-os="ios"] input,html[data-os="ios"] select,html[data-os="ios"] textare
 .calnow{min-height:40px}
 .whochip{width:44px;height:44px;border-radius:50%;border:0;background:var(--surface2);color:var(--ink);font:700 var(--t-cap)/1 inherit;display:grid;place-items:center;padding:0;cursor:pointer;flex:none}
 .whochip .avatar{width:44px;height:44px}
-.incbar{position:fixed;left:0;right:0;bottom:calc(var(--tabs-h,62px) + env(safe-area-inset-bottom,0px));z-index:7;display:flex;align-items:center;gap:12px;min-height:48px;padding:0 16px;background:var(--bg);border:0;border-top:1px solid var(--line);color:var(--ink);font-size:var(--t-sm);text-align:left;cursor:pointer}
+.incbar{position:fixed;left:0;right:0;bottom:calc(var(--tabs-h,62px) + env(safe-area-inset-bottom,0px));z-index:7;display:flex;align-items:center;gap:12px;min-height:48px;padding:0 16px;background:var(--surface);border:0;border-top:1px solid var(--line);color:var(--ink);font-size:var(--t-sm);text-align:left;cursor:pointer}
 .incbar .msi{width:20px;height:20px;color:var(--muted);flex:none}
 .incbar .grow-l{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
 .incbar b{font-size:var(--t-body);text-decoration:underline;text-underline-offset:4px;flex:none}
@@ -1696,4 +1696,7 @@ a.phl{color:var(--accent);font-weight:600;text-decoration:underline;white-space:
 .langpick .checks{gap:2px}.langpick .checks label{border:0;border-radius:var(--r-s);padding:6px 4px;min-height:40px;background:none}.langpick .checks label:has(input:checked){background:var(--surface2);border:0}
 .langpick .checks input{width:22px;height:22px;flex:none}
 
-.verchip{margin-left:8px;padding:2px 9px;border-radius:var(--r-pill);background:var(--accent-soft,var(--surface2));border:1px solid var(--line);color:var(--ink);font-size:var(--t-sm);font-weight:700;letter-spacing:.01em;white-space:nowrap;vertical-align:middle}
+.verchip{margin:0 4px 0 auto;flex:none;padding:2px 9px;border-radius:var(--r-pill);background:var(--accent-soft,var(--surface2));border:1px solid var(--line);color:var(--ink);font-size:var(--t-sm);font-weight:700;letter-spacing:.01em;white-space:nowrap;vertical-align:middle}
+
+/* 3.83: the week/month money bar and the bottom tabs are one block: same colour, no line between them */
+body:has(.incbar) .tabs{border-top-color:transparent}
