@@ -623,3 +623,7 @@ language sql stable security definer set search_path = public as $$
   where b.client_id is not null and b.tour_id in (select public.my_tour_ids())
     and (b.tour_id in (select public.my_full_tour_ids()) or coalesce(b.pickup_addr, '') <> '' or coalesce(b.marks, '{}') && array['pickup','dropoff','stays'])
 $$;
+
+-- 3.86: car number and a small car photo on the driver's profile (shown on the team hover card)
+alter table public.profiles add column if not exists car_plate text;
+alter table public.profiles add column if not exists car_photo text;   -- small JPEG as a data URL, like avatar

@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.85';
+  const APP_VERSION = '3.86';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -1618,6 +1618,7 @@
       <label>Telegram<input id="pe-tg" data-f="telegram" value="${esc(d.telegram ? '@' + d.telegram : '')}" placeholder="@username" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
       <label>${T('colour')}<input id="pe-color" data-f="color" type="color" value="${esc(d.color || '#66737f')}" style="max-width:90px"></label>
       ${old && d.email ? `<div class="muted small">${T('email')}: ${esc(d.email)}</div>` : ''}
+      ${old ? `<label>${T('car_plate')}<input id="pe-plate" data-f="car_plate" value="${esc(d.car_plate || '')}" placeholder="AB-123-CD" autocomplete="off" autocapitalize="characters"></label><div class="carphoto">${d.car_photo ? `<img src="${esc(d.car_photo)}" alt="">` : ''}<label class="btn sm">${msi('photo_camera')}${T('car_photo')}<input type="file" accept="image/*" data-ch="carphoto" hidden></label>${d.car_photo ? `<button type="button" class="btn sm" data-act="carphotodel">${msi('delete')}${T('car_photo_del')}</button>` : ''}</div>` : ''}
       <label>${T('vehicle')}<select id="pe-veh" data-f="vehicle">${opt('', T('veh_none'), d.vehicle || '')}${opt('own', T('veh_own'), d.vehicle)}${opt('delica', T('veh_delica'), d.vehicle)}</select></label>
       <details class="sect"><summary>${T('ws_person')}</summary><div class="f">${weekEditor(d)}</div></details>
       ${d.role === 'guide' || d.role === 'admin' ? `<details class="sect"><summary>${T('skills_title')} (${(d.skills || []).length || T('skills_all')})</summary><div class="f"><span class="muted small">${T('skills_text')}</span><div class="checks col">${catalog().filter(c => c.id).map(c => `<label><input type="checkbox" data-sk="${esc(String(c.id))}" ${(d.skills || []).includes(String(c.id)) ? 'checked' : ''}>${esc(c.title)}</label>`).join('')}</div></div></details>` : ''}
@@ -1628,6 +1629,7 @@
     if ((d.telegram || '').trim() && !tgUser(d.telegram)) { toast(T('tg_bad')); return; }
     const f = { name, role: d.role || 'guide', phone: (d.phone || '').trim() || null, languages: (d.languages || '').trim() || null, telegram: tgUser(d.telegram) || null, color: d.color || '#66737f' };
     const extra = { skills: d.skills || [], vehicle: d.vehicle || null };
+    if (!m.isNew) { extra.car_plate = String(d.car_plate || '').trim().toUpperCase() || null; extra.car_photo = d.car_photo || null; }
     if (d.promo !== undefined && d.id) { const pr = { ...(rules().promos || {}) }, code = String(d.promo || '').trim().toUpperCase(); if (code) pr[d.id] = code; else delete pr[d.id]; await S.save('settings', { id: 'rules', value: { ...rules(), promos: pr } }); }
     if (!m.isNew) { const p = person(d.id); await S.save('profiles', { ...stripEmail(p), ...f, ...extra, ...week, role: d.id === me().id ? p.role : f.role }); logAct(`Edited person: ${name}`); state.modal = null; toast(T('saved')); return; }
     if (S.mode === 'demo') { await S.save('profiles', { id: S.uid(), ...f, ...extra, ...week, lang: 'en', active: true }); logAct(`Added person: ${name}`); state.modal = null; toast(T('saved')); return; }
@@ -1996,14 +1998,19 @@
       + (offs.length ? row('beach_access', T('pc_dayoff') + ': ' + offs.map(o => o.date_from === o.date_to ? d(o.date_from) : d(o.date_from) + ' – ' + d(o.date_to)).join('; ')) : '')
       + (reqs ? row('event_available', T('pc_req', { n: reqs })) : '')
       + (p.languages ? row('language', esc(String(p.languages))) : '')
+      + (p.phone || p.telegram ? `<div class="pcrow">${ico('call')}<span>${esc(p.phone || '@' + p.telegram)}</span>${staffBtns(p, true)}</div>` : '')
+      + (p.vehicle || p.car_plate ? `<div class="pcrow">${msi('directions_car')}<span>${esc([p.vehicle ? T('veh_' + p.vehicle) : '', p.car_plate || ''].filter(Boolean).join(' · '))}</span>${p.car_plate ? ibCopy(p.car_plate, T('copy')) : ''}</div>` : '')
+      + (p.car_photo ? `<img class="pccar" src="${esc(p.car_photo)}" alt="">` : '')
       + (!p.avatar ? row('warning', T('pc_noav')) : '');
   }
-  { let card = null; const hide = () => { if (card) { card.remove(); card = null; } };
-    document.addEventListener('mouseover', ev => { if (!window.matchMedia('(hover:hover)').matches) return; const b = ev.target.closest && ev.target.closest('.sidepanel .cpp[data-v]'); if (!b || !b.dataset.v) { if (!ev.target.closest || !ev.target.closest('.pcard')) hide(); return; }
-      let html = ''; try { html = personCardHtml(b.dataset.v); } catch (e) { console.warn('pcard', e.message); return; } if (!html) return; hide(); card = document.createElement('div'); card.className = 'pcard'; card.innerHTML = html; document.body.appendChild(card);
+  { let card = null, timer = 0; const hide = () => { clearTimeout(timer); if (card) { card.remove(); card = null; } }, later = () => { clearTimeout(timer); timer = setTimeout(hide, 220); };
+    document.addEventListener('mouseover', ev => { if (!window.matchMedia('(hover:hover)').matches || !ev.target.closest) return; if (ev.target.closest('.pcard')) { clearTimeout(timer); return; }
+      const b = ev.target.closest('.sidepanel .cpp[data-v]'); if (!b || !b.dataset.v) { if (card) later(); return; }
+      clearTimeout(timer); if (card && card.dataset.id === b.dataset.v) return;
+      let html = ''; try { html = personCardHtml(b.dataset.v); } catch (e) { return; } if (!html) return; hide(); card = document.createElement('div'); card.className = 'pcard'; card.dataset.id = b.dataset.v; card.innerHTML = html; document.body.appendChild(card);
       const r = b.getBoundingClientRect(), h = card.offsetHeight; card.style.left = Math.min(r.right + 10, window.innerWidth - card.offsetWidth - 8) + 'px'; card.style.top = Math.max(8, Math.min(r.top - 6, window.innerHeight - h - 8)) + 'px'; });
-    document.addEventListener('mouseout', ev => { if (card && !(ev.relatedTarget && ev.relatedTarget.closest && ev.relatedTarget.closest('.sidepanel .cpp'))) hide(); });
-    document.addEventListener('scroll', hide, true); document.addEventListener('click', hide, true); }
+    document.addEventListener('mouseout', ev => { if (card && !(ev.relatedTarget && ev.relatedTarget.closest && ev.relatedTarget.closest('.pcard'))) later(); });
+    document.addEventListener('scroll', ev => { if (!(ev.target.closest && ev.target.closest('.pcard'))) hide(); }, true); document.addEventListener('click', ev => { if (!(ev.target.closest && ev.target.closest('.pcard')) || ev.target.closest('[data-act=copy]')) setTimeout(hide, 0); }, true); }
   const tasksBadge = () => db.tasks.filter(k => k.status === 'open' && (k.assignees || []).includes(me().id)).length + (needAvatar() ? 1 : 0);
   function unstaffedHtml() {
     const list = unstaffed(); if (!list.length) return '';
@@ -3710,6 +3717,7 @@
     balm(el) { const mo = state.balMonth || today().slice(0, 7), d = new Date(Number(mo.slice(0, 4)), Number(mo.slice(5, 7)) - 1 + Number(el.dataset.d), 1); state.balMonth = iso(d).slice(0, 7); render(); },
     avcolor(el) { state.avColor = el.dataset.v; state.avOpen = true; render(); },
     avgo() { state.modal = null; state.view = 'me'; state.meTab = 'profile'; state.avOpen = true; render(); window.scrollTo(0, 0); },
+    carphotodel() { if (state.modal && state.modal.draft) { state.modal.draft.car_photo = null; renderModal(); } },
     avpick(el) { state.avOpen = false; run(() => S.save('profiles', { ...stripEmail(me()), avatar: el.dataset.v || null }), T('saved')); },
     gosetup(el) { const k = el.dataset.k || (setupSteps().find(x => !x.done) || {}).k; state.view = 'me'; state.meTab = 'profile'; if (k === 'photo') state.avOpen = true; render(); const x = document.getElementById(k === 'tours' ? 'me-tours' : k === 'photo' ? 'me-photo' : k === 'tg' ? (document.getElementById('me-tgbot') ? 'me-tgbot' : 'me-tg') : 'me-details'); if (x) x.scrollIntoView({ block: 'center', behavior: 'smooth' }); },
     async mytoursok() {
@@ -3919,6 +3927,12 @@
       const img = new Image(), url = URL.createObjectURL(f);
       img.onload = async () => { try { const full = await shrink(img, 1280, 0.78), th = await shrink(img, 420, 0.72); URL.revokeObjectURL(url); m.draft = { url: full.url, thumb: th.blob, full: full.blob, thumbUrl: th.url }; m.err = ''; m.edit = false; if (state.modal === m) renderModal(); } catch (e) { phFail(m, e); } };
       img.onerror = () => { URL.revokeObjectURL(url); phFail(m, new Error('This file is not a photo the phone can open')); }; img.src = url;
+    },
+    carphoto(el) {
+      const f = el.files && el.files[0], m = state.modal; if (!f || !m || !m.draft) return;
+      const img = new Image(), url = URL.createObjectURL(f);
+      img.onload = () => { const k = Math.min(1, 640 / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k)); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); m.draft.car_photo = c.toDataURL('image/jpeg', 0.72); if (state.modal === m) renderModal(); };
+      img.onerror = () => { URL.revokeObjectURL(url); toast(T('err_save')); }; img.src = url;
     },
     avatar(el) {
       const f = el.files && el.files[0]; if (!f) return;

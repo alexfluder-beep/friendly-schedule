@@ -23,6 +23,8 @@ create table if not exists public.profiles (
   telegram_id bigint unique,   -- set by the crew bot when the person sends it /link with the code below
   link_code text,              -- one-time code the person creates in the app (Me > Telegram bot)
   work_week jsonb,             -- working hours per weekday: 7 entries, Monday first; null = day off, otherwise ["09:00","18:00"]
+  car_plate text,              -- car number, shown on the team hover card
+  car_photo text,              -- small JPEG (data URL) of the car
   vehicle text check (vehicle in ('own','delica')),   -- own car or the company Delica; used for driving statistics and badges
   email text,                  -- sign-in email, shown to admins in the team list
   skills text[] not null default '{}',   -- tours this guide leads (ids from the tour list); empty = all tours
