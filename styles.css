@@ -1606,8 +1606,6 @@ a.phl{color:var(--accent);font-weight:600;text-decoration:underline;white-space:
 .sheet .hdr .ttlwrap{flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}.sheet .hdr .ttlwrap h2{margin:0;min-width:0}.sheet .hdr .hedit{flex:none;white-space:nowrap}
 
 /* Computer view of the admin calendar: team panel on the left (Setmore-like) */
-@media (min-width:900px){.calsplit{display:grid;grid-template-columns:220px minmax(0,1fr);gap:16px;align-items:start}.calpanel{position:sticky;top:12px;display:flex;flex-direction:column;gap:2px;padding:10px;border:1px solid var(--line);border-radius:var(--r-l);background:var(--surface);max-height:calc(100vh - 24px);overflow:auto}.cph{padding:4px 8px 8px;font-size:var(--t-sm);color:var(--muted)}.cpp{display:flex;align-items:center;gap:10px;min-height:44px;padding:6px 8px;border:0;border-radius:var(--r-m,12px);background:none;color:var(--ink);text-align:left;cursor:pointer;font:inherit}.cpp:hover{background:var(--surface2)}.cpp.on{background:var(--surface2);box-shadow:inset 0 0 0 2px var(--ink);font-weight:700}.cpp .av,.cpp .avatar{flex:none}.cxsw{margin-top:8px;border-top:1px solid var(--line);border-radius:0;padding-top:10px;gap:10px}.cxsw input{width:20px;height:20px}}
-@media (max-width:899px){.calpanel{display:none}.calsplit{display:block}}
 @media (min-width:900px){.calsplit .whosel{display:none}}
 
 .offm{white-space:nowrap;max-width:100%}
@@ -1625,3 +1623,45 @@ a.phl{color:var(--accent);font-weight:600;text-decoration:underline;white-space:
 
 .tag.t-chg{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700;display:inline-flex;align-items:center;gap:4px}.tag.t-chg .msi{width:14px;height:14px}
 .syncrow .sage{font-size:var(--t-sm)}
+
+/* Back office on a computer: a flat left panel with every section, the chosen section on the right (phones keep the tiles) */
+.admwrap{display:block}.admnav,.admhint{display:none}
+@media (min-width:900px){
+  .admwrap{display:grid;grid-template-columns:232px minmax(0,1fr);gap:28px;align-items:start}
+  .admnav{display:flex;flex-direction:column;gap:2px;position:sticky;top:72px;max-height:calc(100vh - 88px);overflow:auto;padding:4px 0 24px}
+  .admgrp{font-size:var(--t-cap);font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);padding:14px 12px 6px}
+  .admitem{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:44px;padding:8px 12px;border:2px solid transparent;border-radius:var(--r-m);background:none;color:var(--ink);font:inherit;font-size:var(--t-body);text-align:left;cursor:pointer}
+  .admitem:hover{background:var(--surface2)}
+  .admitem[aria-current="page"]{background:var(--surface2);border-color:var(--ink);font-weight:700}
+  .admmain{min-width:0;display:flex;flex-direction:column;gap:16px}
+  .admmain>h3,.admmain>.tiles{display:none}.admmain .backbar>.btn[data-act=admintab]{display:none}.admhint{display:block}
+}
+
+/* Admin calendar: a team panel that slides in from the left (like Setmore). Computer: pushes the calendar aside. Phone: slides over it. */
+.sidebar-top{display:flex;align-items:center;gap:10px;min-height:44px;margin-bottom:6px}.sidettl{font-size:var(--t-h3);font-weight:600;color:var(--muted)}
+.sidetoggle{flex:none}.sidetoggle .msi{width:24px;height:24px}
+.sph{display:block;padding:14px 12px 6px;font-size:var(--t-sm);font-weight:700}
+.cpp{display:flex;align-items:center;gap:12px;width:100%;min-height:44px;padding:6px 12px;border:0;border-radius:var(--r-m);background:none;color:var(--ink);text-align:left;cursor:pointer;font:inherit}
+.cpp[hidden]{display:none}.cpp:hover{background:var(--surface2)}.cpp.on{background:var(--surface2);font-weight:700}.cpp .av,.cpp .avatar{flex:none}
+.spsearch{display:flex;align-items:center;gap:8px;min-height:44px;margin:2px 4px 6px;padding:0 12px;border:1px solid var(--line);border-radius:var(--r-m);background:var(--surface);color:var(--muted)}
+.spsearch input{flex:1;min-width:0;border:0;outline:0;background:none;font:inherit;color:var(--ink)}.spsearch:focus-within{border-color:var(--ink)}.spsearch .msi{width:20px;height:20px;flex:none}
+.cxsw{margin-top:10px;border-top:1px solid var(--line);border-radius:0;padding-top:12px}.cxsw input{width:20px;height:20px}
+.sideback{display:none}
+@media (min-width:900px){
+  .calsplit{display:grid;grid-template-columns:264px minmax(0,1fr);grid-template-rows:auto 1fr;column-gap:16px;transition:grid-template-columns .28s cubic-bezier(.2,0,0,1)}
+  .calsplit.shut{grid-template-columns:0 minmax(0,1fr);column-gap:0}
+  .sidebar-top{grid-column:1 / -1}
+  .sidepanel{grid-column:1;grid-row:2;min-width:0;overflow:hidden;align-self:start;position:sticky;top:12px;max-height:calc(100vh - 24px)}
+  .sidepanel .spin{width:264px;max-height:calc(100vh - 24px);overflow:auto;padding-bottom:16px;transition:opacity .2s}
+  .calsplit.shut .sidepanel .spin{opacity:0}
+  .calmain{grid-column:2;grid-row:2;min-width:0}
+  .calsplit .whosel{display:none}
+}
+@media (max-width:899px){
+  .calsplit{display:block}
+  .sidepanel{position:fixed;left:0;top:0;bottom:0;width:min(86vw,320px);z-index:80;background:var(--surface);box-shadow:2px 0 24px rgba(0,0,0,.22);transform:translateX(-104%);transition:transform .28s cubic-bezier(.2,0,0,1);overflow:auto;padding-top:max(8px,env(safe-area-inset-top,0px))}
+  .calsplit.open .sidepanel{transform:none}
+  .sideback{display:block;position:fixed;inset:0;z-index:79;background:rgba(32,37,31,.4);opacity:0;pointer-events:none;transition:opacity .28s}
+  .calsplit.open .sideback{opacity:1;pointer-events:auto}
+}
+@media (prefers-reduced-motion:reduce){.calsplit,.sidepanel,.sidepanel .spin,.sideback{transition:none!important}}

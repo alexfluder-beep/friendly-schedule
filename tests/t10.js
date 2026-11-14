@@ -26,11 +26,11 @@ const { chromium, devices } = require('playwright');
   await as('Mariam (sample) · Guide'); await p.click('.acard:has-text("Kakheti") >> nth=0'); await p.waitForSelector('.glist'); await p.click('.sheet details.sect summary'); await p.click('.sheet [data-act=cancelask]'); await p.fill('#cx-reason', 'Guest is ill'); await p.click('form[data-form=cancel] button.danger'); await p.waitForTimeout(300);
   await p.keyboard.press('Escape'); await p.keyboard.press('Escape');
   ok(await p.locator('.acard.cancelled').count() === 0, 'a guide report does not cancel the tour by itself');
-  await as('Sample Admin · Admin'); await p.click('.tabs [data-v=admin]'); await p.click('[data-act=admintab][data-v=requests]');
+  await as('Sample Admin · Admin'); await p.click('.tabs [data-v=admin]'); await p.click('.admmain [data-act=admintab][data-v=requests]');
   ok((await txt('main .list')).includes('Tour is cancelled'), 'admin sees the cancellation report'); await p.click('[data-act=creqdecide][data-s="1"] >> nth=0'); await p.waitForTimeout(300);
   ok(await p.evaluate(() => Store.db.tours.some(t => t.title.startsWith('Kakheti') && t.status === 'cancelled' && t.cancel_reason === 'Guest is ill')), 'approval cancels the tour and keeps the reason');
   // --- team: add, edit, working hours, skills, delete
-  await p.click('[data-act=admintab][data-v=""]'); await p.click('[data-act=admintab][data-v=team]'); await p.screenshot({ path: S + '/v13-team.png', fullPage: true });
+  await p.click('.admmain [data-act=admintab][data-v=""]'); await p.click('.admmain [data-act=admintab][data-v=team]'); await p.screenshot({ path: S + '/v13-team.png', fullPage: true });
   await p.click('[data-act=pnew]'); await p.fill('#pe-name', 'Test Guide'); await p.fill('#pe-phone', '+995500111222'); await p.fill('#pe-langs', 'EN'); await p.screenshot({ path: S + '/v13-person.png' }); await p.click('form[data-form=person] button.primary'); await p.waitForTimeout(250);
   ok((await txt('main')).includes('Test Guide'), 'admin adds a person');
   await p.click('.prow:has-text("Test Guide") [data-act=pedit]'); await p.fill('#pe-name', 'Test Guide Two'); await p.click('.sheet details:has-text("Tours this person leads") summary'); await p.locator('.sheet [data-sk]').first().check(); await p.click('form[data-form=person] button.primary'); await p.waitForTimeout(250);
@@ -42,7 +42,7 @@ const { chromium, devices } = require('playwright');
   ok(await p.locator('details:has-text("Former team")').count() === 1, 'former team list shown');
   // --- privacy: old guests
   await p.evaluate(async () => { const t = { id: Store.uid(), date: '2023-05-01', title: 'Old tour', kind: 'private', status: 'confirmed', pax: 2, adults: 2, children: 0, guide_id: Store.db.profiles.find(q => q.name.startsWith('Mariam')).id }; const c = { id: Store.uid(), name: 'Ancient Guest', phone: '+4411', email: 'a@b.c' }; await Store.save('tours', t); await Store.save('clients', c); await Store.save('bookings', { id: Store.uid(), tour_id: t.id, client_id: c.id, guest: 'Ancient Guest x2', adults: 2, children: 0, pax: 2, phone: '+4411', ref: 'GYG9', marks: [] }); });
-  await p.click('[data-act=admintab][data-v=""]'); await p.click('[data-act=admintab][data-v=privacy]'); await p.click('[data-act=pvcount]'); await p.waitForTimeout(200); await p.screenshot({ path: S + '/v13-privacy.png', fullPage: true });
+  await p.click('.admmain [data-act=admintab][data-v=""]'); await p.click('.admmain [data-act=admintab][data-v=privacy]'); await p.click('[data-act=pvcount]'); await p.waitForTimeout(200); await p.screenshot({ path: S + '/v13-privacy.png', fullPage: true });
   ok((await txt('main')).includes('months: 1.'), 'privacy tab counts old guests');
   await p.click('[data-act=pvrun]'); await p.click('[data-act=confirmyes]'); await p.waitForTimeout(300);
   ok(await p.evaluate(() => { const c = Store.db.clients.find(x => x.anonymised_at); const bk = Store.db.bookings.find(x => x.client_id === c.id); return c.name === 'Guest' && !c.phone && !c.email && bk.guest === 'Guest' && !bk.phone && bk.pax === 2 && Store.db.clients.filter(x => x.anonymised_at).length === 1; }), 'clean-up removes contacts of old guests only, keeps guest numbers');

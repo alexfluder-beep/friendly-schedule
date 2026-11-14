@@ -21,7 +21,7 @@ const { chromium, devices } = require('playwright');
   await p.waitForSelector('.sheet .gaddr', { state: 'attached' }); ok((await p.locator('.sheet .gaddr').first().textContent()).includes('Hotel Sample'), 'guest pick-up address shows on the tour card with a map link'); 
   ok((await p.locator('.sheet .when').innerText()).includes('10:00–16:30'), 'saved tour has the new times'); await p.screenshot({ path: S + '/v16-card.png' }); await p.keyboard.press('Escape');
   // tour list
-  await p.click('.tabs [data-v=admin]'); await p.click('[data-act=admintab][data-v=catalog]'); await p.waitForSelector('.crow'); await p.screenshot({ path: S + '/v16-cat.png' });
+  await p.click('.tabs [data-v=admin]'); await p.click('.admmain [data-act=admintab][data-v=catalog]'); await p.waitForSelector('.crow'); await p.screenshot({ path: S + '/v16-cat.png' });
   ok(await p.locator('main table').count() === 0 && await p.locator('.crow').count() > 30, 'tour list is a simple list');
   await p.click('.crow >> nth=1'); await p.waitForSelector('#c-title'); await p.screenshot({ path: S + '/v16-catedit.png' }); await p.fill('#c-cap', '7'); await p.click('form[data-form=cat] button.primary'); await p.waitForTimeout(300);
   ok(await p.evaluate(() => Store.db.settings.find(s => s.id === 'catalog').value.items[1].capacity === 7), 'tour settings are saved from the edit sheet');
