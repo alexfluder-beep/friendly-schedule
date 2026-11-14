@@ -633,3 +633,33 @@ alter table public.profiles add column if not exists cars jsonb not null default
 drop policy if exists tasks_car_own on public.tasks;
 create policy tasks_car_own on public.tasks for insert to authenticated
   with check (kind = 'car_check' and created_by = (select auth.uid()) and status = 'open');
+
+-- 3.90 (written 15 Nov 2026, NOT applied yet: run only after the owner says yes): company cars in Back office > Cars.
+-- One row per car. Everyone signed in with access can read the list (drivers see which car is theirs); only admins add, edit or retire.
+-- A car is never deleted from the app: "Retire" sets active = false and retired_at, and it moves to "Former cars".
+create table if not exists public.vehicles (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,                    -- short label, e.g. "Delica white tiger"
+  make text, model text,                 -- e.g. Mitsubishi / Delica L400
+  plate text,                            -- car number
+  seats int check (seats is null or seats between 1 and 60),   -- seats for guests
+  four_wd boolean not null default false,
+  color text, livery text,               -- colour from the app list, livery / decal as free text
+  photo text,                            -- small JPEG as a data URL, like the car photos on profiles
+  driver_id uuid references public.profiles(id) on delete set null,   -- usual driver
+  notes text,
+  insurance_until date, inspection_until date,   -- technical inspection
+  service_date date, service_km int, km_now int, -- next service by date and / or by km; km_now = last known km reading
+  active boolean not null default true,
+  retired_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.vehicles enable row level security;
+drop policy if exists vehicles_read on public.vehicles;
+drop policy if exists vehicles_admin on public.vehicles;
+create policy vehicles_read on public.vehicles for select to authenticated using ((select public.app_role()) is not null);
+create policy vehicles_admin on public.vehicles for all to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
+revoke all on public.vehicles from anon;
+grant select, insert, update, delete on public.vehicles to authenticated;
+do $$ begin alter publication supabase_realtime add table public.vehicles; exception when duplicate_object then null; when undefined_object then null; end $$;

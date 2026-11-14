@@ -2,7 +2,7 @@
 (() => {
   'use strict';
   const CFG = window.APP_CONFIG || {};
-  const TABLES = ['profiles', 'expenses', 'tours', 'bookings', 'clients', 'client_ratings', 'tour_ratings', 'payout_details', 'log', 'change_requests', 'pay_adjustments', 'personal_dates', 'usage', 'offers', 'time_off', 'holidays', 'tasks', 'notifications', 'settings', 'invites', 'pay_disputes', 'tour_costs', 'photos', 'thanks', 'badge_likes', 'tickets', 'guest_reviews', 'commission_rules', 'payments', 'staff_payments', 'tour_tips'];
+  const TABLES = ['profiles', 'expenses', 'tours', 'bookings', 'clients', 'client_ratings', 'tour_ratings', 'payout_details', 'log', 'change_requests', 'pay_adjustments', 'personal_dates', 'usage', 'offers', 'time_off', 'holidays', 'tasks', 'notifications', 'settings', 'invites', 'pay_disputes', 'tour_costs', 'photos', 'thanks', 'badge_likes', 'tickets', 'guest_reviews', 'commission_rules', 'payments', 'staff_payments', 'tour_tips', 'vehicles'];
   const ADMIN_ONLY = ['commission_rules', 'payments', 'staff_payments'];   // the database shows these to admins only; other phones do not ask
   const DEMO_KEY = 'fs-demo-v18';
   const db = {}; TABLES.forEach(t => db[t] = []);
@@ -128,7 +128,17 @@
       { id: uid(), title: 'Collect lunch vouchers from office', notes: '', due_date: day(1), assignees: [g3.id], status: 'open', tour_id: null, created_by: admin.id, done_by: null, done_at: null }
     ];
     db.notifications = [{ id: uid(), user_id: admin.id, kind: 'off_requested', params: { name: g1.name, from: day(mon + 9), to: day(mon + 12) }, read: false, created_at: new Date().toISOString() }];
+    db.vehicles = demoVehicles(d1.id);
     persistDemo();
+  }
+
+  // Sample company cars (Back office > Cars). Dates sit near today, so the 30-day warnings show in the demo.
+  function demoVehicles(driverId) {
+    const d = n => { const x = new Date(); x.setDate(x.getDate() + n); return iso(x); }, at = new Date().toISOString();
+    return [
+      { id: uid(), name: 'Delica white tiger', make: 'Mitsubishi', model: 'Delica L400', plate: 'DEMO-001', seats: 6, four_wd: true, color: 'white', livery: 'White tiger decal', photo: null, driver_id: driverId || null, notes: 'Sample car', insurance_until: d(12), inspection_until: d(140), service_date: null, service_km: 250000, km_now: 249400, active: true, retired_at: null, created_at: at },
+      { id: uid(), name: 'Armenia cross-border SUV', make: 'Cars4Rent', model: 'SUV (rented)', plate: 'DEMO-002', seats: 4, four_wd: true, color: 'silver', livery: '', photo: null, driver_id: null, notes: 'Sample: rented for Armenia tours', insurance_until: d(-3), inspection_until: d(200), service_date: d(90), service_km: null, km_now: null, active: true, retired_at: null, created_at: at }
+    ];
   }
 
   // ---------- supabase ----------
@@ -195,7 +205,7 @@
   //  MEDIUM (every 30 min while live): people (guide and driver edits), time off, holidays, settings.
   //  LOW (full check every 60 min while live, or when the app is opened after 30 min away): every changed tour/booking/guest, photos, thanks, disputes, adjustments, invites.
   //  Old tours, payments, analytics, badges and ratings only arrive with the live connection or the full check. Weather is kept 24 hours on the phone and exchange rates load once a day.
-  const TOP = ['tasks', 'notifications', 'change_requests'], MED = ['profiles', 'time_off', 'holidays', 'settings'];
+  const TOP = ['tasks', 'notifications', 'change_requests'], MED = ['profiles', 'time_off', 'holidays', 'settings', 'vehicles'];
   const COLD = ['invites', 'pay_disputes', 'pay_adjustments', 'photos', 'thanks'];
   const sig = rows => rows.map(r => JSON.stringify(r)).sort().join('|');
   let pulsing = false;
@@ -295,7 +305,7 @@
     async init() {
       if (mode === 'demo') {
         let ok = false;
-        try { const raw = ls.get(DEMO_KEY); if (raw) { const d = JSON.parse(raw); TABLES.forEach(t => db[t] = d[t] || []); ok = db.profiles.length > 0; } } catch (e) { ok = false; }
+        try { const raw = ls.get(DEMO_KEY); if (raw) { const d = JSON.parse(raw); TABLES.forEach(t => db[t] = d[t] || []); ok = db.profiles.length > 0; if (ok && !d.vehicles) { db.vehicles = demoVehicles((db.profiles.find(p => p.role === 'driver') || {}).id); persistDemo(); } } } catch (e) { ok = false; }
         if (!ok) seedDemo();
         store.syncedAt = new Date().toISOString();
         if (ls.get('fs-demo-out')) { me = null; return; }
