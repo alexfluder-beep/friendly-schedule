@@ -627,3 +627,9 @@ $$;
 -- 3.86: car number and a small car photo on the driver's profile (shown on the team hover card)
 alter table public.profiles add column if not exists car_plate text;
 alter table public.profiles add column if not exists car_photo text;   -- small JPEG as a data URL, like avatar
+
+-- 3.87: cars (model, colour, number, seats, photo; one or two) on the profile, and a second car sends a check task to the office
+alter table public.profiles add column if not exists cars jsonb not null default '[]';
+drop policy if exists tasks_car_own on public.tasks;
+create policy tasks_car_own on public.tasks for insert to authenticated
+  with check (kind = 'car_check' and created_by = (select auth.uid()) and status = 'open');

@@ -1,0 +1,26 @@
+// Usage tab: opens per day, day/evening/night, checks during tours, Drivers and Delica drivers apart, admin left out. Place picker is a searchable multi-select list. Invented data only.
+const { chromium } = require('playwright');
+(async () => { const b = await chromium.launch(); const errs = []; let bad = 0; const ok = (c, m) => { console.log(c ? '  ok  ' : '  FAIL', m); if (!c) bad = 1; };
+  const p = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage(); p.on('pageerror', e => errs.push(e.message));
+  await p.addInitScript(() => { window.__noCelebrate = true; try { localStorage.setItem('fs-test-seen', '1'); } catch (e) {} });
+  await p.goto('http://localhost:8765/index.html'); await p.waitForSelector('.strip'); await p.selectOption('#demo-as', { label: 'Sample Admin · Admin' }); await p.waitForTimeout(500);
+  await p.evaluate(async () => { const S = window.Store, dr = S.db.profiles.filter(x => x.role === 'driver'), gu = S.db.profiles.find(x => x.role === 'guide'), ad = S.db.profiles.find(x => x.role === 'admin'), day = new Date().toISOString().slice(0, 10);
+    await S.save('profiles', { ...dr[0], vehicle: 'delica', cars: [{ model: 'Delica L400', plate: 'A' }, { model: 'Prius', plate: 'B' }] }); await S.save('profiles', { ...dr[1], vehicle: 'own', cars: [{ model: 'Toyota', plate: 'C' }] });
+    for (const [u, a, n] of [[gu.id, 'open', 4], [gu.id, 'hr_20', 3], [gu.id, 'hr_09', 1], [gu.id, 'ph_during', 2], [ad.id, 'open', 50], [ad.id, 'hr_03', 50]]) await S.save('usage', { id: S.uid(), day, user_id: u, action: a, n }); });
+  await p.evaluate(() => { document.querySelector('.nav [data-v=admin], .tabs [data-v=admin]').click(); }); await p.waitForTimeout(300);
+  await p.evaluate(() => { document.querySelector('[data-act=admintab][data-v=usage]').click(); }); await p.waitForTimeout(500);
+  const t = await p.locator('.admmain').innerText();
+  ok(/Evening/.test(t) && /Night/.test(t) && /Day/.test(t), 'day / evening / night shown'); ok(/During tours/.test(t), 'during tours card');
+  ok(await p.locator('[data-act=usf][data-v=delica]').count() === 1 && await p.locator('[data-act=usf][data-v=office]').count() === 0, 'Delica drivers chip, no office chip');
+  const names = async () => p.evaluate(() => [...document.querySelectorAll('.admmain table tr td:first-child')].map(x => x.textContent.trim()));
+  const all = await names(); ok(!all.some(n => /Admin/.test(n)), 'admin not in the table: ' + all.join(','));
+  await p.locator('[data-act=usf][data-v=delica]').click(); await p.waitForTimeout(300); const dl = await names();
+  await p.locator('[data-act=usf][data-v=driver]').click(); await p.waitForTimeout(300); const dr = await names();
+  ok(dl.length === 1 && dr.length === 3, 'Delica ' + dl.length + ' / Drivers ' + dr.length + ' (a driver with two cars is in both)');
+  await p.evaluate(() => { document.querySelector('[data-act=admintab][data-v=catalog]').click(); }); await p.waitForTimeout(300);
+  await p.evaluate(() => { document.querySelector('[data-act=catedit]').click(); }); await p.waitForTimeout(300);
+  await p.evaluate(() => { document.querySelector('#modal details.sect:has([data-rg])').open = true; document.querySelector('.placepick').open = true; });
+  ok(await p.locator('.placepick input[data-rg]').count() > 30, 'many places in the list');
+  await p.fill('[data-psearch]', 'borj'); await p.waitForTimeout(200); ok(await p.locator('.placepick label[data-pn]:visible').count() === 1, 'search narrows the list');
+  await p.locator('.placepick label[data-pn]:visible input').check(); ok((await p.locator('.placepick .lsum').innerText()).includes('Borjomi'), 'selection shown in the summary');
+  ok(!errs.length, 'errors ' + errs.join('|')); await b.close(); process.exit(bad); })();
