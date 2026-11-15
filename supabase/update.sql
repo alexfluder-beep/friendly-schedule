@@ -636,3 +636,7 @@ create policy tasks_car_own on public.tasks for insert to authenticated
 
 -- 3.90: private car documents, fines and driving licence
 alter table public.payout_details add column if not exists car_docs jsonb not null default '{}'::jsonb;
+
+
+-- 3.92: more guides on one tour (each with an own pay)
+alter table public.tours add column if not exists extra_guides jsonb not null default '[]'::jsonb;

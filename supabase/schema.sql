@@ -44,6 +44,7 @@ create table if not exists public.tours (
   adults int not null default 0,
   children int not null default 0,
   guide_pay numeric, driver_pay numeric,   -- set only when this tour pays differently from the standard rate
+  extra_guides jsonb not null default '[]'::jsonb,   -- more guides on one tour: [{"id": profile id, "pay": amount or null for the standard rate}]
   language text, pickup text, pickup_url text, notes text,
   status text not null default 'confirmed' check (status in ('confirmed','cancelled')),
   cancel_reason text, cancelled_at timestamptz,

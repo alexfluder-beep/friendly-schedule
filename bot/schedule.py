@@ -154,8 +154,16 @@ class ScheduleClient:
         """Confirmed tours of one person that touch the given dates (multi-day tours included)."""
         rows = self._call("GET", "tours", {
             "or": f"(guide_id.eq.{profile_id},driver_id.eq.{profile_id})", "status": "eq.confirmed",
-            "date": "lte." + date_to, "select": "id,date,date_to,start_time,end_time,title,pax,pickup,guide_id,driver_id",
+            "date": "lte." + date_to, "select": "id,date,date_to,start_time,end_time,title,pax,pickup,guide_id,driver_id,extra_guides",
             "order": "date.asc,start_time.asc"})
+        try:   # tours where this person is one of several guides (extra_guides); a problem here must never hide the main list
+            more = self._call("GET", "tours", {
+                "extra_guides": 'cs.[{"id":"%s"}]' % profile_id, "status": "eq.confirmed", "date": "lte." + date_to,
+                "select": "id,date,date_to,start_time,end_time,title,pax,pickup,guide_id,driver_id,extra_guides", "order": "date.asc,start_time.asc"})
+            seen = {t["id"] for t in rows}; rows = list(rows) + [t for t in (more or []) if t["id"] not in seen]
+            rows.sort(key=lambda t: (t["date"], t.get("start_time") or ""))
+        except Exception:
+            pass
         return [t for t in rows if (t.get("date_to") or t["date"]) >= date_from]
 
     def names(self, ids: list) -> dict:

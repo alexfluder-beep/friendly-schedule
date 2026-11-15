@@ -10,7 +10,7 @@ const { chromium } = require('playwright');
   await p.evaluate(i => { document.querySelector(`[data-act=pedit][data-id="${i}"]`).click(); }, id); await p.waitForTimeout(400);
   await p.evaluate(i => { document.querySelector(`#modal [data-act=cars][data-id="${i}"]`).click(); }, id); await p.waitForTimeout(400);
   const fill = async (i, k, v) => p.fill(`[data-car="${i}.${k}"]`, v);
-  await fill(0, 'model', 'Delica L400'); await p.locator('.carbox').first().locator('label.sw', { hasText: 'White' }).click(); await fill(0, 'plate', 'zz-777-yy'); await fill(0, 'seats', '6');
+  await fill(0, 'model', 'Delica L400'); await p.selectOption('.carbox [data-car="0.color"]', 'white'); await fill(0, 'plate', 'zz-777-yy'); await fill(0, 'seats', '6');
   await p.locator('input[data-ch=carphoto]').first().setInputFiles({ name: 'c.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64') }); await p.waitForTimeout(600);
   ok(await p.locator('.carphoto img').count() === 1, 'photo preview'); ok(await p.inputValue('[data-car="0.model"]') === 'Delica L400', 'typing kept after the photo');
   await p.locator('[data-act=caradd]').click(); await p.waitForTimeout(300); ok(await p.locator('.carbox').count() === 2, 'second car form');

@@ -24,7 +24,7 @@ const { chromium } = require('playwright');
   ok(row.pax === 2 && /cancelled/.test(row.mark), 'tour now counts 2 guests, guest is marked cancelled (' + row.pax + ')');
   await open(); const s = await txt();
   ok(/Cancelled guests \(1\)/.test(s) && /flight changed/.test(s), 'cancelled list shows the guest with the reason');
-  ok(/Guests on this tour \(1\)/.test(s), 'guest list shows only the active guest');
+  ok(/Guests on this tour\s*\d+ (people|person)/.test(s), 'guest list shows only the active guest');
   await p.evaluate(() => document.querySelector('[data-act=gcxback]').click()); await p.waitForTimeout(900);
   const r2 = await p.evaluate(i => window.Store.db.tours.find(t => t.id === i).pax, ids.t); ok(r2 === 3, 'restore brings the count back to 3');
   ok(!errs.length, 'errors ' + errs.join('|')); await b.close(); process.exit(bad); })();

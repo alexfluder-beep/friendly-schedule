@@ -18,7 +18,7 @@ const { chromium } = require('playwright');
     let s = await sheetOf(ids.a);
     ok(/Alpha Guest/.test(s) && /Hotel Alpha/.test(s), w + ' driver sees the pick-up guest and address');
     ok(!/Bravo Guest|Charlie Guest|555000002|555000003/.test(s), w + ' driver does not see the other guests');
-    ok(/Pick-up guests \(1\)/.test(s) && /4 more guests meet/.test(s), w + ' pick-up heading and "4 more guests" note');
+    ok(/Pick-up guests\s*2 people/.test(s) && /4 more guests meet/.test(s), w + ' pick-up heading and "4 more guests" note');
     s = await sheetOf(ids.t); ok(/Delta Guest/.test(s), w + ' transfer: driver sees the guest');
     s = await sheetOf(ids.n); ok(/Echo Guest/.test(s), w + ' tour without a guide: driver sees everyone');
     // late request: a pick-up is added for Bravo

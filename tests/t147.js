@@ -1,0 +1,26 @@
+// Profile and My car: car switch sits below the details and is a switch; colour is a list; calendar views live in the left panel. Invented data only.
+const { chromium } = require('playwright');
+(async () => { const b = await chromium.launch(); const errs = []; let bad = 0; const ok = (c, m) => { console.log(c ? '  ok  ' : '  FAIL', m); if (!c) bad = 1; };
+  const p = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage(); p.on('pageerror', e => errs.push(e.message));
+  await p.addInitScript(() => { window.__noCelebrate = true; try { localStorage.setItem('fs-test-seen', '1'); } catch (e) {} });
+  await p.goto('http://localhost:8765/index.html'); await p.waitForSelector('.strip'); await p.selectOption('#demo-as', { label: 'Mariam (sample) · Guide' }); await p.waitForTimeout(500);
+  await p.evaluate(() => { document.querySelector('.nav [data-v=me], .tabs [data-v=me]').click(); }); await p.waitForTimeout(400);
+  const y = async s => (await p.locator(s).first().boundingBox()).y;
+  ok(await y('#me-details') < await y('[data-ch=mycar]'), 'car switch is below My details');
+  const sw = await p.locator('[data-ch=mycar]').evaluate(e => getComputedStyle(e).appearance); ok(sw === 'none', 'car checkbox is drawn as a switch');
+  const lb = await p.locator('.swrow').first().boundingBox(), tx = await p.locator('.swrow').first().evaluate(e => e.getBoundingClientRect().left); ok(lb.width > 250, 'car row spans the card, text on the left');
+  await p.locator('[data-ch=mycar]').click(); await p.waitForTimeout(700);
+  ok(await p.locator('.carbox select[data-car="0.color"]').count() === 1 && await p.locator('.swatches').count() === 0, 'colour is a list');
+  await p.selectOption('[data-car="0.color"]', 'blue'); await p.fill('[data-car="0.model"]', 'Test Van'); await p.locator('form[data-form=cars] button.primary').click(); await p.waitForTimeout(800);
+  const col = await p.evaluate(() => { const D = window.Store.db, me = D.profiles.find(x => x.name && /Mariam/.test(x.name)); return ((me.cars || [])[0] || {}).color; }); ok(col === 'blue', 'colour saved: ' + col);
+  await p.selectOption('#demo-as', { label: 'Sample Admin · Admin' }); await p.waitForTimeout(600);
+  await p.evaluate(() => { document.querySelector('.nav [data-v=calendar], .tabs [data-v=calendar]').click(); }); await p.waitForTimeout(500);
+  ok(await p.locator('.sidepanel .vwb').count() === 5, 'five view buttons in the left panel');
+  ok(!(await p.locator('.calmain .bar .vseg').first().isVisible().catch(() => false)), 'top bar no longer repeats the view buttons');
+  await p.locator('.sidepanel .vwb[data-m=month]').click(); await p.waitForTimeout(400); ok(await p.locator('.sidepanel .vwb[data-m=month].on').count() === 1, 'month view selected from the left panel');
+  await p.selectOption('#demo-as', { label: 'Mariam (sample) · Guide' }); await p.waitForTimeout(600);
+  await p.evaluate(() => { document.querySelector('.nav [data-v=calendar], .tabs [data-v=calendar]').click(); }); await p.waitForTimeout(500);
+  ok(await p.locator('.usplit .vwb').count() === 4, 'guide edition: four view buttons in the left panel');
+  ok(!(await p.locator('.calmain .vseg').first().isVisible().catch(() => false)), 'guide edition: top bar does not repeat them');
+  await p.locator('.usplit .vwb[data-m=month]').click(); await p.waitForTimeout(400); ok(await p.locator('.usplit .vwb[data-m=month].on').count() === 1, 'guide edition: month selected from the left panel');
+  ok(!errs.length, 'errors ' + errs.join('|')); await b.close(); process.exit(bad); })();

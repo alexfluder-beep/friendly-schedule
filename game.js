@@ -51,7 +51,7 @@
         if (st && st < '07:30') early++; if (st >= '12:00') late++; if ((t.end_time || '') >= '21:00') night++;
         if (dow === 0 || dow === 6) weekend++;
         if (t.kind === 'group' && t.capacity > 0 && t.pax >= t.capacity) full++;
-        earned += payFor(t, t.guide_id === id ? 'guide' : 'driver') || 0;
+        earned += (t.guide_id === id || t.driver_id === id ? payFor(t, t.guide_id === id ? 'guide' : 'driver') : 0) || 0;
         regionsOf(t.title).forEach(r => regs.add(r)); months.add(t.date.slice(5, 7)); starts[t.date] = (starts[t.date] || 0) + 1;
         const other = t.guide_id === id ? t.driver_id : t.guide_id; if (other && other !== id) partners[other] = (partners[other] || 0) + 1;
         const yy = t.date.slice(0, 4), mN = Number(t.date.slice(5, 7)), dN = Number(t.date.slice(8, 10)), wk = monday(t.date); per.w[wk] = (per.w[wk] || 0) + 1; per.m[mm] = (per.m[mm] || 0) + 1; per.y[yy] = (per.y[yy] || 0) + 1; if (mN >= r0.seasonFrom && mN <= r0.seasonTo) per.s[yy] = (per.s[yy] || 0) + 1; if (wk === thisMon) weekNow++;
