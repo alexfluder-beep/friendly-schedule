@@ -931,3 +931,6 @@ drop policy if exists tickets_files_delete on storage.objects;
 create policy tickets_files_read on storage.objects for select to authenticated using (bucket_id = 'tickets' and ((storage.foldername(name))[1] = (select auth.uid())::text or (select public.is_admin())));
 create policy tickets_files_insert on storage.objects for insert to authenticated with check (bucket_id = 'tickets' and (select public.app_role()) is not null and (storage.foldername(name))[1] = (select auth.uid())::text);
 create policy tickets_files_delete on storage.objects for delete to authenticated using (bucket_id = 'tickets' and (select public.is_admin()));
+
+-- 3.90: private car documents, fines and driving licence (own row + admins only, same policies as the bank details)
+alter table public.payout_details add column if not exists car_docs jsonb not null default '{}'::jsonb;

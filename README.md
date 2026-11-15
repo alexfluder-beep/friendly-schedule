@@ -7,6 +7,7 @@ Team scheduling for guides and drivers: tours (private, group, customised), days
 With `config.js` left empty the app runs in **demo mode**: sample data, stored only in that browser, no login.
 
 ## What is included
+- 3.90: the My car tab now has type (4x4, SUV, sedan, minivan…), fuel, year, child seat, and a private Documents section (insurance, taxi licence, technical inspection date with due chips, fines list, driving licence number). "I have a car" is now a switch. Needs the private column payout_details.car_docs.
 - 3.89: a My car tab on the Me screen right after Profile for drivers and guides with a car (photo, model, colour, number, seats, second car); guides without a car get an I have a car button.
 - 3.88: the opening greeting follows the hour (00:26 says Good night, not Good afternoon); car colour is picked from a list of 12 colours instead of typed.
 - 3.87: cars on the profile (model, colour, number, seats, photo, a second car sends a check task to the office); Timeline fits many people and keeps the hour column in view; Usage tab shows opens per day, day / evening / night and checks during tours, with Guides, Drivers and Delica drivers apart and admins left out; tour places are a searchable multi-select list with about 50 places (new column cars on profiles, task rule tasks_car_own).

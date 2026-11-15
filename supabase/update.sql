@@ -633,3 +633,6 @@ alter table public.profiles add column if not exists cars jsonb not null default
 drop policy if exists tasks_car_own on public.tasks;
 create policy tasks_car_own on public.tasks for insert to authenticated
   with check (kind = 'car_check' and created_by = (select auth.uid()) and status = 'open');
+
+-- 3.90: private car documents, fines and driving licence
+alter table public.payout_details add column if not exists car_docs jsonb not null default '{}'::jsonb;

@@ -1,0 +1,27 @@
+// Extended car form: type, fuel, year, child seat, private documents, fines, licence. Invented data only.
+const { chromium } = require('playwright');
+(async () => { const b = await chromium.launch(); const errs = []; let bad = 0; const ok = (c, m) => { console.log(c ? '  ok  ' : '  FAIL', m); if (!c) bad = 1; };
+  const p = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage(); p.on('pageerror', e => errs.push(e.message));
+  await p.addInitScript(() => { window.__noCelebrate = true; try { localStorage.setItem('fs-test-seen', '1'); } catch (e) {} });
+  await p.goto('http://localhost:8765/index.html'); await p.waitForSelector('.strip'); await p.selectOption('#demo-as', { label: 'Mariam (sample) · Guide' }); await p.waitForTimeout(500);
+  await p.evaluate(() => { document.querySelector('.nav [data-v=me], .tabs [data-v=me]').click(); }); await p.waitForTimeout(400);
+  ok(await p.locator('.metabs [data-v=car]').count() === 0, 'no car tab before the switch');
+  await p.locator('[data-ch=mycar]').click(); await p.waitForTimeout(700);
+  ok(await p.locator('.metabs button').nth(1).innerText().then(t => t.trim() === 'My car'), 'My car tab sits after Profile');
+  await p.fill('[data-car="0.model"]', 'Test Van'); await p.fill('[data-car="0.plate"]', 'zz-9-zz'); await p.fill('[data-car="0.seats"]', '7'); await p.fill('[data-car="0.year"]', '2016');
+  await p.selectOption('[data-car="0.body"]', 'minivan'); await p.selectOption('[data-car="0.fuel"]', 'hybrid'); await p.locator('[data-car="0.child"]').check();
+  await p.fill('[data-car="lic"]', 'ab12345'); await p.locator('summary').first().click();
+  await p.fill('[data-car="0.docs.ins.co"]', 'Test Insurance'); await p.fill('[data-car="0.docs.ins.until"]', '2020-01-01'); await p.fill('[data-car="0.docs.insp"]', '2099-01-01');
+  await p.locator('[data-car="0.docs.fines_on"]').check(); await p.locator('[data-act=finadd]').click(); await p.waitForTimeout(200);
+  await p.fill('[data-car="0.docs.fines.0.amount"]', '50'); await p.fill('[data-car="0.docs.fines.0.note"]', 'Speed');
+  ok(await p.locator('.carbox .tag.t-danger').count() >= 1, 'expired insurance shows a red chip after render');
+  await p.locator('form[data-form=cars] button.primary').click(); await p.waitForTimeout(800);
+  const r = await p.evaluate(() => { const D = window.Store.db, me = D.profiles.find(x => x.name && /Mariam/.test(x.name)); const c = (me.cars || [])[0] || {}; const pd = D.payout_details.find(x => x.id === me.id) || {}; return { c, keys: Object.keys(c), pd: pd.car_docs }; });
+  ok(r.c.body === 'minivan' && r.c.fuel === 'hybrid' && r.c.year == 2016 && r.c.child === true && r.c.plate === 'ZZ-9-ZZ', 'public fields saved ' + JSON.stringify(r.c).slice(0, 160));
+  ok(!JSON.stringify(r.c).includes('Insurance') && !('docs' in r.c), 'documents are not in the public profile');
+  ok(r.pd && r.pd.licence === 'AB12345' && r.pd.cars[r.c.id].ins.co === 'Test Insurance' && r.pd.cars[r.c.id].fines.length === 1 && r.pd.cars[r.c.id].fines[0].note === 'Speed', 'private docs saved in payout_details');
+  await p.locator('.metabs [data-v=settings]').click(); await p.locator('.metabs [data-v=car]').click(); await p.waitForTimeout(300);
+  ok(await p.inputValue('[data-car="0.body"]') === 'minivan' && await p.inputValue('[data-car="lic"]') === 'AB12345', 'values come back when the tab is reopened');
+  await p.locator('.metabs [data-v=profile]').click(); await p.waitForTimeout(200); await p.locator('[data-ch=mycar]').click(); await p.waitForTimeout(700);
+  ok(await p.locator('.metabs [data-v=car]').count() === 0, 'switch off hides the tab');
+  ok(!errs.length, 'errors ' + errs.join('|')); await b.close(); process.exit(bad); })();
