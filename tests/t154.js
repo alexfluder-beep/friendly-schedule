@@ -1,0 +1,20 @@
+// Guest cards: a saved guest never shows "Already in the base"; the money line (client paid, platform commission, company keeps) shows numbers, never NaN. Invented data only.
+const { chromium } = require('playwright');
+(async () => { const b = await chromium.launch(); const errs = []; let bad = 0; const ok = (c, m) => { console.log(c ? '  ok  ' : '  FAIL', m); if (!c) bad = 1; };
+  const p = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage(); p.on('pageerror', e => errs.push(e.message));
+  await p.addInitScript(() => { window.__noCelebrate = true; try { localStorage.setItem('fs-test-seen', '1'); } catch (e) {} });
+  await p.goto('http://localhost:8765/index.html'); await p.waitForSelector('.strip'); await p.selectOption('#demo-as', { label: 'Sample Admin · Admin' }); await p.waitForTimeout(600);
+  await p.evaluate(() => { const e = document.querySelector('[data-act=newtour]'); if (e) e.click(); }); await p.waitForSelector('#t-title');
+  await p.fill('#t-title', 'Guest card test'); await p.fill('#t-date', '2026-11-25'); await p.fill('#t-start', '10:00');
+  await p.click('[data-act=badd]'); await p.waitForTimeout(200);
+  await p.fill('[data-bi="0"][data-bf=guest]', 'Zed Tester'); await p.fill('[data-bi="0"][data-bf=price]', '30'); await p.selectOption('[data-bi="0"][data-bf=payment]', 'prepaid'); await p.waitForTimeout(300);
+  const gm = await p.locator('#gm-0').innerText(); ok(/30/.test(gm) && !/NaN/.test(gm), 'money line has numbers: ' + gm.replace(/\s+/g, ' '));
+  await p.fill('[data-bi="0"][data-bf=price]', '45.5'); await p.waitForTimeout(300);
+  const gm2 = await p.locator('#gm-0').innerText(); ok(/4[56]/.test(gm2) && !/NaN/.test(gm2), 'money line follows the price: ' + gm2.replace(/\s+/g, ' '));
+  await p.click('form[data-form=tour] > .actions button.primary'); await p.waitForTimeout(800);
+  await p.evaluate(() => { const e = document.createElement('button'); e.dataset.act = 'tour'; e.dataset.id = (window.Store && window.Store.db ? window.Store.db.tours : []).find(x => x.title === 'Guest card test')?.id || ''; e.hidden = true; document.querySelector('main').appendChild(e); e.click(); }); await p.waitForTimeout(500);
+  await p.evaluate(() => { const e = document.querySelector('#modal [data-act=touredit]'); if (e) e.click(); }); await p.waitForTimeout(500);
+  ok(await p.locator('#modal [data-bi="0"][data-bf=guest]').count() === 1, 'saved tour reopened in edit mode');
+  ok(await p.locator('#gsug-0 .sgrow, #gsug-0 > *').count() === 0, 'saved guest card shows no suggestion');
+  const gm3 = await p.locator('#gm-0').innerText(); ok(!/NaN/.test(gm3), 'saved card money line has no NaN: ' + gm3.replace(/\s+/g, ' '));
+  ok(!errs.length, 'errors ' + errs.join('|')); await b.close(); process.exit(bad); })();

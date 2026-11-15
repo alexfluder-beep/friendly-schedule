@@ -1,4 +1,4 @@
-// Profile and My car: car switch sits below the details and is a switch; colour is a list; calendar views live in the left panel. Invented data only.
+// Profile and My car: car switch sits below the details and is a switch; colour is a list; the view switch is in the top bar, the team list on the left in every view. Invented data only.
 const { chromium } = require('playwright');
 (async () => { const b = await chromium.launch(); const errs = []; let bad = 0; const ok = (c, m) => { console.log(c ? '  ok  ' : '  FAIL', m); if (!c) bad = 1; };
   const p = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage(); p.on('pageerror', e => errs.push(e.message));
@@ -15,12 +15,14 @@ const { chromium } = require('playwright');
   const col = await p.evaluate(() => { const D = window.Store.db, me = D.profiles.find(x => x.name && /Mariam/.test(x.name)); return ((me.cars || [])[0] || {}).color; }); ok(col === 'blue', 'colour saved: ' + col);
   await p.selectOption('#demo-as', { label: 'Sample Admin · Admin' }); await p.waitForTimeout(600);
   await p.evaluate(() => { document.querySelector('.nav [data-v=calendar], .tabs [data-v=calendar]').click(); }); await p.waitForTimeout(500);
-  ok(await p.locator('.sidepanel .vwb').count() === 5, 'five view buttons in the left panel');
-  ok(!(await p.locator('.calmain .bar .vseg').first().isVisible().catch(() => false)), 'top bar no longer repeats the view buttons');
-  await p.locator('.sidepanel .vwb[data-m=month]').click(); await p.waitForTimeout(400); ok(await p.locator('.sidepanel .vwb[data-m=month].on').count() === 1, 'month view selected from the left panel');
+  ok(await p.locator('.calmain .bar .vseg button').count() === 5 && await p.locator('.calmain .bar .vseg').first().isVisible(), 'admin: five view buttons in the top bar');
+  ok(await p.locator('.sidepanel .vwb').count() === 0 && await p.locator('.sidepanel .cpp').count() > 5, 'admin: left panel is the team list, no view buttons');
+  await p.locator('.calmain .vseg [data-m=time]').click(); await p.waitForTimeout(500);
+  ok(await p.locator('.tlwrap').count() === 1 && await p.locator('#sidepanel .cpp[data-act=whoset]').count() > 5 && await p.locator('.tlfilter').count() === 0, 'timeline: team list on the left, no chip row');
+  const pe = p.locator('#sidepanel .cpp[data-act=whoset]').nth(2); await pe.click(); await p.waitForTimeout(500);
+  ok(await p.locator('.tlh').count() <= 2, 'timeline: picking a person on the left shows only that column');
+  await p.locator('.calmain .vseg [data-m=month]').click(); await p.waitForTimeout(400); ok(await p.locator('.calmain .vseg [data-m=month][aria-pressed=true]').count() === 1, 'month view selected from the top bar');
   await p.selectOption('#demo-as', { label: 'Mariam (sample) · Guide' }); await p.waitForTimeout(600);
   await p.evaluate(() => { document.querySelector('.nav [data-v=calendar], .tabs [data-v=calendar]').click(); }); await p.waitForTimeout(500);
-  ok(await p.locator('.usplit .vwb').count() === 4, 'guide edition: four view buttons in the left panel');
-  ok(!(await p.locator('.calmain .vseg').first().isVisible().catch(() => false)), 'guide edition: top bar does not repeat them');
-  await p.locator('.usplit .vwb[data-m=month]').click(); await p.waitForTimeout(400); ok(await p.locator('.usplit .vwb[data-m=month].on').count() === 1, 'guide edition: month selected from the left panel');
+  ok(await p.locator('.vseg button').count() === 4 && await p.locator('.vseg').first().isVisible() && await p.locator('.usplit').count() === 0, 'guide edition: four view buttons in the top bar, no left panel');
   ok(!errs.length, 'errors ' + errs.join('|')); await b.close(); process.exit(bad); })();

@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.93';
+  const APP_VERSION = '3.94';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -795,8 +795,8 @@
   const srcIcon = s => (/^(website|direct)$/i.test(s) ? 'language' : 'storefront'), srcShort = s => ({ GetYourGuide: 'GYG', Website: 'Web', FreeTour: 'Free tour' }[s] || s);
   function metaHtml(t) {
     if (!live(t)) return ''; const cur = esc(rules().currency || 'GEL'), bks = tourBookings(t.id), chips = [];
-    if (isAdmin()) {
-      [...new Set(bks.map(b => srcName(sourceOf(b) || b.source)).filter(Boolean))].slice(0, 2).forEach(s => chips.push(`<span class="mchip" title="${esc(s)}">${msi(srcIcon(s))}${esc(srcShort(s))}</span>`));
+    if (isAdmin()) [...new Set(bks.map(b => srcName(sourceOf(b) || b.source)).filter(Boolean))].slice(0, 2).forEach(s => chips.push(`<span class="mchip" title="${esc(s)}">${msi(srcIcon(s))}${esc(srcShort(s))}</span>`));
+    {
       const st = new Set(bks.map(b => b.payment).filter(Boolean)), due = bks.reduce((n, b) => n + (Number(b.amount_due) || 0), 0);
       if (st.has('prepaid')) chips.push(`<span class="mchip ok">${msi('credit_card')}${T('pay_online')}</span>`);
       if (st.has('cash')) chips.push(`<span class="mchip">${msi('payments')}${T('pay_cash')}${due ? ' ' + esc(nf(due)) : ''}</span>`);
@@ -866,7 +866,7 @@
     const lg = b.lang || ({ RUS: 'RU', GER: 'DE', FRA: 'FR' })[(String(b.guest).match(/\b(RUS|GER|FRA)\b/) || [])[1]] || '';
     const fr = isFree(b), marks = (b.marks || []).map(markLabel), bits = [...(lg && !/^EN/i.test(lg) ? [langName(String(lg).toUpperCase())] : []), ...marks], more = bits.length > 2 ? bits.length - 2 : 0;
     const trouble = (clientRating(b.client_id) || {}).rating === 'trouble';
-    const sum = [fr ? `<span class="tag t-free">${esc(T('free_guest'))}</span>` : '', due ? `<b class="due num">${esc(due)}</b>` : '', ...bits.slice(0, 2).map(esc), more ? `+${more}` : ''].filter(Boolean).join(' · ');   // the guest count sits at the end of the name line; this second line shows only when there is something to say
+    const sum = [fr ? `<span class="tag t-free">${esc(T('free_guest'))}</span>` : '', due ? `<b class="due num">${esc(due)}</b>` : b.payment === 'prepaid' ? `<span class="tag t-ok">${esc(T('pay_online'))}</span>` : '', ...bits.slice(0, 2).map(esc), more ? `+${more}` : ''].filter(Boolean).join(' · ');   // the guest count sits at the end of the name line; this second line shows only when there is something to say
     return `<div class="grow gst ${fr ? 'free' : ''}"><span class="grid"><button class="gbtn" data-act="guest" data-id="${b.id}"><span class="avatar ini ${fr ? 'free' : ''}">${esc(initials(cleanName(b.guest) || b.guest))}</span><span class="gtxt"><span class="gline"><span class="gname">${esc(cleanName(b.guest) || b.guest)}</span><span class="gcnt num">${esc(acText(b))}</span></span>${sum ? `<span class="gsum">${sum}</span>` : ''}</span></button>${b.attendance ? `<span class="tag ${b.attendance === 'arrived' ? 't-ok' : 't-danger'}">${T('att_' + b.attendance)}</span>` : '<span></span>'}${b.phone ? `<span class="cbtns">${ib('wa', 'WhatsApp', waLink(b.phone))}${ib('call', T('call'), 'tel:' + b.phone)}</span>` : '<span class="cbtns" aria-hidden="true"></span>'}</span>${needAddr && b.pickup_addr && !sameAddr ? `<span class="gaddr">${ico('pin')}<span>${esc(b.pickup_addr)}</span></span>` : ''}${trouble ? `<span class="row">${ratingTag(b.client_id)}</span>` : ''}</div>`;
   }
   function guestRowsHtml(t) {
@@ -997,11 +997,9 @@
       && (!q || [t.title, pname(t.guide_id), pname(t.driver_id), ...tourBookings(t.id).map(b => b.guest + ' ' + (b.ref || '') + ' ' + (b.phone || ''))].join(' ').toLowerCase().includes(q))).sort((a, b) => (a.date + (a.start_time || '')).localeCompare(b.date + (b.start_time || '')));
   }
   const TLH = 52;
-  const tlHidden = () => { if (!state.tlHide) { let a = []; try { a = JSON.parse(localStorage.getItem('fs-tl-hide') || '[]'); } catch (e) { /* private mode */ } state.tlHide = new Set(Array.isArray(a) ? a : []); } return state.tlHide; };
-  const tlSave = () => { try { localStorage.setItem('fs-tl-hide', JSON.stringify([...tlHidden()])); } catch (e) { /* private mode */ } };
   function timelineHtml() {
-    const d = state.date, td = today(), hide = tlHidden(), all = crew();
-    const shown = all.filter(p => !hide.has(p.id) && (!state.mine || p.id === me().id) && (!state.who || p.id === state.who));
+    const d = state.date, td = today(), all = crew();
+    const shown = all.filter(p => (!state.mine || p.id === me().id) && (!state.who || p.id === state.who));
     const ts = toursOnDay(d).filter(live), wd = (D(d).getDay() + 6) % 7;
     const endM = t => (endOf(t) > d ? 1440 : (t.end_time && t.start_time && t.end_time > t.start_time ? mins(t.end_time) : mins(t.start_time || '09:00') + 90));
     const startM = (t, from) => (t.date < d ? from : t.start_time ? mins(t.start_time) : from);
@@ -1009,8 +1007,7 @@
     ts.forEach(t => { if (t.date === d && t.start_time) from = Math.min(from, Math.floor(mins(t.start_time) / 60) * 60); to = Math.max(to, Math.min(1440, Math.ceil(endM(t) / 60) * 60)); });
     const H = (to - from) / 60 * TLH, px = m => Math.round((m - from) / 60 * TLH);
     const un = ts.filter(t => !t.guide_id && !t.driver_id), cols = [...(un.length && !state.mine && !state.who ? [{ id: '', name: T('unassigned'), sub: '', list: un }] : []), ...shown.map(p => ({ id: p.id, name: p.name, sub: T('role_' + p.role), list: ts.filter(t => involves(t, p.id)) }))];
-    const filter = `<div class="tlfilter" role="group" aria-label="${T('tl_pick')}">${all.map(p => `<button class="tlp" data-act="tlpick" data-id="${p.id}" aria-pressed="${!hide.has(p.id)}">${avatar(p.id)}<span>${esc(firstName(p) || p.name)}</span></button>`).join('')}<button class="btn sm" data-act="tlall">${T('tl_all')}</button><button class="btn sm" data-act="tlnone">${T('tl_none')}</button></div>`;
-    if (!cols.length) return `${filter}<div class="empty">${T('tl_empty')}</div>`;
+    if (!cols.length) return `<div class="empty">${T('tl_empty')}</div>`;
     const lanes = list => { const out = [], ends = []; list.slice().sort((a, b) => startM(a, from) - startM(b, from)).forEach(t => { const s = startM(t, from); let i = ends.findIndex(e => e <= s); if (i < 0) { i = ends.length; ends.push(0); } ends[i] = endM(t); out.push({ t, i }); }); return out.map(o => ({ ...o, n: ends.length })); };
     const grey = (a, b, label) => (b > a ? `<div class="tloff" style="top:${px(a)}px;height:${px(b) - px(a)}px">${label ? `<span>${esc(label)}</span>` : ''}</div>` : '');
     const colHtml = c => {
@@ -1023,7 +1020,7 @@
     const hours = [...Array((to - from) / 60)].map((_, i) => `<span style="top:${i * TLH}px">${String(from / 60 + i).padStart(2, '0')}:00</span>`).join('');
     const now = new Date(), nm = now.getHours() * 60 + now.getMinutes(), nowLine = d === td && nm >= from && nm <= to ? `<div class="tlnow" style="top:${px(nm)}px"><span>${hhmm(nm)}</span></div>` : '';
     const gt = `grid-template-columns:48px repeat(${cols.length},minmax(${cols.length > 9 ? 108 : cols.length > 6 ? 130 : 150}px,1fr))`;
-    return `${filter}<div class="tlwrap"><div class="tlhead${cols.length > 9 ? ' tight' : ''}" style="${gt}"><div class="tlcorner"></div>${cols.map(c => `<div class="tlh">${c.id ? avatar(c.id) : ''}<div><b>${esc(c.name)}</b><span class="r">${esc(c.sub)}</span></div></div>`).join('')}</div>
+    return `<div class="tlwrap"><div class="tlhead${cols.length > 9 ? ' tight' : ''}" style="${gt}"><div class="tlcorner"></div>${cols.map(c => `<div class="tlh">${c.id ? avatar(c.id) : ''}<div><b>${esc(c.name)}</b><span class="r">${esc(c.sub)}</span></div></div>`).join('')}</div>
       <div class="tlbody" style="${gt}"><div class="tlhours" style="height:${H}px">${hours}</div>${cols.map(colHtml).join('')}${nowLine}</div></div>`;
   }
   // Admin calendar: a team panel that slides in from the left (like Setmore): your own calendar, a search box and the team with photos.
@@ -1033,17 +1030,14 @@
   const sideSet = v => { state.side = !!v; if (!NARROW()) { try { localStorage.setItem('fs-side', v ? '1' : '0'); } catch (e) { /* no storage */ } } };
   function calendarHtml() {
     const wide = isAdmin() && state.mode === 'week' && state.wgrid && !state.mine;
-    const viewList = ms => ms.map(([m, k]) => `<button class="cpp vwb${state.mode === m ? ' on' : ''}" data-act="mode" data-m="${m}" aria-pressed="${state.mode === m}" title="${esc(T('v_key', { k }))}"><span>${T('v_' + m)}</span></button>`).join('');
-    // Guides and drivers on a computer: a slim left panel with only the view list (Day, Week, Month, Agenda).
-    if (!isAdmin() && !NARROW() && !PHONE()) return `<div class="calsplit open usplit"><aside class="sidepanel" id="sidepanel" aria-label="${T('side_view')}"><div class="spin"><b class="sph">${T('side_view')}</b>${viewList([['day', 'D'], ['week', 'W'], ['month', 'M'], ['agenda', 'A']])}</div></aside><div class="calframe calmain">${calendarInner()}</div></div>`;
-    if (!isAdmin() || state.mode === 'time') return `<div class="calframe ${wide ? 'calwide' : ''}">${calendarInner()}</div>`;
+    // The view switch (Day, Week, Month, Agenda, Timeline) is always in the top bar; the left panel is the team list (a computer shows it, a phone slides it over).
+    if (!isAdmin()) return `<div class="calframe">${calendarInner()}</div>`;
     const who = state.who || '', cr = crew(), open = sideOpen(), q = String(state.sideQ || '').trim().toLowerCase(), mineOn = !!state.mine;
     const btn = (id, label, ic, on, act) => `<button class="cpp${on ? ' on' : ''}" data-act="${act}" data-v="${id}" data-n="${esc(String(label).toLowerCase())}" aria-pressed="${on}"${q && !String(label).toLowerCase().includes(q) ? ' hidden' : ''}>${ic}<span>${esc(label)}</span></button>`;
     const title = mineOn ? T('side_cal', { n: me().name }) : who ? T('side_cal', { n: pname(who) }) : T('side_all');
     return `<div class="calsplit ${open ? 'open' : 'shut'}"><div class="sidebar-top"><button class="iconbtn sidetoggle" data-act="sidetoggle" aria-expanded="${open}" aria-controls="sidepanel" title="${esc(T('side_toggle'))}" aria-label="${esc(T('side_toggle'))}">${msi('view_sidebar')}</button><b class="sidettl">${esc(title)}</b></div>
       <div class="sideback" data-act="sideclose" aria-hidden="true"></div>
       <aside class="sidepanel" id="sidepanel" aria-label="${T('v_who')}"${open ? '' : ' inert'}><div class="spin">
-        ${NARROW() ? '' : `<b class="sph">${T('side_view')}</b>`}${NARROW() ? '' : viewList([['day', 'D'], ['week', 'W'], ['month', 'M'], ['agenda', 'A'], ['time', 'L']])}
         <b class="sph">${T('side_yours')}</b>${btn('1', me().name, avatar(me().id), mineOn, 'sidemine')}
         <b class="sph">${T('nav_team')}</b><label class="spsearch">${msi('search')}<input type="search" id="sideq" placeholder="${esc(T('side_search'))}" value="${esc(state.sideQ || '')}" autocomplete="off" aria-label="${esc(T('side_search'))}"></label>
         ${btn('', T('v_allteam', { n: cr.length }), msi('groups'), !mineOn && !who, 'whoset')}${cr.map(p => btn(p.id, p.name, avatar(p.id), !mineOn && who === p.id, 'whoset')).join('')}
@@ -1358,9 +1352,9 @@
       <div class="bar"><button type="button" class="lnk" data-act="msclear" data-i="${i}">${T('ms_clear')}</button><span class="spacer"></span><button type="button" class="btn sm primary" data-act="msdone">${T('ms_done')}</button></div></div></details>`;
   }
   function guestMatches(b) {
+    if (b.id && db.bookings.some(x => x.id === b.id)) return [];   // a saved guest card never shows suggestions: they are only for guests typed in now
     const ph = digits(normPhone(b.phone)), em = (b.email || '').trim().toLowerCase(), nm = cleanName(b.guest || '').toLowerCase().trim(), ref = (b.ref || '').trim().toLowerCase(), out = new Map();
-    const saved = !!(b.id && db.bookings.some(x => x.id === b.id)), linked = saved ? (db.bookings.find(x => x.id === b.id).client_id || (findClient(b) || {}).id) : null;   // a saved guest already tied to a client is not offered that client again
-    const add = (cl, why) => { if (cl && !cl.anonymised_at && cl.id !== b.client_id && cl.id !== linked && !out.has(cl.id)) out.set(cl.id, why); };
+    const add = (cl, why) => { if (cl && !cl.anonymised_at && cl.id !== b.client_id && !out.has(cl.id)) out.set(cl.id, why); };
     if (ph.length >= 7) db.clients.forEach(x => { const d = digits(x.phone); if (d.length >= 7 && (d === ph || d.slice(-9) === ph.slice(-9))) add(x, 'phone'); });
     if (/@/.test(em)) db.clients.forEach(x => { if ((x.email || '').toLowerCase() === em) add(x, 'email'); });
     if (ref.length >= 4) db.bookings.forEach(x => { if (x.id !== b.id && x.client_id && (x.ref || '').toLowerCase() === ref) add(db.clients.find(y => y.id === x.client_id), 'ref'); });
@@ -1369,9 +1363,9 @@
   }
   // One guest's money line (office only): what the guest paid, the platform's commission, what stays with the company. Direct bookings carry no commission.
   function gmoneyHtml(b, d) {
-    const price = Number(b.price) || 0; if (!price) return '';
-    const cu = b.currency || guestCur(), pc = commOf({ ...b, tour_id: b.tour_id || d.id, source: b.source }) || 0, cm = Math.round(price * pc) / 100, keep = Math.round((price - cm) * 100) / 100, cell = (v, l) => `<span class="gm"><b class="num">${nf(v)}</b><span class="muted small">${l}</span></span>`;
-    return `${cell(price + ' ' + cu, T('gm_paid'))}${cell(pc ? cm + ' ' + cu + ' · ' + pc + '%' : '0', T('gm_comm'))}${cell(keep + ' ' + cu, T('gm_keep'))}`;
+    const price = Number(String(b.price ?? '').replace(',', '.')) || 0; if (!price) return '';
+    const cu = b.currency || guestCur(), pc = commOf({ ...b, tour_id: b.tour_id || d.id, source: b.source }) || 0, cm = Math.round(price * pc) / 100, keep = Math.round((price - cm) * 100) / 100, cell = (v, l) => `<span class="gm"><b class="num">${v}</b><span class="muted small">${l}</span></span>`;
+    return `${cell(nf(price) + ' ' + cu, T('gm_paid'))}${cell(pc ? nf(cm) + ' ' + cu + ' · ' + pc + '%' : '0', T('gm_comm'))}${cell(nf(keep) + ' ' + cu, T('gm_keep'))}`;
   }
   // More guides on one (big group) tour: each with an own pay, blank = the standard guide rate.
   function xguidesHtml(d) {
@@ -3232,7 +3226,7 @@
     const t = x.t, adm = isAdmin(), how = x.m.how, kind = t.kind === 'group' ? 'group' : 'private';
     const chips = `${how ? `<span class="mchip">${msi(how === 'online' ? 'credit_card' : 'payments')}${how === 'mix' ? T('pd_cash') + ' + ' + T('pd_online') : how === 'online' ? T('pd_online') : T('pay_cash')}</span>` : ''}<span class="mchip">${msi('person')}${T('ppl_n', { n: t.pax || 0 })}</span><span class="mchip">${msi(kind === 'group' ? 'groups' : 'lock')}${T('kind_' + kind)}</span>`;
     const amt = !adm ? `<b class="num">${nf(x.pay)} ${esc(cur)}</b>` : `<span class="pa"><input class="inp pinp" id="pi-${t.id}" type="number" step="any" min="0" inputmode="decimal" value="${esc(x.pay)}" data-orig="${esc(x.pay)}" data-conf="pc-${t.id}" aria-label="${T('pd_pay_for')} (${esc(cur)})"><span class="muted small pcur">${esc(cur)}</span><button class="iconbtn okbtn" id="pc-${t.id}" data-act="paysave" data-id="${t.id}" data-who="${esc(id)}" disabled aria-label="${T('confirm')}" title="${T('confirm')}">${TICK}</button><button class="iconbtn xbtn" data-act="paydel" data-id="${t.id}" data-who="${esc(id)}" aria-label="${T('delete')}" title="${T('delete')}">${CROSS}</button></span>`;
-    return `<div class="prow"><div class="pt"><span class="num small muted">${esc(dateText(t))}</span><b class="ptitle">${esc(t.title)}</b> ${disputeTag(disputeOf(t.id, id))}${id === me().id && !adm ? `<button class="btn sm dpbtn" data-act="dispute" data-id="${t.id}">${msi('flag')}${T('dp_btn')}</button>` : ''}</div><div class="pm">${chips}</div><div class="pv">${amt}</div></div>`;
+    return `<div class="prow"><div class="pt"><span class="num small muted">${esc(dateText(t))}</span><b class="ptitle">${esc(t.title)}</b> ${disputeTag(disputeOf(t.id, id))}</div><div class="pm">${chips}${id === me().id && !adm ? `<button class="lnk small dplnk" data-act="dispute" data-id="${t.id}">${msi('flag')}${T('dp_btn')}</button>` : ''}</div><div class="pv">${amt}</div></div>`;
   }
   // Corrections: date, reason (plain text), amount and currency, then tick (save) and cross (delete). The guide sees the same row without the buttons.
   function payAdjHtml(st, cur, id) {
@@ -3284,17 +3278,34 @@
   function statementHtml(id, mo, modal) {
     const st = statement(id, mo), cur = rules().currency || 'GEL', pd = db.payout_details.find(x => x.id === id);
     const text = [`${pname(id)} · ${mo}`, ...st.rows.map(x => `${x.t.date} ${x.t.title}: ${x.pay} ${cur}`), `${T('total')}: ${st.total} ${cur}`].join('\n');
-    return `${modal ? `<div class="hdr"><h2>${esc(pname(id))} · ${esc(mo)}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>` : ''}
+    return `${modal ? '' : '<div class="stmt">'}${modal ? `<div class="hdr"><h2>${esc(pname(id))} · ${esc(mo)}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>` : ''}
       ${(() => { const b = bigPay(st.base, mo); return `<div class="card earnhero"><span class="muted">${T(id === me().id ? 'eh_you' : 'eh_earns')}</span><b class="bignum num">${b.n} <span class="bigcur">${esc(b.cur)}</span></b><span class="muted small">${b.sub ? b.sub + ' · ' : ''}${T('tours_n')}: ${st.rows.length}</span></div>`; })()}
       ${payDashHtml(id, mo, st, cur, modal)}
+      ${modal ? '' : payAdjHtml(st, cur, id)}
       <div class="plist">${st.rows.map(x => payRowHtml(x, id, cur)).join('') || `<p class="muted">${T('no_tours_range')}</p>`}</div>
-      ${payAdjHtml(st, cur, id)}
+      ${modal ? payAdjHtml(st, cur, id) : ''}
       ${rules().payNote ? `<p class="muted small">${esc(rules().payNote)}</p>` : ''}
       ${modal ? expensesHtml(id, mo + '-01', monthEnd(mo)) : ''}
       ${modal && isAdmin() ? `<form class="bar adjform" data-form="adjust"><input type="hidden" name="user_id" value="${id}"><input type="hidden" name="month" value="${mo}"><label class="adjl">${T('adj_made_on')}<input class="inp" id="adj-date" name="made" type="date" value="${today()}" required></label><label class="adjl rs">${T('adj_note')}<input class="inp" id="adj-note" name="note" required></label><label class="adjl am">${T('adj_amount')} (${esc(cur)})<input class="inp" id="adj-amount" name="amount" type="number" step="any" inputmode="decimal" placeholder="+ / −" required></label><button class="btn">+ ${T('correction')}</button></form><span class="muted small">${T('adj_whole')}</span>` : ''}
       ${pd && (pd.account || pd.bank_name) ? `<div class="card"><b>${T('payout')}</b><div class="small">${esc([pd.holder, pd.bank_name].filter(Boolean).join(' · '))}</div>${pd.account ? `<div class="row"><span class="num">${esc(pd.account)}</span><button class="btn sm" data-act="copy" data-v="${esc(pd.account)}">${T('copy')}</button></div>` : ''}</div>` : ''}
       ${modal && isAdmin() && !state.viewAs && id !== me().id ? bankAdminHtml(id) : ''}
-      <div class="actions"><button class="btn" data-act="copy" data-v="${esc(text)}">${T('copy')}</button>${modal && isAdmin() && id !== me().id ? `<button class="btn primary" data-act="sendstatement" data-id="${id}" data-m="${mo}">${T('send_statement')}</button>` : ''}</div>`;
+      <div class="actions"><button class="btn" data-act="copy" data-v="${esc(text)}">${T('copy')}</button>${modal && isAdmin() ? `<button class="btn" data-act="paypdf" data-id="${esc(id)}" data-m="${esc(mo)}">${T('pdf_btn')}</button>` : ''}${modal && isAdmin() && id !== me().id ? `<button class="btn primary" data-act="sendstatement" data-id="${id}" data-m="${mo}">${T('send_statement')}</button>` : ''}</div>${modal ? '' : '</div>'}`;
+  }
+  // Printable payment list for one person and month (opens in its own window; "Save as PDF" in the print dialog). Plain HTML, nothing is sent anywhere.
+  function payPrintHtml(id, mo) {
+    const st = statement(id, mo), cur = rules().currency || 'GEL', owes = st.balance >= 0, adjSum = Math.round((st.total - st.base) * 100) / 100, pd = db.payout_details.find(x => x.id === id);
+    const cap = s => String(s).charAt(0).toUpperCase() + String(s).slice(1), row = (a, b, c) => `<tr><td>${a}</td><td>${b}</td><td class="r">${c}</td></tr>`;
+    const tours = st.rows.map(x => row(esc(dateText(x.t)), esc(x.t.title) + ' · ' + T('ppl_n', { n: x.t.pax || 0 }), nf(x.pay))).join('');
+    const adj = st.adj.filter(x => !isCashAdj(x)).map(x => row(esc(fmtDay((x.created_at || '').slice(0, 10) || today())), esc(x.note || T('correction')), (Number(x.amount) > 0 ? '+' : '') + nf(x.amount))).join('');
+    const sum = (l, v, b) => `<tr class="${b ? 'b' : ''}"><td colspan="2">${cap(l)}</td><td class="r">${v}</td></tr>`;
+    const css = 'body{font:14px/1.45 Arial,Helvetica,sans-serif;color:#111;margin:24px}h1{font-size:22px;margin:0 0 2px}h2{font-size:15px;margin:18px 0 6px}.m{color:#555}table{width:100%;border-collapse:collapse}td{padding:6px 4px;border-bottom:1px solid #ccc;vertical-align:top}.r{text-align:right;white-space:nowrap}.b td{font-weight:bold;border-top:2px solid #111}.sg{display:flex;gap:40px;margin-top:48px}.sg div{flex:1;border-top:1px solid #111;padding-top:4px;color:#555}@media print{body{margin:12mm}}';
+    return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(T('pdf_title'))} · ${esc(pname(id))} · ${esc(mo)}</title><style>${css}</style></head><body>
+      <h1>${esc(T('pdf_title'))}</h1><div class="m">Friendly.ge · ${esc(mo)}</div><h2>${esc(pname(id))}</h2>
+      <table>${row(`<b>${esc(T('pdf_date'))}</b>`, `<b>${esc(T('pdf_tour'))}</b>`, `<b>${esc(T('pdf_pay'))} (${esc(cur)})</b>`)}${tours}</table>
+      ${adj ? `<h2>${esc(T('correction'))}</h2><table>${adj}${sum(T('correction'), (adjSum > 0 ? '+' : '') + nf(adjSum), false)}</table>` : ''}
+      <h2>${esc(T('total'))} (${esc(cur)})</h2><table>${sum(T('pd_w_earned'), nf(st.base), false)}${sum(T('pd_cash'), '− ' + nf(st.cash), false)}${adjSum ? sum(T('correction'), (adjSum > 0 ? '+' : '−') + ' ' + nf(Math.abs(adjSum)), false) : ''}${sum(T(owes ? 'pdf_owed' : 'pdf_owes_co'), nf(Math.abs(st.balance)), true)}</table>
+      ${pd && (pd.account || pd.bank_name) ? `<p class="m">${esc([pd.holder, pd.bank_name, pd.account].filter(Boolean).join(' · '))}</p>` : ''}
+      <div class="sg"><div>${esc(T('pdf_sign'))}</div><div>${esc(T('pdf_paid_on'))}</div></div></body></html>`;
   }
   // The office types a person's bank details; the person sees them and confirms or edits. Nothing here moves money.
   function bankAdminHtml(id) {
@@ -3440,7 +3451,7 @@
     const m = me(), perm = ('Notification' in window) ? Notification.permission : 'unsupported', tab = state.meTab, mo = state.listMonth || today().slice(0, 7);
     const pd = db.payout_details.find(x => x.id === m.id) || {};
     let h = `<div class="bar"><h2>${T('nav_me')}</h2><span class="spacer"></span>${helpBtn()}</div>${helpBox('me')}<div class="seg metabs">${meTabs().filter(x => (x !== 'badges' || gameOn()) && !(isDrv() && x === 'stats')).map(x => `<button data-act="metab" data-v="${x}" aria-pressed="${tab === x}" title="${esc(T('me_' + x))}">${T('metab_' + x)}</button>`).join('')}</div>`;
-    if (tab === 'month') { const pr = payRange(); return h + rangeBar() + (pr.month ? statementHtml(m.id, pr.month, false) : payRangeHtml(m.id, pr.from, pr.to, false)) + expensesHtml(m.id, pr.from, pr.to) + adviceHtml(m.id); }
+    if (tab === 'month') { const pr = payRange(); return h + `<div class="paysplit"><aside class="payside">${rangeBar()}</aside><div class="paymain">${(pr.month ? statementHtml(m.id, pr.month, false) : payRangeHtml(m.id, pr.from, pr.to, false)) + expensesHtml(m.id, pr.from, pr.to) + adviceHtml(m.id)}</div></div>`; }
     if (tab === 'stats') return h + statsHtml(isAdmin() ? (state.statUser || m.id) : m.id);
     if (tab === 'badges') return h + (gameOn() ? badgesHtml(m.id) : `<div class="empty">${T('pf_off')}</div>`);
     if (tab === 'car' && hasCar(m)) return h + `<div class="cols"><div class="list"><div class="card"><p class="muted small">${T('car_tab_text')}</p>${carsModalHtml(carsCur())}</div></div></div>`;
@@ -3718,9 +3729,6 @@
     mode(el) { state.mode = el.dataset.m; render(); },
     rpst(el) { rpState().st = el.dataset.v; render(); },
     rpquick(el) { const f = rpState(), td = today(), v = el.dataset.v, first = d => d.slice(0, 8) + '01', last = d => addDays(first(addDays(first(d), 32)), -1); if (v === 'month') { f.from = first(td); f.to = last(td); } else if (v === 'last') { const p = addDays(first(td), -1); f.from = first(p); f.to = last(p); } else { f.from = td.slice(0, 4) + '-01-01'; f.to = td.slice(0, 4) + '-12-31'; } render(); },
-    tlpick(el) { const h = tlHidden(), id = el.dataset.id; if (h.has(id)) h.delete(id); else h.add(id); tlSave(); render(); },
-    tlall() { tlHidden().clear(); tlSave(); render(); },
-    tlnone() { crew().forEach(p => tlHidden().add(p.id)); tlSave(); render(); },
     mine(el) { state.mine = isAdmin() ? el.dataset.v === '1' : true; render(); },   // guides and drivers see their own schedule only
     day(el) { state.date = el.dataset.date; render(); const x = document.getElementById('day-' + state.date); if (x) x.scrollIntoView({ block: 'start', behavior: 'smooth' }); },
     pickday(el) { state.date = el.dataset.date; render(); const x = document.getElementById('day-' + state.date); if (x && window.matchMedia('(max-width:760px)').matches) x.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); },
@@ -3863,6 +3871,7 @@
     tcpage(el) { const d = Number(el.dataset.d); state.tcPage = d ? Math.max(-12, Math.min(12, (Number(state.tcPage) || 0) + d)) : 0; state.tcWhy = ''; render(); },
     tcday(el) { const d = el.dataset.date, why = el.dataset.why; if (el.dataset.mine) { state.tcWhy = `${fmtDay(d)}: ${el.dataset.mine}`; render(); } else if (d < today()) { return; } else if (why) { state.tcWhy = `${fmtDay(d)}: ${T('tc_no')} (${why})`; render(); } else { state.tcWhy = ''; acts.offnew({ dataset: { date: d } }); } },
     print() { window.print(); },
+    paypdf(el) { const w = window.open('', '_blank'); if (!w) { toast(T('pdf_blocked')); return; } w.document.open(); w.document.write(payPrintHtml(el.dataset.id, el.dataset.m)); w.document.close(); w.focus(); setTimeout(() => { try { w.print(); } catch (e) {} }, 400); },
     totem() { state.modal = { type: 'totem', back: state.modal }; renderModal(); track('totem'); },
     mood(el) { const v = Number(el.dataset.v) || 0; try { localStorage.setItem(moodKey(), JSON.stringify({ day: today(), v })); } catch (e) { /* private mode */ } if (v) { S.save('usage', { id: S.uid(), day: today(), user_id: me().id, action: 'mood_' + v, n: 1 }).catch(() => {}); toast(T('md_thanks')); } render(); },
     moodredo() { try { localStorage.removeItem(moodKey()); } catch (e) { /* private mode */ } state.view = 'calendar'; render(); window.scrollTo(0, 0); },

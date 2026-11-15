@@ -28,7 +28,9 @@ const { chromium } = require('playwright'); const { spawn } = require('child_pro
   await q.goto('http://localhost:8766/index.html'); await q.waitForTimeout(2500);
   ok(await q.locator('form[data-form=login], #login, [data-form=signin]').count() === 0, 'no login screen while offline');
   await q.evaluate(() => { const n = document.querySelector('.nav [data-v=calendar]'); n && n.click(); }); await q.waitForTimeout(600);
-  const body = await q.evaluate(() => document.body.innerText);
+  // on a Sunday, tomorrow is Monday = the next week of the list: look there too
+  let body = await q.evaluate(() => document.body.innerText);
+  if (new Date().getDay() === 0) { await q.evaluate(() => { const n = document.querySelector('[data-act=nav][data-d="1"]'); n && n.click(); }); await q.waitForTimeout(500); body += await q.evaluate(() => document.body.innerText); await q.evaluate(() => { const n = document.querySelector('[data-act=nav][data-d="-1"]'); n && n.click(); }); await q.waitForTimeout(500); }
   ok(/Offline Test Walk/.test(body), 'today tour is listed offline');
   ok(/Offline Test Drive/.test(body) || await q.evaluate(() => { const n = document.querySelector('.nxt'); return !!n && /Offline Test/.test(n.innerText); }), 'tomorrow tour is listed (or next tour card)');
   ok(/no internet|offline|last update/i.test(await q.locator('.syncrow').first().innerText().catch(() => '')), 'a line says there is no internet and when it was last updated: ' + (await q.locator('.syncrow').first().innerText().catch(() => 'none')).replace(/\s+/g, ' '));

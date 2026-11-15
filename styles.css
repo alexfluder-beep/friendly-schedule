@@ -1535,11 +1535,6 @@ a.phl{color:var(--accent);font-weight:600;text-decoration:underline;white-space:
 @media (min-width:761px){.tocols>.list:first-child{order:2}}
 
 /* Timeline (3.70): one day, a column per guide or driver. Grey = not working, black line = now, seat counter on group tours. */
-.tlfilter{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px}
-.tlp{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:4px 14px 4px 6px;border:2px solid var(--line);border-radius:var(--r-pill);background:var(--surface);font-size:var(--t-sm)}
-.tlp .avatar{width:32px;height:32px;flex:none}
-.tlp[aria-pressed="true"]{border-color:var(--ink);background:var(--accent-soft);font-weight:700}
-.tlp[aria-pressed="false"]{opacity:.6}
 .tlwrap{overflow:auto;border:1px solid var(--line);border-radius:var(--r-m);background:var(--surface);max-height:78vh}
 .tlhead,.tlbody{display:grid;min-width:fit-content}
 .tlhead{position:sticky;top:0;z-index:3;background:var(--surface2);border-bottom:1px solid var(--line)}
@@ -1773,11 +1768,6 @@ body:has(.incbar) .tabs{border-top-color:transparent}
 .swrow input[type=checkbox]:checked::after{transform:translateX(20px);background:#fff}
 .swrow input[type=checkbox]:focus-visible{outline:3px solid color-mix(in srgb,var(--accent) 45%,transparent);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){.swrow input[type=checkbox],.swrow input[type=checkbox]::after{transition:none}}
-/* calendar view buttons live in the left panel on a computer, so the top bar does not repeat them */
-@media (min-width:900px){.calsplit.open .bar .vseg{display:none}}
-.cpp.vwb{min-height:40px}
-/* guide and driver calendar on a computer: slim left panel with the view list only */
-@media (min-width:900px){.calsplit.usplit{grid-template-columns:200px minmax(0,1fr);grid-template-rows:auto}.usplit .sidepanel{grid-row:1;background:none;border:0}.usplit .sidepanel .spin{width:200px;padding-top:0}.usplit .calmain{grid-row:1}}
 
 /* pay statement: dashboard, one line per tour, corrections */
 .paydash .stats{margin:0}
@@ -1862,4 +1852,24 @@ body:has(.incbar) .tabs{border-top-color:transparent}
   .adjform{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
   .adjform .adjl.am{order:2}.adjform .adjl.rs{order:3;grid-column:1 / -1}.adjform .btn{order:4;grid-column:1 / -1}
   .adjrow:not(.ro){grid-template-columns:150px minmax(0,1fr) 44px 44px}
+}
+
+/* pay statement: no frame inside a frame; the cash number is a plain number with a dashed underline */
+.card.paydash{background:none;border:0;box-shadow:none;padding:0}
+.paydash .cashin{border:0;border-bottom:2px dashed var(--muted);border-radius:0;background:transparent;padding:0 0 2px;margin:0;max-width:100%}
+.paydash .cashin:focus{border-bottom-style:solid}
+/* guide's own pay statement: one tidy column, corrections right under the totals, "Pay not right?" as a small link on the chips line */
+.stmt{max-width:720px;display:flex;flex-direction:column;gap:12px}
+.stmt .plist{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:0 14px}
+.stmt .prow:first-child{border-top:0}
+.prow .dplnk{display:inline-flex;align-items:center;gap:4px;margin-left:auto;min-height:32px;padding:0 4px;white-space:nowrap}
+.prow .dplnk .msi{width:18px;height:18px}
+/* guide's Pay page on a computer: the period switch (Month, Last month, This year...) sits in a left panel, the statement is one column on the right */
+@media (min-width:900px){
+  .paysplit{display:grid;grid-template-columns:230px minmax(0,720px);gap:24px;align-items:start}
+  .payside{position:sticky;top:12px}
+  .payside .seg{display:flex;flex-direction:column;align-items:stretch;gap:4px;border-radius:16px;padding:6px;height:auto}
+  .payside .seg button{text-align:left;justify-content:flex-start;border-radius:12px}
+  .payside .bar,.payside .f{margin-top:10px}
+  .paymain .stmt{max-width:none}
 }
