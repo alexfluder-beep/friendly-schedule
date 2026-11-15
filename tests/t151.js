@@ -12,7 +12,7 @@ const { chromium } = require('playwright');
       const g = await p.evaluate(() => { const row = document.querySelector('.nextrow').getBoundingClientRect(); const cs = [...document.querySelectorAll('.nextrow > *')].map(e => e.getBoundingClientRect()); return { inside: cs.every(r => r.left >= row.left - 1 && r.right <= row.right + 1), hscroll: document.documentElement.scrollWidth > innerWidth + 1, n: cs.length, sameTop: innerWidth > 1000 ? cs.every(r => Math.abs(r.top - cs[0].top) < 3) : true }; });
       ok(g.inside && !g.hscroll && (g.n === 3 || (W < 500 && g.n >= 1)) && g.sameTop, W + ': three blocks aligned ' + JSON.stringify(g));
       await p.locator('.nextrow .earnc').click(); await p.waitForTimeout(400); ok(await p.locator('#modal .prow').count() > 0 && await p.locator('#modal .earnhero .bignum').count() === 1, W + ': tap opens own statement');
-      ok(await p.locator('#modal input.pinp').count() === 0 && await p.locator('#modal .paydash').innerText().then(x => !/Commission|Paid online/.test(x)), W + ': guide sees no edit fields, no commission');
+      ok(await p.locator('#modal input.pinp').count() === 0 && await p.locator('#modal .paydash').innerText().then(x => /Cash collected/.test(x) && /Company owes|You owe/.test(x) && !/Commission|Paid online|Company keeps/.test(x)), W + ': guide sees earned, cash collected, company owes; no edit fields, no commission');
     }
     await p.context().close();
   }
