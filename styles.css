@@ -1873,3 +1873,10 @@ body:has(.incbar) .tabs{border-top-color:transparent}
   .payside .bar,.payside .f{margin-top:10px}
   .paymain .stmt{max-width:none}
 }
+/* Needs review card (office calendar) and one-tap staff suggestions (Tasks) */
+.nrcard{margin-bottom:12px}
+.nrblock{display:flex;flex-direction:column;gap:4px;padding:8px 0;border-top:1px solid var(--line)}
+.nrlist{display:flex;flex-wrap:wrap;gap:4px 12px}
+.nrt{min-height:36px;text-align:left}
+.qfits{display:flex;flex-direction:column;gap:6px;margin:-2px 0 10px}
+.qfit{width:100%;text-align:left}
