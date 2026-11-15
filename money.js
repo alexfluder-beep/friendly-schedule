@@ -7,6 +7,12 @@
   const PAY_KINDS = ['tour', 'addon', 'tip', 'refund'], PAY_METHODS = ['cash', 'card', 'online', 'platform'], STAFF_METHODS = ['cash', 'card', 'bank'];
   const gelRate = (cur, date) => (!cur || cur === 'GEL' ? 1 : (fxOn(cur, date || today()) || manualRate(cur) || 0));
   const toursById = () => { const m = getMemo(); return m.tmapN === db.tours.length ? m.tmap : (m.tmapN = db.tours.length, m.tmap = new Map(db.tours.map(t => [t.id, t]))); };
+  // The percent now in force for one platform (all tours): the newest rule that has started, else the old text in Rules.
+  function curPct(src) {
+    const rs = (db.commission_rules || []).filter(x => srcName(x.platform) === srcName(src) && !x.tour_key && x.valid_from <= today()).sort((x, y) => y.valid_from.localeCompare(x.valid_from));
+    if (rs.length) return Number(rs[0].percent) || 0;
+    const m = String(rules().commission ?? 'GetYourGuide 25').match(new RegExp(String(src).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*[=:]?\\s*([\\d.]+)', 'i')); return m ? Number(m[1]) || 0 : 0;
+  }
   // The commission of one booking: a rule for this tour wins, then a rule for the platform (newest "valid from" before the tour day), then the old text in Rules.
   function ruleCommission(b) {
     const rs = db.commission_rules; if (!rs || !rs.length) return null;
@@ -46,9 +52,11 @@
         <input class="inp" name="note" placeholder="${T('m_note')}"><button class="btn primary">${T('m_save')}</button></form></div>
       <div class="card f"><b>${T('m_staff_bal')}</b><div class="tablewrap"><table><tr><th>${T('name')}</th><th class="n">${T('m_staff_earned')}</th><th class="n">${T('m_staff_paid')}</th><th class="n">${T('m_open')}</th></tr>${people.map(p => { const e = earnedOf(p.id), o = outs.filter(x => x.user_id === p.id).reduce((n, x) => n + payGel(x), 0); return e || o ? `<tr><td>${esc(p.name)}</td><td class="n">${nf(Math.round(e))}</td><td class="n">${nf(Math.round(o))}</td><td class="n"><b>${nf(Math.round(e - o))}</b></td></tr>` : ''; }).join('')}</table></div>
         <div class="list">${outs.sort((a, b) => b.paid_at.localeCompare(a.paid_at)).map(x => `<div class="exrow"><span class="grow-l"><b>${esc(x.user_id ? pname(x.user_id) : (x.payee_name || '—'))}</b> <span class="num">${esc(nf(Number(x.amount) || 0))} ${esc(x.currency)}</span>${x.currency !== 'GEL' ? ` <span class="muted small num">(${money(payGel(x))})</span>` : ''}<span class="muted small"> · ${esc(fmtDay(x.paid_at))} · ${tags(x)}${x.note ? ' · ' + esc(x.note) : ''}</span></span>${del('staff_payments', x.id)}</div>`).join('')}</div></div>
-      <div class="card f"><b>${T('m_comm')}</b><span class="muted small">${T('m_comm_text')}</span>
+      <div class="card f commtable"><b>${T('m_comm')}</b><span class="muted small">${T('m_comm_table')}</span>
+        <div class="ctab">${SOURCES.map(sc => `<form class="crow" data-form="mcommrow"><input type="hidden" name="platform" value="${esc(sc)}"><span class="cname"><b>${esc(sc)}</b></span><label class="cpct"><input class="inp" name="percent" type="number" step="any" min="0" max="100" inputmode="decimal" value="${esc(curPct(sc))}" aria-label="${esc(sc)} %"><span class="muted">%</span></label><button class="btn sm">${T('confirm')}</button></form>`).join('')}</div></div>
+      <details class="sect"><summary>${T('m_comm_more')}</summary><div class="card f"><span class="muted small">${T('m_comm_text')}</span>
         <div class="list">${db.commission_rules.slice().sort((a, b) => a.platform.localeCompare(b.platform) || (a.tour_key || '').localeCompare(b.tour_key || '') || b.valid_from.localeCompare(a.valid_from)).map(x => `<div class="exrow"><span class="grow-l"><b>${esc(x.platform)}</b> <span class="num">${esc(String(x.percent))}%</span><span class="muted small"> · ${x.tour_key ? esc(x.tour_key) : T('m_all_tours')} · ${T('m_from')} ${esc(fmtDay(x.valid_from))}${x.note ? ' · ' + esc(x.note) : ''}</span></span>${del('commission_rules', x.id)}</div>`).join('') || `<span class="muted">${T('m_comm_old', { t: String(rules().commission ?? 'GetYourGuide 25') })}</span>`}</div>
-        <form class="f" data-form="mcomm"><div class="bar"><select class="inp" name="platform" required>${SOURCES.map(s => opt(s, s, '')).join('')}</select><select class="inp" name="tour_key"><option value="">${T('m_all_tours')}</option>${[...new Set(db.tours.map(t => statKey(t.title)).filter(Boolean))].sort().map(k => opt(k, k, '')).join('')}</select><input class="inp" name="percent" type="number" step="any" min="0" max="100" placeholder="%" required style="max-width:90px"><input class="inp" name="valid_from" type="date" value="${today()}" required></div><input class="inp" name="note" placeholder="${T('m_note')}"><button class="btn primary">${T('m_save')}</button></form></div>`;
+        <form class="f" data-form="mcomm"><div class="bar"><select class="inp" name="platform" required>${SOURCES.map(s => opt(s, s, '')).join('')}</select><select class="inp" name="tour_key"><option value="">${T('m_all_tours')}</option>${[...new Set(db.tours.map(t => statKey(t.title)).filter(Boolean))].sort().map(k => opt(k, k, '')).join('')}</select><input class="inp" name="percent" type="number" step="any" min="0" max="100" placeholder="%" required style="max-width:90px"><input class="inp" name="valid_from" type="date" value="${today()}" required></div><input class="inp" name="note" placeholder="${T('m_note')}"><button class="btn primary">${T('m_save')}</button></form></div></details>`;
   }
     const acts = {
     mmo(el) { const mo = state.moneyMo || today().slice(0, 7), d = new Date(Number(mo.slice(0, 4)), Number(mo.slice(5, 7)) - 1 + Number(el.dataset.d), 1); state.moneyMo = iso(d).slice(0, 7); render(); },
@@ -68,6 +76,12 @@
       const who = fd.get('user_id') || null, payee = String(fd.get('payee_name') || '').trim(); if (!who && !payee) { toast(T('m_payee')); return; }
       await S.save('staff_payments', { id: S.uid(), user_id: who, payee_name: who ? null : payee, amount, currency: cur, gel_rate: rate, gel_amount: Math.round(amount * rate * 100) / 100, method: fd.get('method') || 'bank', bank: fd.get('bank') || null, tx_code: fd.get('tx_code') || null, paid_at: date, for_month: fd.get('for_month') || date.slice(0, 7), note: fd.get('note') || null, created_by: me().id, created_at: new Date().toISOString() });
       logAct(`Payment to ${who ? pname(who) : payee}: ${amount} ${cur}`); render();
+    },
+    async mcommrow(fd) {
+      const pl = fd.get('platform'), pc = Math.min(90, Math.max(0, Number(fd.get('percent')) || 0)); if (pc === curPct(pl)) { toast(T('saved')); return; }
+      const same = (db.commission_rules || []).find(x => srcName(x.platform) === srcName(pl) && !x.tour_key && x.valid_from === today());
+      await S.save('commission_rules', same ? { ...same, percent: pc } : { id: S.uid(), platform: pl, tour_key: null, percent: pc, valid_from: today(), note: null, created_by: me().id, created_at: new Date().toISOString() });
+      setMemo({}); logAct(`Commission ${pl} ${pc}% from today`); toast(T('saved')); render();
     },
     async mcomm(fd) {
       await S.save('commission_rules', { id: S.uid(), platform: fd.get('platform'), tour_key: fd.get('tour_key') || null, percent: Number(fd.get('percent')) || 0, valid_from: fd.get('valid_from') || today(), note: fd.get('note') || null, created_by: me().id, created_at: new Date().toISOString() });

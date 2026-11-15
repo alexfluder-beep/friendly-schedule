@@ -213,7 +213,7 @@ details.more[open]{display:flex;flex-direction:column;gap:6px}
 .att button.on.no{background:color-mix(in srgb,var(--danger) 12%,var(--surface));border-color:var(--danger);color:var(--danger)}
 .sheet>*{flex-shrink:0}
 
-.nextrow{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:10px}
+.nextrow{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr);gap:10px}
 .nextrow .card{height:100%;justify-content:flex-start}
 @media (max-width:760px){.nextrow{grid-template-columns:1fr}}
 @media (max-width:760px){.nextrow{gap:6px}.nextrow .card{padding:8px 12px;gap:3px}.nextrow .offc{flex-direction:row;flex-wrap:wrap;align-items:center;gap:4px 10px}.bar h2{font-size:var(--t-h3)}}
@@ -1739,3 +1739,91 @@ body:has(.incbar) .tabs{border-top-color:transparent}
 .carbox .swrow input[type=checkbox],.card .swrow input[type=checkbox]{width:24px;height:24px;flex:none}
 .carbox .fine{margin:8px 0}
 .carbox .tag{margin-left:6px}
+
+/* 3.91 tour card: no scrollbar, icon-only kind chip, clear guest count, equal bottom buttons, draggable top bar */
+.sheet.tview{scrollbar-width:none;-ms-overflow-style:none}
+.sheet.tview::-webkit-scrollbar{display:none;width:0;height:0}
+.sheet .hdr .tag.kindic{width:40px;height:40px;min-height:40px;padding:0;justify-content:center;border-radius:var(--r-pill)}
+.sheet .hdr .tag.kindic .msi{width:22px;height:22px;margin:0}
+.sheet .hdr .hedit{min-height:40px}
+.sheet.pop>.hdr.thdr{cursor:grab;touch-action:none;user-select:none}
+.sheet.pop>.hdr.thdr:active{cursor:grabbing}
+.sheet.pop>.hdr.thdr button,.sheet.pop>.hdr.thdr a{cursor:pointer}
+.sheet h3.gh{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.sheet h3.gh .gtot{font-size:var(--t-sm);font-weight:600;color:var(--muted)}
+.sheet .tacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.sheet .tacts .btn,.sheet .tacts .btn.tmore{flex-direction:column;justify-content:center;gap:4px;min-height:60px;padding:8px 6px;white-space:normal;text-align:center;line-height:1.15;border-radius:var(--r-m,16px);font-size:var(--t-sm)}
+.sheet .tacts .btn .msi{width:22px;height:22px;margin:0}
+.sheet .tacts .tmore{grid-column:auto}
+.sheet .tacts .tmorebody{grid-column:1 / -1;display:grid;gap:8px}
+.sheet .tacts .tmorebody .btn{flex-direction:row;min-height:44px}
+@media (max-width:420px){.sheet .tacts{grid-template-columns:repeat(3,minmax(0,1fr))}.sheet .tacts .tmore{grid-column:auto}}
+/* 3.91 tour card: guide, driver, guest avatars and the tour icon all 40px, with the same gap from the frame (the tour icon stays a rounded square, people stay round) */
+.sheet .glist .grow,.sheet .glist.crew .grow{padding-left:12px;padding-right:12px}
+.sheet .glist .avatar,.sheet .gst .gbtn .avatar,.sheet .glist.crew .avatar{width:40px;height:40px;min-width:40px}
+.sheet .gst .gbtn{grid-template-columns:40px minmax(0,1fr)}
+.sheet .hdr .emb.big,.sheet .hdr .emb.big.ic{width:40px;height:40px;min-width:40px;border-radius:12px;margin-top:0;display:inline-flex;align-items:center;justify-content:center}
+.sheet .hdr .emb.big.ic .msi{width:24px;height:24px}
+@media (max-width:420px){.sheet .glist .grow,.sheet .glist.crew .grow{padding-left:8px;padding-right:8px}.sheet .gst .grid{column-gap:8px}.sheet .gst .gbtn{column-gap:10px}.sheet .tacts .btn,.sheet .tacts .btn.tmore{padding:6px 4px;font-size:var(--t-cap)}}
+/* 3.91 switches: text on the left, a real on/off switch on the right (I have a car, child seat, fines) */
+.carbox .swrow,.card .swrow,.swrow{display:flex;flex-direction:row-reverse;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:48px;text-align:left;font-size:16px;font-weight:600;color:var(--ink);cursor:pointer}
+.swrow input[type=checkbox]{-webkit-appearance:none;appearance:none;flex:none;position:relative;width:48px;height:28px;margin:0;border-radius:var(--r-pill);border:2px solid var(--line);background:var(--surface2);cursor:pointer;transition:background .2s,border-color .2s}
+.swrow input[type=checkbox]::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:var(--muted);transition:transform .2s,background .2s}
+.swrow input[type=checkbox]:checked{background:var(--accent);border-color:var(--accent)}
+.swrow input[type=checkbox]:checked::after{transform:translateX(20px);background:#fff}
+.swrow input[type=checkbox]:focus-visible{outline:3px solid color-mix(in srgb,var(--accent) 45%,transparent);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.swrow input[type=checkbox],.swrow input[type=checkbox]::after{transition:none}}
+/* calendar view buttons live in the left panel on a computer, so the top bar does not repeat them */
+@media (min-width:900px){.calsplit.open .bar .vseg{display:none}}
+.cpp.vwb{min-height:40px}
+/* guide and driver calendar on a computer: slim left panel with the view list only */
+@media (min-width:900px){.calsplit.usplit{grid-template-columns:200px minmax(0,1fr);grid-template-rows:auto}.usplit .sidepanel{grid-row:1;background:none;border:0}.usplit .sidepanel .spin{width:200px;padding-top:0}.usplit .calmain{grid-row:1}}
+
+/* pay statement: dashboard, one line per tour, corrections */
+.paydash .stats{margin:0}
+.paydash .stat b{overflow-wrap:anywhere}
+.cashfix{align-items:flex-end;gap:8px}
+.cashfix .cashl{display:flex;flex-direction:column;gap:4px;flex:1;min-width:140px;font-size:var(--t-small,13px);color:var(--muted)}
+.plist{display:flex;flex-direction:column}
+.prow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.prow .pt{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;min-width:0}
+.prow .ptitle{overflow-wrap:anywhere}
+.prow .pm{grid-column:1;display:flex;flex-wrap:wrap;gap:6px}
+.prow .pv{grid-column:2;grid-row:1 / span 2;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.prow .pa{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.prow .pinp{width:96px;text-align:right;min-height:40px}
+.prow .pinp[readonly]{background:transparent;border-color:transparent;font-weight:700}
+.adjform{flex-wrap:wrap}
+.adjform #adj-amount{width:130px}
+.adjform #adj-note{flex:1;min-width:140px}
+.adjrow{flex-wrap:wrap}
+.adjrow .inp{min-width:90px;flex:1}
+@media (max-width:480px){
+  .prow{grid-template-columns:minmax(0,1fr)}
+  .prow .pm{grid-column:1}
+  .prow .pv{grid-column:1;grid-row:auto;align-items:stretch}
+  .prow .pa{justify-content:space-between}
+}
+@media (max-width:480px){
+  .paydash .stats{display:flex;flex-direction:column;gap:6px}
+  .paydash .stat{display:flex;flex-direction:row-reverse;justify-content:space-between;align-items:center;gap:12px;padding:10px 14px;text-align:left}
+  .paydash .stat b{font-size:20px}
+  .cashfix .cashl{flex-basis:100%}
+}
+.prow .pt>.num{flex-basis:100%}
+.gmoney{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.gmoney:empty{display:none}
+.gmoney .gm{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border:1px solid var(--line);border-radius:12px;min-width:0;overflow-wrap:anywhere}
+@media (max-width:420px){.gmoney{grid-template-columns:1fr}.gmoney .gm{flex-direction:row;justify-content:space-between;align-items:center}}
+.ctab{display:flex;flex-direction:column}
+.crow{display:grid;grid-template-columns:minmax(0,1fr) 110px auto;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+.crow .cpct{display:flex;align-items:center;gap:6px}
+.crow .cpct .inp{width:100%;min-height:40px}
+.crow .btn{justify-self:end}
+@media (max-width:420px){.crow{grid-template-columns:minmax(0,1fr) 84px auto;gap:6px}.crow .btn{padding:0 12px}}
+.nextrow .earnc{text-align:left;align-items:flex-start}
+@media (max-width:1000px) and (min-width:761px){.nextrow{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.nextrow .nxt{grid-column:1 / -1}}
+@media (max-width:760px){.nextrow .earnc{flex-direction:row;flex-wrap:wrap;align-items:center;gap:4px 10px}}
+.mrow .mpay{display:none;margin-left:auto;font-size:11px;color:var(--muted);align-items:center;gap:2px}
+.mrow .mpay .msi{width:14px;height:14px}
+@media (min-width:700px){.mrow .mpay{display:inline-flex}}
