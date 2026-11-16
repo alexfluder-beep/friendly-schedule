@@ -1365,7 +1365,7 @@ button.agr.off{width:100%;text-align:inherit;font:inherit;color:inherit;backgrou
 /* 23: weekday names at the tiny size; no letter spacing on the date number */
 @media (max-width:760px){.strip button{font-size:var(--t-micro)}.strip button b{letter-spacing:0}}
 /* 24: on the tour card the date and time line is the loud one; the title is a card title */
-@media (max-width:760px){.sheet>.hdr.thdr h2{font-size:var(--t-h3);font-weight:600}}
+@media (max-width:760px){.sheet>.hdr.thdr h2{font-size:var(--t-h3);font-weight:600;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}}
 /* 25: Tasks: the Open / Done / All filter is quieter than the Tasks / Tours switch above it */
 .tfilt .seg button[aria-pressed="true"]{background:var(--surface2);color:var(--ink)}
 /* task 21: bottom bar labels: one size on phones (12px; 11px on the narrowest), one line, never cut with "…" */
@@ -1598,7 +1598,7 @@ a.phl{color:var(--accent);font-weight:600;text-decoration:underline;white-space:
 
 .tcd.hol:not(.mine){background:var(--tertiary-bg,#efe6f2)}.striplg .hold{display:inline-block;width:8px;height:8px;border-radius:50%;background:#8a6a1f;margin-right:4px}
 
-.sheet .hdr .ttlwrap{flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}.sheet .hdr .ttlwrap h2{margin:0;min-width:0}.sheet .hdr .hedit{flex:none;white-space:nowrap}
+.sheet .hdr .ttlwrap{flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}.sheet .hdr .ttlwrap h2{margin:0;min-width:0;flex:1 1 140px}.sheet .hdr .hedit{flex:none;white-space:nowrap}
 
 /* Computer view of the admin calendar: team panel on the left (Setmore-like) */
 @media (min-width:900px){.calsplit .whosel{display:none}}

@@ -30,7 +30,8 @@ const { chromium, devices } = require('playwright');
       await p.locator('#me-tgbot .btn[data-act=tgcode]').click(); await p.waitForTimeout(500); t = await tg(); ok(/^\/link \d{6}$/.test(t.code) && t.btns.length === 1 && /^link:/.test(t.btns[0]) && t.nw === 1 && !t.side, `${l}: with a code the one button is Open the bot; "New code" is a quiet link (${t.code.replace(/\d/g, '#')})`);
       if (l === 'en') { await p.locator('#me-tgbot').scrollIntoViewIfNeeded(); await p.screenshot({ path: S + '/v82-tgbot.png' }); } }
     await setLang(p, 'en');
-    /* a person with data: nothing hidden */
+    /* a person with data: nothing hidden. The sample tours lie around today, so early in the week Mariam may have none finished yet: give her one. */
+    await p.evaluate(async () => { const S = window.Store, me = S.db.profiles.find(x => /^Mariam/.test(x.name)), d = new Date(Date.now() - 2 * 864e5), iso = d.toISOString().slice(0, 10); await S.save('tours', { id: S.uid(), date: iso, date_to: null, start_time: '10:00', end_time: '16:00', title: 'Sample Past Tour', kind: 'private', capacity: 0, pax: 2, adults: 2, children: 0, status: 'confirmed', guide_id: me.id, driver_id: null, language: 'EN' }); });
     await p.click('.tabs [data-v=calendar]'); await p.click('.tabs [data-v=me]'); await p.click('[data-act=metab][data-v=stats]'); await p.waitForTimeout(600); ok(await p.locator('main .bars .barcol:not(.dcol)').count() === 12 && await p.locator('main .stats .stat').count() >= 4 && await p.locator('main .empty').count() === 0, 'a person with tours still sees the tiles and the chart');
     await p.click('[data-act=metab][data-v=badges]'); await p.waitForTimeout(600); ok(await p.locator('main .weekc').count() === 1 && await p.locator('main .empty').count() === 0, 'a person with tours still sees the weekly challenge');
     ok(!/\d \/ \d/.test(await p.locator('main').innerText()), 'part-of-whole numbers are written without spaces (0/1, not 0 / 1)');

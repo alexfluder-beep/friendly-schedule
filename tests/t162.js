@@ -1,0 +1,21 @@
+// Clean names when a new guest is saved: PACK, PICK UP, FRONT, UNPAID, /WINE and a leading start time are stripped from the guest record;
+// real surnames in normal case (Pack, Front) stay. Invented data only.
+const { chromium } = require('playwright');
+(async () => { const b = await chromium.launch(); const errs = []; let bad = 0; const ok = (c, m) => { console.log(c ? '  ok  ' : '  FAIL', m); if (!c) bad = 1; };
+  const p = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage(); p.on('pageerror', e => errs.push(e.message));
+  await p.addInitScript(() => { window.__noCelebrate = true; try { localStorage.setItem('fs-test-seen', '1'); } catch (e) {} });
+  await p.goto('http://localhost:8765/index.html'); await p.waitForSelector('.strip'); await p.selectOption('#demo-as', { label: 'Sample Admin · Admin' }); await p.waitForTimeout(600);
+  await p.evaluate(() => { const e = document.querySelector('[data-act=newtour]'); if (e) e.click(); }); await p.waitForSelector('#t-title');
+  await p.fill('#t-title', 'Clean name test'); await p.fill('#t-date', '2026-11-26'); await p.fill('#t-start', '10:30');
+  await p.click('[data-act=badd]'); await p.waitForTimeout(200);
+  await p.fill('[data-bi="0"][data-bf=guest]', '10:30 Zed Tester PACK PICK UP /WINE'); await p.waitForTimeout(200);
+  await p.click('[data-act=badd]'); await p.waitForTimeout(200);
+  await p.fill('[data-bi="1"][data-bf=guest]', 'Yan Pack UNPAID FRONT'); await p.waitForTimeout(300);
+  await p.click('form[data-form=tour] > .actions button.primary'); await p.waitForTimeout(900);
+  const r = await p.evaluate(() => { const db = window.Store.db; const t = db.tours.find(x => x.title === 'Clean name test'); const bk = db.bookings.filter(x => x.tour_id === t.id); return bk.map(x => ({ guest: x.guest, client: (db.clients.find(c => c.id === x.client_id) || {}).name })); });
+  const z = r.find(x => /Zed/.test(x.guest)), y = r.find(x => /Yan/.test(x.guest));
+  ok(z && z.client === 'Zed Tester', 'new guest saved as "Zed Tester" (time, PACK, PICK UP, /WINE stripped): ' + JSON.stringify(z));
+  ok(y && y.client === 'Yan Pack', 'surname Pack kept, UNPAID and FRONT stripped: ' + JSON.stringify(y));
+  const shown = await p.evaluate(() => [...document.querySelectorAll('#modal .gst .gbtn, .sheet .gst .gbtn')].map(x => x.textContent.replace(/\s+/g, ' ').trim()).join(' | '));
+  ok(!/PACK|PICK UP|UNPAID|FRONT|10:30 Zed/.test(shown), 'guest rows on screen show the clean names: ' + shown.slice(0, 120));
+  ok(!errs.length, 'errors ' + errs.join('|')); await b.close(); process.exit(bad); })();

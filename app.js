@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.95';
+  const APP_VERSION = '3.96';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -171,7 +171,7 @@
   const avArt = v => { const m = /^art:([a-z0-9]+)$/.exec(v || ''); return m && AV_ART.includes(m[1]) ? `art/avatars/${m[1]}.webp` : ''; };
   const avLib = v => { const m = /^ms:([a-z_]+):(#[0-9a-f]{6})$/i.exec(v || ''); return m && AV_ICONS.includes(m[1]) ? { icon: m[1], color: m[2] } : null; };
   // Country of a phone number from its dialling code. It shows where the number is registered, not the guest's nationality.
-  const DIAL = { 1: 'US', 20: 'EG', 27: 'ZA', 30: 'GR', 31: 'NL', 32: 'BE', 33: 'FR', 34: 'ES', 36: 'HU', 39: 'IT', 40: 'RO', 41: 'CH', 43: 'AT', 44: 'GB', 45: 'DK', 46: 'SE', 47: 'NO', 48: 'PL', 49: 'DE', 52: 'MX', 54: 'AR', 55: 'BR', 60: 'MY', 61: 'AU', 62: 'ID', 63: 'PH', 64: 'NZ', 65: 'SG', 66: 'TH', 7: 'RU', 76: 'KZ', 77: 'KZ', 81: 'JP', 82: 'KR', 84: 'VN', 86: 'CN', 90: 'TR', 91: 'IN', 92: 'PK', 94: 'LK', 98: 'IR', 351: 'PT', 352: 'LU', 353: 'IE', 354: 'IS', 356: 'MT', 357: 'CY', 358: 'FI', 359: 'BG', 370: 'LT', 371: 'LV', 372: 'EE', 373: 'MD', 374: 'AM', 375: 'BY', 380: 'UA', 381: 'RS', 385: 'HR', 386: 'SI', 420: 'CZ', 421: 'SK', 852: 'HK', 886: 'TW', 961: 'LB', 962: 'JO', 964: 'IQ', 965: 'KW', 966: 'SA', 968: 'OM', 971: 'AE', 972: 'IL', 973: 'BH', 974: 'QA', 992: 'TJ', 993: 'TM', 994: 'AZ', 995: 'GE', 996: 'KG', 998: 'UZ' };
+  const DIAL = { 1: 'US', 20: 'EG', 27: 'ZA', 30: 'GR', 31: 'NL', 32: 'BE', 33: 'FR', 34: 'ES', 36: 'HU', 39: 'IT', 40: 'RO', 41: 'CH', 43: 'AT', 44: 'GB', 45: 'DK', 46: 'SE', 47: 'NO', 48: 'PL', 49: 'DE', 52: 'MX', 54: 'AR', 55: 'BR', 60: 'MY', 61: 'AU', 62: 'ID', 63: 'PH', 64: 'NZ', 65: 'SG', 66: 'TH', 7: 'RU', 76: 'KZ', 77: 'KZ', 81: 'JP', 82: 'KR', 84: 'VN', 86: 'CN', 90: 'TR', 91: 'IN', 92: 'PK', 94: 'LK', 98: 'IR', 351: 'PT', 352: 'LU', 353: 'IE', 354: 'IS', 356: 'MT', 357: 'CY', 358: 'FI', 359: 'BG', 370: 'LT', 371: 'LV', 372: 'EE', 373: 'MD', 374: 'AM', 375: 'BY', 380: 'UA', 381: 'RS', 385: 'HR', 386: 'SI', 420: 'CZ', 421: 'SK', 852: 'HK', 886: 'TW', 961: 'LB', 962: 'JO', 964: 'IQ', 965: 'KW', 966: 'SA', 968: 'OM', 971: 'AE', 972: 'IL', 973: 'BH', 974: 'QA', 992: 'TJ', 993: 'TM', 994: 'AZ', 995: 'GE', 996: 'KG', 998: 'UZ', 51: 'PE', 53: 'CU', 56: 'CL', 57: 'CO', 58: 'VE', 93: 'AF', 95: 'MM', 211: 'SS', 212: 'MA', 213: 'DZ', 216: 'TN', 218: 'LY', 220: 'GM', 221: 'SN', 228: 'TG', 230: 'MU', 231: 'LR', 233: 'GH', 234: 'NG', 251: 'ET', 254: 'KE', 255: 'TZ', 256: 'UG', 257: 'BI', 258: 'MZ', 260: 'ZM', 261: 'MG', 263: 'ZW', 264: 'NA', 267: 'BW', 350: 'GI', 355: 'AL', 376: 'AD', 377: 'MC', 382: 'ME', 383: 'XK', 387: 'BA', 389: 'MK', 423: 'LI', 500: 'FK', 502: 'GT', 503: 'SV', 504: 'HN', 505: 'NI', 506: 'CR', 507: 'PA', 591: 'BO', 593: 'EC', 595: 'PY', 598: 'UY', 673: 'BN', 677: 'SB', 679: 'FJ', 850: 'KP', 853: 'MO', 855: 'KH', 856: 'LA', 880: 'BD', 960: 'MV', 967: 'YE', 970: 'PS', 975: 'BT', 976: 'MN', 977: 'NP' };
   function phoneCountry(phone) {
     const iso = phoneIso(phone); if (!iso) return '';
     try { return new Intl.DisplayNames([LOCALES[lang()]], { type: 'region' }).of(iso) || iso; } catch (e) { return iso; }
@@ -245,7 +245,9 @@
   const vipTag = cid => (isVip(cid) ? `<span class="tag t-vip">${T('vip')}</span>` : '');
   const COSTS = ['accommodation', 'food', 'tickets', 'fuel', 'other'];
   const costOf = id => { const c = db.tour_costs.find(x => x.id === id) || {}, items = c.items || {}; return { items, note: c.note || '', total: COSTS.reduce((n, k) => n + (Number(items[k]) || 0), 0) }; };
-  const cleanName = v => String(v || '').replace(/\s+x\s*\d+(\s*\+\s*\d+)?/i, '').replace(/\s*\+\S+/g, '').replace(/\b(RUS|ENG|GER|FRA)\b/g, '').trim();
+  // Guest name without the office tags typed next to it: "x2", "+wine", "/WINE", a language code, PACK / PICK UP / FRONT / UNPAID (capitals only, so
+  // a real surname like Pack or Front stays) and a leading start time ("10:30 Anna Sample"). Used on screen, for matching and when a guest is saved.
+  const cleanName = v => String(v || '').replace(/^\s*\d{1,2}[:.]\d{2}\s*/, '').replace(/\s*\/\s*wine\b/ig, '').replace(/\s+x\s*\d+(\s*\+\s*\d+)?/i, '').replace(/\s*\+\S+/g, '').replace(/\b(RUS|ENG|GER|FRA|PACK|PICK ?UP|FRONT|UNPAID)\b/g, '').replace(/\s+/g, ' ').replace(/^[\s,.\-–·]+|[\s,.\-–·]+$/g, '').trim();
   const clientRating = id => idx().rat[id];
   // Lookup tables rebuilt once per screen draw, so thousands of tours and guests stay fast.
   // A guest who cancelled stays in the list of the tour (marked "cancelled") but is not counted, paid or shown as a guest.
@@ -1130,18 +1132,36 @@
     const ids = [...new Set(d.bookings.map(b => b.client_id).filter(Boolean))].filter(c => !(state.visits || {})[c]);
     if (t && ids.length) S.guestVisits(ids, me().id, t.date).then(rows => { state.visits = state.visits || {}; ids.forEach(c => { state.visits[c] = { total: 0, mine: 0 }; }); rows.forEach(r => { state.visits[r.client_id] = r; }); if (rows.length && state.modal && state.modal.type === 'tour' && !state.modal.edit) renderModal(); }).catch(() => {});
   }
-  // Draft message for the guests of one tour. Only facts the app holds; the admin copies it and sends it by hand.
-  function preTripText(t) {
-    const bk = t.bookings || tourBookings(t.id), g = person(t.guide_id) || {}, L = ['Hello, this is Friendly.ge.', `A reminder about your tour: ${t.title}.`, `${fmt(t.date, { weekday: 'long', day: 'numeric', month: 'long' })}${t.start_time ? ', ' + t.start_time : ''}.`];
-    if (t.pickup) L.push(`Meeting point: ${placeName(t.pickup)}${tourMap(t) ? '\n' + tourMap(t) : ''}`);
+  // Pre-trip reminder for the guests of one tour, as an e-mail (subject + body). Only facts the app holds; the admin copies it or opens it
+  // in his own mail program and sends it himself. With a booking given, the draft is for that one guest (their name, address, cash due).
+  function preTripMail(t, b) {
+    const bk = t.bookings || tourBookings(t.id), g = person(t.guide_id) || {}, dr = person(t.driver_id) || null, day = fmt(t.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const name = b ? cleanName(b.guest) || b.guest || '' : '', many = b && (Number(b.pax) || (Number(b.adults) || 0) + (Number(b.children) || 0)) > 1;
+    const subject = `Friendly.ge: ${t.title}, ${fmt(t.date, { weekday: 'short', day: 'numeric', month: 'short' })}${t.start_time ? ' ' + t.start_time : ''}`;
+    const L = [name ? `Hello ${name},` : 'Hello,', '', `This is Friendly.ge with a reminder about your tour: ${t.title}.`, `Date: ${day}.`];
+    const pick = b && needsAddr(b) && b.pickup_addr;
+    if (t.start_time) L.push(`${pick ? 'Pick-up time' : 'Start time'}: ${t.start_time}${pick ? ' (please be ready 5 minutes before)' : ''}.`);
+    if (pick) L.push(`Pick-up address: ${b.pickup_addr}`, `Map: ${mapFor(b.pickup_addr, b.pickup_url)}`);
+    else if (t.pickup) L.push(`Meeting point: ${placeName(t.pickup)}`, ...(tourMap(t) ? [`Map: ${tourMap(t)}`] : []));
     if (t.guide_id) L.push(`Your guide: ${pname(t.guide_id)}${g.phone ? ', ' + g.phone : ''}.`);
-    if (cashDue(bk)) L.push(`Please have ${cashText(bk)} in cash for the guide.`);
+    if (dr && t.driver_id !== t.guide_id) L.push(`Your driver: ${dr.name}${dr.phone ? ', ' + dr.phone : ''}.`);
+    const who = dr || (g.vehicle ? g : null), car = who ? carsOf(who)[0] : null;
+    if (car) { const line = [car.model, carColorName(car.color), car.plate].filter(Boolean).join(', '); if (line) L.push(`Car: ${line}.`); }
+    const due = b ? cashDue([b]) : cashDue(bk);
+    if (due) L.push(`Please have ${cashText(b ? [b] : bk)} in cash for the guide.`);
     { const ti = String(t.title || ''), tips = [];
       if (/gareji|kazbegi|truso|tusheti|rainbow|juta|svaneti/i.test(ti)) tips.push('Friendly tips: please bring warm layers, a windproof jacket, closed-toe walking shoes, water, and a little cash in GEL for roadside restrooms.');
       if (/mtskheta|chronicle/i.test(ti) && (t.start_time || '') >= '12:00') tips.push('Friendly tip: afternoon traffic in Tbilisi can be heavy, so the tour may take a little longer.');
-      L.push(...tips); }
-    L.push('Please reply to confirm you received this. See you soon.');
-    return L.join('\n');
+      if (tips.length) L.push('', ...tips); }
+    L.push('', `Please reply to this e-mail to confirm you received it. See you soon${many ? ', all of you' : ''}!`, '', 'Friendly.ge', 'Tbilisi');
+    return { subject, body: L.join('\n'), to: b ? shownEmail(b.email) || shownEmail((db.clients.find(c => c.id === b.client_id) || {}).email) : '' };
+  }
+  const preTripText = t => preTripMail(t).body;
+  // Rows with one e-mail draft per booking plus one for the whole tour. Admin only; the app sends nothing.
+  function preTripRows(t) {
+    const bk = (t.bookings || tourBookings(t.id)).filter(b => b.guest && !isCx(b));
+    const row = (label, sub, tid, bid) => `<div class="row"><span style="flex:1;min-width:0"><b>${esc(label)}</b>${sub ? `<br><span class="muted small">${esc(sub)}</span>` : ''}</span><button class="btn sm" data-act="pretrip" data-id="${esc(tid)}"${bid ? ` data-b="${esc(bid)}"` : ''}>${ico('mail')}${T('email')}</button></div>`;
+    return `<div class="list">${bk.map(b => { const m = preTripMail(t, b); return row(cleanName(b.guest) || b.guest, m.to || (needsAddr(b) && b.pickup_addr ? b.pickup_addr : T('gr_noemail')), t.id, b.id); }).join('')}${bk.length !== 1 ? row(T('gr_all'), `${t.start_time || ''} ${t.title}`.trim(), t.id, '') : ''}</div>`;
   }
   function summaryHtml(m) {
     const d = m.date, ts = toursOnDay(d).filter(t => isAdmin() || involves(t, me().id)).sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
@@ -1149,7 +1169,7 @@
     const ppl = isAdmin() ? crew().filter(p => ts.some(t => involves(t, p.id))) : [];
     return `<div class="hdr"><h2>${T('day_summary')}: ${esc(fmtDay(d))}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>
       ${ts.length ? `<pre class="pre">${esc(all)}</pre><div class="actions"><button class="btn" data-act="copy" data-v="${esc(all)}">${T('copy')}</button><button class="btn" data-act="print">${T('print')}</button><a class="btn primary" href="${esc(waLink('', all))}" target="_blank" rel="noopener">WhatsApp</a></div>
-      ${isAdmin() && ts.length ? `<b>${T('gr_title')}</b><span class="muted small">${T('gr_text')}</span><div class="list">${ts.map(t => `<div class="row"><span style="flex:1;min-width:0">${esc(t.start_time || '')} ${esc(t.title)}</span><button class="btn sm" data-act="copy" data-v="${esc(preTripText(t))}">${T('copy')}</button></div>`).join('')}</div>` : ''}
+      ${isAdmin() && ts.length ? `<b>${T('gr_title')}</b><span class="muted small">${T('gr_text')}</span>${ts.map(t => `<div class="muted small" style="margin-top:8px">${esc(t.start_time || '')} ${esc(t.title)}</div>${preTripRows(t)}`).join('')}` : ''}
       ${ppl.length ? `<b>${T('send_each')}</b><div class="list">${ppl.map(p => { const tx = [fmt(d, { weekday: 'long', day: 'numeric', month: 'long' }), ...ts.filter(t => involves(t, p.id)).map(tourText)].join('\n\n'); return `<div class="row">${avatar(p.id)}<span style="flex:1">${esc(p.name)}</span><button class="btn sm" data-act="copy" data-v="${esc(tx)}">${T('copy')}</button>${p.phone ? `<a class="btn sm" href="${esc(waLink(p.phone, tx))}" target="_blank" rel="noopener">WhatsApp</a>` : ''}</div>`; }).join('')}</div>` : ''}` : `<div class="empty">${T('no_tours')}</div>`}`;
   }
   function guestSheetHtml(m) {
@@ -1250,6 +1270,7 @@
         ${cxGuests(d.id).length && !drvLimited(d) ? `<h3>${T('gcx_title')} (${cxGuests(d.id).length})</h3><div class="glist">${cxGuests(d.id).map(b => `<div class="grow gcx"><span class="grow-l" style="flex-direction:column;align-items:flex-start"><b>${esc(b.guest)}</b><span class="muted small">${esc([acText(b), b.notes].filter(Boolean).join(' · '))}</span></span>${isAdmin() ? `<button class="btn sm" data-act="gcxback" data-id="${b.id}">${T('gcx_back')}</button>` : ''}</div>`).join('')}</div>` : ''}
         ${canCheck && d.bookings.length && d.bookings.every(b => b.attendance === 'noshow') ? `<div class="nhbox"><span>${msi('event_busy')}${T('nh_ask')}</span><button class="btn" data-act="nohappen" data-id="${d.id}">${T('nh_btn')}</button></div>` : ''}
         ${mine && d.date <= today() && live(d) ? `<button class="btn exptour" data-act="expnew" data-tour="${d.id}" data-date="${d.date}">${msi('receipt_long')} ${T('ex_tour')}</button>` : ''}
+        ${isAdmin() && live(d) && endOf(d) >= today() && d.bookings.some(b => b.guest && !isCx(b)) ? `<details class="sect"><summary>${T('gr_title')}</summary><div class="f"><div class="muted small">${T('gr_text')}</div>${preTripRows(d)}</div></details>` : ''}
         <details class="sect"><summary>${T('more')}</summary><div class="f">
           <div class="bar"><button class="btn sm" data-act="share" data-title="${esc(d.title)}" data-v="${esc(tourText(d))}">${ico('share')}${T('share')}</button><a class="btn sm" href="${esc(gcalLink(d))}" target="_blank" rel="noopener">${ico('cal')}${T('cal_short')}</a><button class="btn sm" data-act="copy" data-v="${esc(tourText(d))}">${ico('copy')}${T('copy')}</button>${tipUrl(d) && (mine || isAdmin()) ? `<button class="btn sm" data-act="tipqr" data-id="${d.id}">${T('tip_btn')}</button>` : ''}${(mine || isAdmin()) && tourBookings(d.id).some(isFree) ? `<button class="btn sm" data-act="tipsin" data-id="${d.id}">${T('tips_btn')}${tipsOf(d.id) ? ' · ' + esc(tipsText(d.id)) : ''}</button>` : ''}</div>
           <div class="muted small num">${esc([T('kind_' + d.kind), paxText(d), d.language, cn.duration, cn.note, endOf(d) !== d.date ? T('multiday', { n: tourDays(d).length }) : ''].filter(Boolean).join(' · '))}</div>
@@ -1606,10 +1627,13 @@
     } catch (e) { return ''; }
   }
   function shareModalHtml(m) {
-    const tx = m.text || '', e = encodeURIComponent;
-    return `<div class="hdr"><h2>${T('share')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>
-      <pre class="pre" id="sh-text">${esc(tx)}</pre>
-      <div class="shgrid"><a class="btn primary" href="${esc(waLink('', tx))}" target="_blank" rel="noopener">WhatsApp</a><a class="btn" href="https://t.me/share/url?url=${e(tx)}" target="_blank" rel="noopener">Telegram</a><a class="btn" href="mailto:?subject=${e(m.title || '')}&body=${e(tx)}">${T('email')}</a><button class="btn" data-act="copy" data-v="${esc(tx)}">${ico('copy')}${T('copy')}</button></div>`;
+    const tx = m.text || '', e = encodeURIComponent, mail = m.mail;   // mail: an e-mail draft (subject shown, "to" filled in, e-mail button first)
+    const mailto = `mailto:${e(m.to || '')}?subject=${e(m.title || '')}&body=${e(tx)}`;
+    return `${m.back ? `<div class="hdr backrow">${backBtn(m)}</div>` : ''}<div class="hdr"><h2>${T(mail ? 'gr_mail_title' : 'share')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>
+      ${mail ? `<div class="muted small">${T('gr_to')}: <b>${m.to ? esc(m.to) : T('gr_noemail')}</b></div><div class="muted small">${T('gr_subject')}: <b class="sel">${esc(m.title || '')}</b> <button class="btn sm" data-act="copy" data-v="${esc(m.title || '')}">${T('copy')}</button></div>` : ''}
+      <pre class="pre sel" id="sh-text">${esc(tx)}</pre>
+      ${mail ? `<div class="muted small">${T('gr_mail_text')}</div>` : ''}
+      <div class="shgrid">${mail ? `<a class="btn primary" href="${esc(mailto)}">${ico('mail')}${T('gr_open_mail')}</a><button class="btn" data-act="copy" data-v="${esc(m.title + '\n\n' + tx)}">${ico('copy')}${T('gr_copy_all')}</button><button class="btn" data-act="copy" data-v="${esc(tx)}">${ico('copy')}${T('copy')}</button><a class="btn" href="${esc(waLink('', tx))}" target="_blank" rel="noopener">WhatsApp</a>` : `<a class="btn primary" href="${esc(waLink('', tx))}" target="_blank" rel="noopener">WhatsApp</a><a class="btn" href="https://t.me/share/url?url=${e(tx)}" target="_blank" rel="noopener">Telegram</a><a class="btn" href="${esc(mailto)}">${T('email')}</a><button class="btn" data-act="copy" data-v="${esc(tx)}">${ico('copy')}${T('copy')}</button>`}</div>`;
   }
   // ---------- move a tour to another day or time (button, or drag and drop for the admin) ----------
   function openMove(t, o) { state.modal = { type: 'move', id: t.id, date: o.date || t.date, start: o.start !== undefined ? o.start : (t.start_time || ''), who: o.who || null, back: state.modal }; renderModal(); }
@@ -2368,7 +2392,7 @@
     for (const r of db.client_ratings) { const o = cl[r.client_id]; if (!o) continue; if (['good', 'like'].includes(r.rating)) o.good++; else if (['bad', 'trouble', 'dislike'].includes(r.rating)) o.bad++; }
     const all = Object.values(cl).filter(c => c.n > 0), back = all.filter(c => c.n >= 2), nm = id => (db.clients.find(x => x.id === id) || {}).name || T('guest');
     const btn = id => `<button class="btn sm" data-act="client" data-id="${id}">${esc(nm(id))}</button>`, m = v => (v ? `${nf(v)} ${cur}` : '—');
-    const fl = iso => (iso && iso !== '?' ? `${flagOf(iso)} ${esc(countryName(iso))}` : T('ts_unknown'));
+    const fl = iso => (iso && iso !== '?' ? `${flagOf(iso)} ${esc(countryName(iso))}` : T('ts_nophone'));
     const gsv = x => { const t = String(x).replace(/<[^>]*>/g, '').replace(/&[a-z]+;/g, '').trim(); return { t, n: /^-?[\d.,\s]+\s?(%|[A-Za-z]{3})?$/.test(t) ? parseFloat(t.replace(/,/g, '')) : null }; };
     const tbl = (head, rows, sid) => { const so = sid && (state.gisort || {})[sid]; if (so) rows = rows.slice().sort((p, q) => { const u = gsv(p[so.c]), v = gsv(q[so.c]); const r = u.n !== null && v.n !== null ? u.n - v.n : u.n !== null ? -1 : v.n !== null ? 1 : u.t.localeCompare(v.t); return so.d === 'asc' ? r : -r; });
       return `<div class="tablewrap"><table><tr>${head.map((x, i) => `<th${i ? ' class="n"' : ''}>${sid ? `<button class="thsort" data-act="gisort" data-id="${sid}" data-c="${i}">${x}${so && so.c === i ? (so.d === 'asc' ? ' ▲' : ' ▼') : ''}</button>` : x}</th>`).join('')}</tr>${rows.map(r => `<tr>${r.map((x, i) => `<td${i ? ' class="n num"' : ''}>${x}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${head.length}" class="muted">—</td></tr>`}</table></div>`; };
@@ -3765,6 +3789,7 @@
     help() { state.help = !state.help; render(); },
     offer(el) { state.modal = { type: 'offer', bid: el.dataset.b || null, back: state.modal }; renderModal(); },
     offercopy(el) { logOffer(el.dataset.tour, el.dataset.b); acts.copy(el); },
+    pretrip(el) { const t = db.tours.find(x => x.id === el.dataset.id); if (!t) return; const bk = tourBookings(t.id), b = el.dataset.b ? bk.find(x => x.id === el.dataset.b) : null, m = preTripMail({ ...t, bookings: bk }, b); state.modal = { type: 'share', mail: true, title: m.subject, text: m.body, to: m.to, back: state.modal }; renderModal(); },
     guest(el) { state.modal = { type: 'guest', id: el.dataset.id, back: state.modal }; renderModal(); },
     adjdel(el) { const x = db.pay_adjustments.find(q => q.id === el.dataset.id); if (!x) return; const back = state.modal; confirmDo(T('adj_del_q'), T('delete'), async () => { await S.remove('pay_adjustments', x.id); logAct(`Pay correction removed: ${pname(x.user_id)}, ${x.month}, ${x.amount}`); state.modal = back; redoPay(); }); },
     async paysave(el) {
@@ -4482,7 +4507,7 @@
     if (S.recall && window.showDirectoryPicker && isAdmin()) S.recall('offdir').then(async h => { if (h && h.queryPermission) { OFFDIR.handle = h; OFFDIR.ok = (await h.queryPermission({ mode: 'readwrite' })) === 'granted'; } }).catch(() => {});
     if (S.remember) S.remember('lang', lang()); if ((S.pending || 0) > 0) setTimeout(() => toast(T('st_waiting_open', { n: S.pending || 0 })), 600);
     if (S.warming) { let warm = true; S.onChange((t, r, type) => { if (warm && type === 'STATE' && !S.warming) { warm = false; PH.asked.clear(); displayFromAccount(); saveHello(); weekCheck(); setTimeout(xcNudge, 4000); } }); }
-    if (S.mode === 'demo') window.__test = { dupClients, parseSetmore, impPayDiff, impPayApply, setImp: v => { state.imp = v; state.impPay = null; }, getImpPay: () => state.impPay, setImpPay: v => { state.impPay = v; }, parseReview, isReview, rrHtml: id => revreqModalHtml({ id }), rrTours: () => db.tours.filter(t => tourBookings(t.id).some(b => b.guest)).map(t => t.id), trackOpen, flushUsage, tourPhase, dupClients, dupTours, parseBooking, T: (k, v) => T(k, v), payFor, setGrid: v => { state.wgrid = !!v; render(); }, dayBlock, tasksOnDay, withPhones, taskLineHtml, pushBanner, xcNudge, relayEmail, guestEmail, parseBooking, badgeNote: () => { const b = game(me().id).list.find(x => x.done); if (b) badgeNote([b]); }, checkBadges, newVersion: v => { state.newVersion = !!v; render(); }, pageFor: (title, kind) => { const u = pageFor({ title, kind }), m = /\/activity\/(\d+)/.exec(u); return m ? { id: Number(m[1]) } : null; } };          // for the automatic tests only
+    if (S.mode === 'demo') window.__test = { dupClients, parseSetmore, openTour: id => { openTour(id); }, preTripMail: (tid, bid) => { const t = db.tours.find(x => x.id === tid); return preTripMail({ ...t, bookings: tourBookings(t.id) }, bid ? db.bookings.find(x => x.id === bid) : null); }, impPayDiff, impPayApply, setImp: v => { state.imp = v; state.impPay = null; }, getImpPay: () => state.impPay, setImpPay: v => { state.impPay = v; }, parseReview, isReview, rrHtml: id => revreqModalHtml({ id }), rrTours: () => db.tours.filter(t => tourBookings(t.id).some(b => b.guest)).map(t => t.id), trackOpen, flushUsage, tourPhase, dupClients, dupTours, parseBooking, T: (k, v) => T(k, v), payFor, setGrid: v => { state.wgrid = !!v; render(); }, dayBlock, tasksOnDay, withPhones, taskLineHtml, pushBanner, xcNudge, relayEmail, guestEmail, parseBooking, badgeNote: () => { const b = game(me().id).list.find(x => x.done); if (b) badgeNote([b]); }, checkBadges, newVersion: v => { state.newVersion = !!v; render(); }, pageFor: (title, kind) => { const u = pageFor({ title, kind }), m = /\/activity\/(\d+)/.exec(u); return m ? { id: Number(m[1]) } : null; } };          // for the automatic tests only
     if (me() && !isAdmin()) state.mine = true;
     displayFromAccount();
     try { history.scrollRestoration = 'manual'; } catch (e) { /* old browser */ }
