@@ -1731,7 +1731,6 @@ body:has(.incbar) .tabs{border-top-color:transparent}
 .carbox .sect{border-top:1px solid var(--line,#ddd);padding-top:10px;margin-top:6px}
 .carbox .sect summary{font-weight:700;font-size:17px;min-height:44px;display:flex;align-items:center;cursor:pointer}
 .carbox .swrow,.card .swrow{display:flex;align-items:center;gap:10px;min-height:44px;font-size:16px}
-.carbox .swrow input[type=checkbox],.card .swrow input[type=checkbox]{width:24px;height:24px;flex:none}
 .carbox .fine{margin:8px 0}
 .carbox .tag{margin-left:6px}
 
@@ -1883,3 +1882,31 @@ body:has(.incbar) .tabs{border-top-color:transparent}
 
 /* 3.97 result of a pasted e-mail */
 .card.pbres.ok{border-color:var(--ok)}.card.pbres.warn{border-color:var(--warn,#b8441c)}.card.pbres .msi{vertical-align:-4px}
+
+/* 3.98 "We get" box on the guest card: typed amount, placeholder shows the fixed-% value */
+.gmoney .gmin{cursor:text}.gmoney .gmin .row{gap:6px;align-items:center}.gmoney .gmin input{flex:1;min-width:0;min-height:40px;font-weight:700;font-size:var(--t-body)}.gmoney .gmin input::placeholder{color:var(--muted);font-weight:500}
+@media (max-width:420px){.gmoney .gmin{flex-direction:column;align-items:stretch}}
+
+/* 3.98 "Not your language" tag in Open tours: may wrap, never pushes into the tour name */
+.xrow .tag.xlang{flex:0 1 auto;max-width:44%;white-space:normal;line-height:1.25;text-align:left}
+
+/* 3.98 The day row you swipe through (owner's video): 7 days fill the width, swipe for earlier/later weeks; weekend names red;
+   a small upright month label where a month starts. Same look as the old 7-day strip otherwise. */
+.strip.sroll,.ghome .strip.sroll{display:flex;grid-template-columns:none;gap:4px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x proximity;scroll-padding-left:0;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
+.strip.sroll>button{flex:0 0 calc((100% - 24px) / 7);scroll-snap-align:start;min-height:52px}
+.strip.sroll>button.we>span:first-child{color:var(--danger)}
+.strip.sroll>button.we[aria-pressed="true"]>span:first-child{color:inherit}
+.strip.sroll .smon{flex:0 0 16px;align-self:center;writing-mode:vertical-rl;transform:rotate(180deg);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);line-height:16px;text-align:center;user-select:none}
+@media (max-width:760px){
+  .strip.sroll,.ghome .strip.sroll{gap:0;scrollbar-width:none}
+  .strip.sroll::-webkit-scrollbar{display:none}
+  .strip.sroll>button{flex-basis:calc(100% / 7)}
+}
+@media (max-width:360px){.strip.sroll,.ghome .strip.sroll{gap:0}.strip.sroll>button{flex-basis:calc(100% / 7)}}
+@media (prefers-reduced-motion:reduce){.strip.sroll{scroll-behavior:auto}}
+
+/* 3.98 pay typed in another currency: a small currency picker next to the amount, the conversion on its own line under the row */
+.prow .pa{flex-wrap:wrap}
+.prow .pcursel{width:auto;min-width:72px;min-height:40px;padding-right:28px}
+.prow .pconv{flex-basis:100%;text-align:right}.prow .pconv:empty{display:none}
+@media (max-width:760px){.prow .pconv{text-align:left}}

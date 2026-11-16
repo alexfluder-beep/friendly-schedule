@@ -25,6 +25,9 @@ A plain JavaScript PWA for Friendly.ge guides and drivers (replaces Setmore). Li
 ## Test rules
 - Sample data lies around today, so a test must not assume a demo person already has a finished tour: save one with `S.save('tours', …)` first (t82 failed every Monday until this was done).
 - Data added in a test goes through `S.save(...)`, not `db.x.push(...)`: the lookup index (`idx()`) is a memo and does not see a plain push.
+- Since 3.98 the day row (`.strip.sroll`) holds 70 days (2 weeks back, 8 ahead). Tests must count or target the days on screen (`.strip button.inwk` = the shown week), never "all buttons" or `.last()`.
+- Choosing a person in the demo "View as" list rebuilds the sample data: save test data after choosing.
+- When editing a long one-line test, never insert a `//` comment mid-line (it hides the rest of the line); use `/* */`.
 
 ## Cleaning rules
 - Before deleting code, search every file (app, store, cute, catalog, index, sw) and long template lines; a dead-code scan once missed a real use (`titlesOf`). Delete, then run all tests.

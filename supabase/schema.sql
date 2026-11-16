@@ -70,6 +70,7 @@ create table if not exists public.bookings (
   marks text[] not null default '{}',     -- wine, private_room, front_seat, bear_food, pickup, dropoff, stays (stays at the destination after the tour), or your own
   email text, lang text, currency text,   -- guest email, the language the guest asked for, currency of price and amount_due
   price numeric,                          -- what the booking brings in (platform price or net), for the week and month figures
+  net_amount numeric,                     -- what the company really receives (promo codes, other commission); null = price minus the fixed commission
   history jsonb not null default '[]',    -- booked, changed, moved, cancelled: time, who, what
   created_at timestamptz not null default now()
 );

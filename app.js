@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.97';
+  const APP_VERSION = '3.98';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -746,6 +746,28 @@
   }
   // Under each date of the week strip: how many tours (a dot and the number; amber when a tour still needs a guide or driver)
   // and how many people are off (the same umbrella as on the Day off card). For one person: their own tours and their own day off.
+  // The day row (owner's video, 16 Nov): one row you swipe through, 2 weeks back and 8 weeks ahead of the week shown, 7 days fill the width.
+  // Weekend names in red, a small month label where a month starts. Tapping a day shows that day's week below, as before.
+  const STRIP_BACK = 14, STRIP_DAYS = 70;
+  function stripHtml(days, sel, offId, markId, drop) {
+    const td = today(), start = addDays(days[0], -STRIP_BACK); let h = '', lastM = '';
+    for (let i = 0; i < STRIP_DAYS; i++) {
+      const d = addDays(start, i), m = d.slice(0, 7), dw = D(d).getDay();
+      if (m !== lastM) { h += `<span class="smon" aria-hidden="true">${esc(fmt(d, { month: 'short' }))}</span>`; lastM = m; }
+      h += `<button data-act="day" data-date="${d}"${drop ? ` data-drop="${d}"` : ''} aria-pressed="${d === sel}" aria-label="${esc(fmt(d, { weekday: 'long', day: 'numeric', month: 'long' }))}" class="${d === td ? 'tdy' : ''} ${dw === 0 || dw === 6 ? 'we' : ''} ${days.includes(d) ? 'inwk' : ''} ${offCls(offOn(offId, d))} ${holidayOn(d) ? 'hol' : ''}"><span>${esc(fmt(d, { weekday: 'short' }))}</span><b class="num">${D(d).getDate()}</b>${dayMarks(d, markId)}</button>`;
+    }
+    return `<div class="strip sroll" data-wk="${days[0]}">${h}</div>`;
+  }
+  // After a render: keep where the person swiped to (same week shown), else put the shown week's Monday at the left edge.
+  function stripPlace(root) {
+    root.querySelectorAll('.strip.sroll').forEach(el => {
+      const wk = el.dataset.wk, k = state.stripX && state.stripX.wk === wk ? state.stripX : null, rel = b => b.getBoundingClientRect().left - el.getBoundingClientRect().left - el.clientLeft + el.scrollLeft;
+      if (k && k.date) { const b = el.querySelector(`[data-date="${k.date}"]`); if (b) el.scrollLeft = rel(b) - k.off; state.stripX = { wk, x: el.scrollLeft }; }
+      else if (k) el.scrollLeft = k.x;
+      else { const b = el.querySelector(`[data-date="${wk}"]`); if (b) el.scrollLeft = rel(b); }
+      if (!el.dataset.on) { el.dataset.on = '1'; el.addEventListener('scroll', () => { state.stripX = { wk: el.dataset.wk, x: el.scrollLeft }; }, { passive: true }); }
+    });
+  }
   function dayMarks(d, id) {
     const ts = toursOnDay(d).filter(t => !id || involves(t, id)), need = !id && isAdmin() && ts.some(t => !t.guide_id || (!t.driver_id && kmOf(t.title) > 0)), mine = offOn(id || me().id, d), n = id ? 0 : offCount(d);
     return `<span class="smrow"><span class="smk tr ${need ? 'need' : ''} ${ts.length ? '' : 'none'}" ${ts.length ? `aria-label="${esc(T('sm_tours', { n: ts.length }))}"` : 'aria-hidden="true"'}><i></i></span><span class="smk off ${mine ? 'me' : ''} ${mine || n ? '' : id ? 'gone' : 'none'}" ${mine || n ? `aria-label="${esc(mine ? T('off_mine') : T('sm_off', { n }))}"` : 'aria-hidden="true"'}>${msi(mine && mine.type === 'sick' ? 'sick' : 'beach_access')}</span></span>`;
@@ -921,7 +943,7 @@
     const asks = db.change_requests.filter(q => q.swap_with === id && q.status === 'pending' && !q.agreed);
     return `${PHONE() ? '' : setupCard(true) + greetHtml() + askCardHtml() + viewBarHtml() + weekCardHtml() + nextHtml()}<div class="ghome">${PHONE() ? setupCard(true) + greetHtml() + askCardHtml() + weekCardHtml() + (asks.length ? nextHtml() : (() => { const e = earnCardHtml(me().id, today()); return e ? `<div class="nextrow">${e}</div>` : ''; })()) : ''}
       <div class="bar ${PHONE() ? 'homebar' : ''}"><h2>${esc(PHONE() ? fmt(days[3], { month: 'long', year: 'numeric' }) : title)}</h2><label class="jump" title="${T('pick_date')}">${ico('cal')}<input type="date" id="jump" data-ch="jump" value="${esc(state.date)}" aria-label="${T('pick_date')}"></label><span class="spacer"></span><div class="seg"><button data-act="nav" data-d="-1" aria-label="${T('prev')}">‹</button><button data-act="today">${T('today')}</button><button data-act="nav" data-d="1" aria-label="${T('next')}">›</button></div></div>
-      <div class="list home"><div class="strip">${days.map(d => `<button data-act="day" data-date="${d}" aria-pressed="${d === sel}" class="${d === td ? 'tdy' : ''} ${offCls(offOn(id, d))} ${holidayOn(d) ? 'hol' : ''}"><span>${esc(fmt(d, { weekday: 'short' }))}</span><b class="num">${D(d).getDate()}</b>${dayMarks(d, id)}</button>`).join('')}</div>${stripLegend(true)}
+      <div class="list home">${stripHtml(days, sel, id, id, false)}${stripLegend(true)}
       ${now ? nowCardHtml(now) : ''}${days.map(myDayHtml).join('')}</div>
       ${photoStripHtml()}
       <div class="bar homelinks"><button class="btn" data-act="mode" data-m="month">${T('month')}</button><button class="btn" data-act="summary">${T('day_summary')}</button></div></div>`;
@@ -977,7 +999,9 @@
   // Platform commission: the price in a GetYourGuide or Viator email is what the guest paid; the platform keeps its share.
   // Back office > Rules > Platform commission, e.g. "GetYourGuide 25, Viator 20".
   const commOf = b => { const rc = ruleCommission(b); if (rc !== null) return rc; const src = srcName(sourceOf(b) || b.source); if (!src) return 0; const m = String(rules().commission ?? 'GetYourGuide 25').match(new RegExp(src.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*[=:]?\\s*([\\d.]+)', 'i')); return m ? Math.min(90, Number(m[1]) || 0) : 0; };
-  const netOf = b => (Number(b.price) || 0) * (1 - commOf(b) / 100);
+  // What the company receives for a booking: the amount the office typed ("We get": promo codes, other commission), else price minus the fixed commission.
+  const netTyped = b => { const v = b.net_amount; return v === null || v === undefined || String(v).trim() === '' ? null : Number(String(v).replace(',', '.')); };
+  const netOf = b => { const t = netTyped(b); return t !== null && !isNaN(t) ? t : (Number(b.price) || 0) * (1 - commOf(b) / 100); };
   function periodStats(from, to) {
     const ts = db.tours.filter(t => live(t) && t.date >= from && t.date <= to), ids = new Set(ts.map(t => t.id)), cur = rules().currency || 'GEL';
     let rev = 0, noPrice = 0, noRate = new Set(); const bks = liveB().filter(b => ids.has(b.tour_id)), tdOf = {}; ts.forEach(t => { tdOf[t.id] = t.date; });
@@ -1091,7 +1115,7 @@
       ${people.map(p => rowFor(p.name, T('role_' + p.role), p.id, t => involves(t, p.id))).join('')}</div></div>`;
     // phone: day strip + agenda
     const sel = state.date;
-    h += `<div class="ghome ${state.wgrid ? 'only-phone' : ''}"><div class="list home"><div class="strip">${days.map(d => `<button data-act="day" data-date="${d}" data-drop="${d}" aria-pressed="${d === sel}" class="${d === td ? 'tdy' : ''} ${offCls(offOn(me().id, d))} ${holidayOn(d) ? 'hol' : ''}"><span>${esc(fmt(d, { weekday: 'short' }))}</span><b class="num">${D(d).getDate()}</b>${dayMarks(d, state.mine ? me().id : '')}</button>`).join('')}</div>${stripLegend(!!state.mine)}`;
+    h += `<div class="ghome ${state.wgrid ? 'only-phone' : ''}"><div class="list home">${stripHtml(days, sel, me().id, state.mine ? me().id : '', true)}${stripLegend(!!state.mine)}`;
     for (const d of days) h += dayBlock(d);
     h += `</div></div>`;
     return h + photoStripHtml() + pstats;
@@ -1185,7 +1209,7 @@
     const row = (icon, label, attrs) => `<${attrs.href ? 'a' : 'button'} class="arow" ${Object.entries(attrs).map(([k, v]) => `${k}="${esc(v)}"`).join(' ')}>${icon ? ico(icon) : '<span style="width:16px"></span>'}<span>${esc(label)}</span></${attrs.href ? 'a' : 'button'}>`;
     return `${m.back ? `<div class="hdr backrow">${backBtn(m)}</div>` : ''}<div class="hdr"><span class="avatar big ini">${esc(initials(cleanName(b.guest) || b.guest))}</span><h2>${esc(b.guest)}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>
       <div class="muted small">${[acText(b), phoneFlag(b.phone), b.lang && T('guest_lang') + ' ' + b.lang, sourceOf(b)].filter(Boolean).map(esc).join(' · ')}${b.ref ? ` · <code class="ref">${esc(b.ref)}</code>` : ''}${[b.booked_at && T('bk_booked', { d: fmtDay(String(b.booked_at).slice(0, 10)) }), b.notes].filter(Boolean).map(x => ' · ' + esc(x)).join('')}</div>${isVip(b.client_id) ? (v => `<div class="banner small">${vipTag(b.client_id)}<span>${T('vip_text', { n: v.total, y: v.years || 1, a: v.addons || 0 })}</span></div>`)(guestStats(b.client_id)) : ''}${isFree(b) ? `<div class="banner small">${freeTag(b)}<span>${T('free_text')}</span>${tipUrl(t) ? `<button class="btn sm" data-act="tipqr" data-id="${t.id}">${T('tip_btn')}</button>` : ''}</div>` : ''}
-      ${isAdmin() && Number(b.price) ? `<div class="small num">${T('bk_price')}: <b>${esc(b.price)} ${esc(b.currency || guestCur())}</b>${commOf(b) ? ` · ${T('net_after', { src: srcName(sourceOf(b) || b.source), p: commOf(b), v: Math.round(netOf(b) * 100) / 100, c: b.currency || guestCur() })}` : ''}</div>` : ''}
+      ${isAdmin() && Number(b.price) ? `<div class="small num">${T('bk_price')}: <b>${esc(b.price)} ${esc(b.currency || guestCur())}</b>${netTyped(b) !== null ? ` · ${T('net_real', { v: nf2(netOf(b)), c: b.currency || guestCur() })}` : commOf(b) ? ` · ${T('net_after', { src: srcName(sourceOf(b) || b.source), p: commOf(b), v: Math.round(netOf(b) * 100) / 100, c: b.currency || guestCur() })}` : ''}</div>` : ''}
       ${!can && live(t) && t.date > today() && (involves(t, me().id) || isAdmin()) ? `<div class="muted small">${T('att_later', { date: fmtDay(t.date) })}</div>` : ''}
       ${can ? `<div class="att"><button class="${b.attendance === 'arrived' ? 'on ok' : ''}" data-act="attend" data-id="${b.id}" data-s="arrived" aria-pressed="${b.attendance === 'arrived'}">${T('att_arrived')}</button><button class="${b.attendance === 'noshow' ? 'on no' : ''}" data-act="attend" data-id="${b.id}" data-s="noshow" aria-pressed="${b.attendance === 'noshow'}">${T('att_noshow')}</button></div>` : ''}
       <div class="alist">${b.client_id ? row('', T('open_client') + ' ›', { 'data-act': 'client', 'data-id': b.client_id }) : ''}
@@ -1262,7 +1286,7 @@
         <div class="tfacts">${(() => { const cap = Number(d.capacity) || 0, pax = Number(d.pax) || 0, bits = [];
           if (d.kind === 'group' && cap) bits.push(`<span class="tag ${pax > cap ? 't-danger' : pax === cap ? 't-warn' : 't-ok'} num">${T('tf_seats', { n: pax, c: cap })}</span><span class="small num ${pax >= cap ? 'muted' : ''}">${pax > cap ? T('tf_over', { n: pax - cap }) : pax === cap ? T('tf_full') : T('tf_free', { n: cap - pax })}</span>`);
           tourLangs(d).forEach(l => bits.push(`<span class="tag t-lang">${esc(l)}</span>`));
-          if (isAdmin()) { const by = {}; d.bookings.forEach(b => { if (Number(b.price)) { const c = b.currency || guestCur(); by[c] = (by[c] || 0) + Number(b.price); } }); const tx = Object.keys(by).map(c => `${nf(Math.round(by[c]))} ${c}`).join(' + '); if (tx) bits.push(`<span class="small num"><span class="muted">${T('tf_cost')}</span> <b>${esc(tx)}</b></span>`); }
+          if (isAdmin()) { const by = {}, got = {}; d.bookings.forEach(b => { if (Number(b.price) && !isCx(b)) { const c = b.currency || guestCur(); by[c] = (by[c] || 0) + Number(b.price); got[c] = (got[c] || 0) + netOf({ ...b, tour_id: b.tour_id || d.id }); } }); const tx = Object.keys(by).map(c => `${nf(Math.round(by[c]))} ${c}`).join(' + '), gx = Object.keys(got).map(c => `${nf(Math.round(got[c]))} ${c}`).join(' + '); if (tx) bits.push(`<span class="small num"><span class="muted">${T('tf_cost')}</span> <b>${esc(tx)}</b> · <span class="muted">${T('tf_got')}</span> <b>${esc(gx)}</b></span>`); }
           return bits.join(''); })()}</div>
         ${wxLine(d, true)}
         ${d.status === 'cancelled' && d.cancel_reason ? `<div class="warnline">${msi('warning')}<span>${T('cancel_info', { reason: cxWhy(d.cancel_reason) })}</span></div>` : ''}
@@ -1321,7 +1345,7 @@
           <div class="four"><label>${T('adults')}<input type="number" min="0" data-bi="${i}" data-bf="adults" value="${esc(b.adults ?? 1)}"></label><label>${T('children')}<input type="number" min="0" data-bi="${i}" data-bf="children" value="${esc(b.children ?? 0)}"></label><label>${T('ref')}<input data-bi="${i}" data-bf="ref" value="${esc(b.ref || '')}" autocomplete="off"></label><label>${T('guest_lang')}<select data-bi="${i}" data-bf="lang"><option value="">—</option>${[...new Set([...GUEST_LANGS, ...(b.lang ? [String(b.lang).toUpperCase()] : [])])].map(x => `<option value="${x}" ${String(b.lang || '').toUpperCase() === x ? 'selected' : ''}>${esc(langName(x))}</option>`).join('')}</select></label></div>
           <div class="two"><label><span>${T('phone')} <span class="pflag" id="pflag-${i}">${esc(phoneFlag(normPhone(b.phone)))}</span></span><input type="tel" inputmode="tel" data-bi="${i}" data-bf="phone" value="${esc(b.phone || '')}" placeholder="+995 5…" autocomplete="off"></label><label>${T('email')}<input type="email" inputmode="email" data-bi="${i}" data-bf="email" value="${esc(b.email || '')}" autocomplete="off"></label></div>
           <div class="four five"><label>${T('payment')}<select data-bi="${i}" data-bf="payment">${opt('', '—', b.payment)}${['prepaid', 'cash', 'unpaid'].map(x => opt(x, T('pay_' + x), b.payment)).join('')}</select></label><label>${T('bk_price')}<input type="number" min="0" step="any" inputmode="decimal" data-bi="${i}" data-bf="price" value="${esc(b.price ?? '')}"></label><label>${T('amount_due')}<input type="number" min="0" step="any" inputmode="decimal" data-bi="${i}" data-bf="amount_due" value="${esc(b.amount_due ?? '')}"></label><label>${T('currency')}<select data-bi="${i}" data-bf="currency">${[...new Set([...CURRENCIES, ...(b.currency ? [b.currency] : [])])].map(x => opt(x, x, b.currency || guestCur())).join('')}</select></label><label>${T('source')}<select data-bi="${i}" data-bf="source">${opt('', sourceOf({ ref: b.ref }) ? T('auto') + ': ' + sourceOf({ ref: b.ref }) : '—', b.source)}${SOURCES.map(x => opt(x, x, b.source)).join('')}</select></label></div>
-          ${isAdmin() ? `<div class="gmoney" id="gm-${i}">${gmoneyHtml(b, d)}</div>` : ''}
+          ${isAdmin() ? `<div class="gmoney" id="gm-${i}">${gmoneyHtml(b, d, i)}</div>` : ''}
           <div class="f"><span class="muted small">${T('options')}</span>${optPicker(b, i, marks)}</div>
           ${needsAddr(b) ? `<label>${T('guest_addr')}<input data-bi="${i}" data-bf="pickup_addr" list="fs-addrs" value="${esc(b.pickup_addr || '')}" placeholder="${T('addr_hint')}" autocomplete="off"></label><span class="muted small">${T('addr_auto')}</span>` : ''}
           <input class="inp" aria-label="${T('note')}" placeholder="${T('other_marks')}" data-bi="${i}" data-bf="notes" value="${esc(b.notes || '')}"></div>`).join('')}
@@ -1391,10 +1415,19 @@
     return [...out].slice(0, 5).map(([id, why]) => ({ cl: db.clients.find(x => x.id === id), why }));
   }
   // One guest's money line (office only): what the guest paid, the platform's commission, what stays with the company. Direct bookings carry no commission.
-  function gmoneyHtml(b, d) {
+  function gmoneyHtml(b, d, i) {
     const price = Number(String(b.price ?? '').replace(',', '.')) || 0; if (!price) return '';
-    const cu = b.currency || guestCur(), pc = commOf({ ...b, tour_id: b.tour_id || d.id, source: b.source }) || 0, cm = Math.round(price * pc) / 100, keep = Math.round((price - cm) * 100) / 100, cell = (v, l) => `<span class="gm"><b class="num">${v}</b><span class="muted small">${l}</span></span>`;
-    return `${cell(nf(price) + ' ' + cu, T('gm_paid'))}${cell(pc ? nf(cm) + ' ' + cu + ' · ' + pc + '%' : '0', T('gm_comm'))}${cell(nf(keep) + ' ' + cu, T('gm_keep'))}`;
+    const cu = b.currency || guestCur(), pc = commOf({ ...b, tour_id: b.tour_id || d.id, source: b.source }) || 0, keepFix = Math.round((price - Math.round(price * pc) / 100) * 100) / 100, cell = (v, l, id) => `<span class="gm"${id ? ` id="${id}"` : ''}><b class="num">${v}</b><span class="muted small">${l}</span></span>`;
+    const typed = netTyped(b);
+    return `${cell(nf2(price) + ' ' + cu, T('gm_paid'))}${gmCommHtml(b, d, i)}<label class="gm gmin"><span class="row nw"><input class="inp num" type="number" min="0" step="any" inputmode="decimal" data-bi="${i}" data-bf="net_amount" value="${esc(typed ?? '')}" placeholder="${esc(nf2(keepFix))}" aria-label="${esc(T('gm_keep'))} (${esc(cu)})"><b class="small">${esc(cu)}</b></span><span class="muted small">${T(typed === null ? 'gm_keep_auto' : 'gm_keep')}</span></label>`;
+  }
+  // The commission tile: from the typed "We get" amount when there is one (real difference and %), else the platform's fixed %.
+  function gmCommHtml(b, d, i) {
+    const price = Number(String(b.price ?? '').replace(',', '.')) || 0, cu = b.currency || guestCur(), typed = netTyped(b);
+    let v;
+    if (typed !== null && !isNaN(typed) && price) { const cm = Math.round((price - typed) * 100) / 100, pc = Math.round(cm / price * 1000) / 10; v = `${nf2(cm)} ${cu} · ${nf2(pc)}%`; }
+    else { const pc = commOf({ ...b, tour_id: b.tour_id || d.id, source: b.source }) || 0; v = pc ? `${nf2(Math.round(price * pc) / 100)} ${cu} · ${pc}%` : '0'; }
+    return `<span class="gm" id="gmc-${i}"><b class="num">${v}</b><span class="muted small">${T(typed !== null ? 'gm_comm_real' : 'gm_comm')}</span></span>`;
   }
   // More guides on one (big group) tour: each with an own pay, blank = the standard guide rate.
   function xguidesHtml(d) {
@@ -1448,7 +1481,7 @@
       else if ((em && !c.email) || (b.phone && !c.phone)) { c = { ...c, email: c.email || em, phone: c.phone || b.phone || null }; await S.save('clients', c); }
       const loc = needsAddr(b) ? parseLoc(b.pickup_addr) : { addr: '', url: '' };
       const a = Number(b.adults) || 0, ch = Number(b.children) || 0;
-      const br = { id: b.id || S.uid(), tour_id: row.id, client_id: c.id, guest: b.guest.trim(), adults: a, children: ch, pax: a + ch, phone: b.phone || null, ref: b.ref || null, notes: b.notes || null, marks: b.marks || [], source: b.source || null, payment: b.payment || null, amount_due: numOrNull(b.amount_due), attendance: b.attendance || null, pickup_addr: loc.addr || null, pickup_url: loc.url || (needsAddr(b) && loc.addr && b.pickup_url && b.pickup_addr === (db.bookings.find(x => x.id === b.id) || {}).pickup_addr ? b.pickup_url : null), email: em, lang: (b.lang || '').trim().toUpperCase().slice(0, 12) || null, currency: b.currency || guestCur(), price: numOrNull(b.price) };
+      const br = { id: b.id || S.uid(), tour_id: row.id, client_id: c.id, guest: b.guest.trim(), adults: a, children: ch, pax: a + ch, phone: b.phone || null, ref: b.ref || null, notes: b.notes || null, marks: b.marks || [], source: b.source || null, payment: b.payment || null, amount_due: numOrNull(b.amount_due), attendance: b.attendance || null, pickup_addr: loc.addr || null, pickup_url: loc.url || (needsAddr(b) && loc.addr && b.pickup_url && b.pickup_addr === (db.bookings.find(x => x.id === b.id) || {}).pickup_addr ? b.pickup_url : null), email: em, lang: (b.lang || '').trim().toUpperCase().slice(0, 12) || null, currency: b.currency || guestCur(), price: numOrNull(b.price), net_amount: numOrNull(b.net_amount) };
       br.history = bookHistory(db.bookings.find(x => x.id === br.id), br, old, row);
       keep.add(br.id); await S.save('bookings', br);
     }
@@ -1972,6 +2005,15 @@
   const langTags = t => { const l = tourLangs(t); return l.length ? ` <span class="tag t-muted ltag" title="${T('lang_tour')}">${msi('language')}${esc(l.join(' · '))}</span>` : ''; };
   // Delica drivers are offered only the off-road rides the Delica is for.
   const RIDE_4X4 = /4\s*[x×х]\s*4|4\s*wd|delica/i;   // by the tour name only: not every Kazbegi tour is a 4x4 ride (owner, 11 Nov)
+  // Open-tour requests (owner, 16 Nov): a private car tour (not a 4x4 ride, not a walk) with no driver goes in the guide's own car;
+  // a guide without a car sees a notice but may still ask. A guide may not ask for a tour in a language they do not speak.
+  const WALK = /walk|walking|пешеход|прогулк|ფეხით/i;
+  const needsOwnCar = (t, role) => role !== 'driver' && t.kind === 'private' && !t.driver_id && !RIDE_4X4.test(t.title || '') && !WALK.test(t.title || '');
+  const myLangs = p => [...new Set(String((p || {}).languages || '').toUpperCase().split(/[\s,;/]+/).filter(Boolean).map(c => (c === 'QA' ? 'KA' : c)))];   // several profiles say QA for Georgian (KA)
+  // Languages of the tour (its own and its guests') the guide does not list. Empty when the guide has listed none: we cannot know, so no block.
+  const langUi = c => { try { return new Intl.DisplayNames([LOCALES[lang()]], { type: 'language' }).of(String(c).toLowerCase()) || c; } catch (e) { return c; } };
+  const xcNotes = (t, role) => { const gap = langGap(t, me(), role); if (gap.length) return `<div class="warnline soft xbusy">${msi('language')}<span>${esc(T('xc_lang', { tour: gap.map(langUi).join(', '), mine: myLangs(me()).map(langUi).join(', ') }))}</span></div>`; return needsOwnCar(t, role) && !hasCar(me()) ? `<div class="warnline soft xbusy">${msi('directions_car')}<span>${esc(T('xc_car'))}</span></div>` : ''; };
+  const langGap = (t, p, role) => { if (role === 'driver') return []; const mine = myLangs(p); if (!mine.length) return []; return tourLangs(t).filter(l => !mine.includes(l)); };
   // For guides and drivers the team's days off are numbers per day, never names: "2 guides, 1 driver off" and the share of the team.
   // Best weeks for a longer rest (guides and drivers): seven days in a row in the next four months when this person has no tour,
   // no busy period or high season falls on them, as few teammates as possible are off, and the team has few tours. Suggestions only.
@@ -2171,7 +2213,7 @@
   }
   function exchangeHtml() {
     const list = openTours(true); if (!list.length) return '';
-    return `<div class="card f xcard"><b>${T('xc_title', { n: list.filter(x => !x.busy.length).length })}</b><ol class="xhow muted"><li>${T('xc_h1')}</li><li>${T('xc_h2')}</li><li>${T('xc_h3')}</li></ol>${list.slice(0, 40).map(({ t, role, mine, busy }) => `<div class="xrow"><button class="grow-l arow" data-act="tour" data-id="${t.id}">${emblem(t)}<span><b class="num">${esc(fmt(t.date, { weekday: 'short', day: 'numeric', month: 'short' }))} ${tmTxt(t)}</b> ${esc(aliasOf(t.title))}${langTags(t)}</span></button>${mine ? `<span class="xasked"><span class="tag t-off" title="${esc(T('xc_note'))}">${T('xc_asked')}</span><button class="btn sm" data-act="xcback" data-id="${mine.id}">${msi('undo')}${T('xc_back')}</button></span>` : busy.length ? `<span class="tag t-warn">${T('xc_busy_tag')}</span>` : `<button class="btn sm primary" data-act="xctake" data-id="${t.id}" data-role="${role}">${T('xc_can')}</button>`}${mine ? `<div class="muted small xbusy xnote">${msi('schedule')}<span>${esc(T('xc_note'))}</span></div>` : ''}${busy.length ? `<div class="warnline soft xbusy">${msi('warning')}<span>${esc(T('xc_busy', { what: workText(busy) }))}</span></div>` : ''}</div>`).join('')}</div>`;
+    return `<div class="card f xcard"><b>${T('xc_title', { n: list.filter(x => !x.busy.length).length })}</b><ol class="xhow muted"><li>${T('xc_h1')}</li><li>${T('xc_h2')}</li><li>${T('xc_h3')}</li></ol>${list.slice(0, 40).map(({ t, role, mine, busy }) => `<div class="xrow"><button class="grow-l arow" data-act="tour" data-id="${t.id}">${emblem(t)}<span><b class="num">${esc(fmt(t.date, { weekday: 'short', day: 'numeric', month: 'short' }))} ${tmTxt(t)}</b> ${esc(aliasOf(t.title))}${langTags(t)}</span></button>${mine ? `<span class="xasked"><span class="tag t-off" title="${esc(T('xc_note'))}">${T('xc_asked')}</span><button class="btn sm" data-act="xcback" data-id="${mine.id}">${msi('undo')}${T('xc_back')}</button></span>` : busy.length ? `<span class="tag t-warn">${T('xc_busy_tag')}</span>` : langGap(t, me(), role).length ? `<span class="tag t-muted xlang">${msi('language')}${T('xc_lang_tag')}</span>` : `<button class="btn sm primary" data-act="xctake" data-id="${t.id}" data-role="${role}">${T('xc_can')}</button>`}${mine ? `<div class="muted small xbusy xnote">${msi('schedule')}<span>${esc(T('xc_note'))}</span></div>` : ''}${busy.length ? `<div class="warnline soft xbusy">${msi('warning')}<span>${esc(T('xc_busy', { what: workText(busy) }))}</span></div>` : ''}${!mine && !busy.length ? xcNotes(t, role) : ''}</div>`).join('')}${!isAdmin() && me() && me().role === 'guide' && !myLangs(me()).length ? `<div class="muted small xbusy">${msi('language')}<span>${T('xc_lang_none')}</span></div>` : ''}</div>`;
   }
   function tasksHtml() {
     const f = state.taskFilter, admin = isAdmin();
@@ -3302,7 +3344,7 @@
   function payRowHtml(x, id, cur) {
     const t = x.t, adm = isAdmin(), how = x.m.how, kind = t.kind === 'group' ? 'group' : 'private';
     const chips = `${how ? `<span class="mchip">${msi(how === 'online' ? 'credit_card' : 'payments')}${how === 'mix' ? T('pd_cash') + ' + ' + T('pd_online') : how === 'online' ? T('pd_online') : T('pay_cash')}</span>` : ''}<span class="mchip">${msi('person')}${T('ppl_n', { n: t.pax || 0 })}</span><span class="mchip">${msi(kind === 'group' ? 'groups' : 'lock')}${T('kind_' + kind)}</span>`;
-    const amt = !adm ? `<b class="num">${nf(x.pay)} ${esc(cur)}</b>` : `<span class="pa"><input class="inp pinp" id="pi-${t.id}" type="number" step="any" min="0" inputmode="decimal" value="${esc(x.pay)}" data-orig="${esc(x.pay)}" data-conf="pc-${t.id}" aria-label="${T('pd_pay_for')} (${esc(cur)})"><span class="muted small pcur">${esc(cur)}</span><button class="iconbtn okbtn" id="pc-${t.id}" data-act="paysave" data-id="${t.id}" data-who="${esc(id)}" disabled aria-label="${T('confirm')}" title="${T('confirm')}">${TICK}</button><button class="iconbtn xbtn" data-act="paydel" data-id="${t.id}" data-who="${esc(id)}" aria-label="${T('delete')}" title="${T('delete')}">${CROSS}</button></span>`;
+    const amt = !adm ? `<b class="num">${nf(x.pay)} ${esc(cur)}</b>` : `<span class="pa"><input class="inp pinp" id="pi-${t.id}" type="number" step="any" min="0" inputmode="decimal" value="${esc(x.pay)}" data-orig="${esc(x.pay)}" data-conf="pc-${t.id}" data-pconv="${t.id}" aria-label="${T('pd_pay_for')}"><select class="inp pcursel" id="pcs-${t.id}" data-orig="${esc(cur)}" data-conf="pc-${t.id}" data-pconv="${t.id}" aria-label="${T('currency')}">${[...new Set([cur, ...CURRENCIES])].map(c => opt(c, c, cur)).join('')}</select><button class="iconbtn okbtn" id="pc-${t.id}" data-act="paysave" data-id="${t.id}" data-who="${esc(id)}" disabled aria-label="${T('confirm')}" title="${T('confirm')}">${TICK}</button><button class="iconbtn xbtn" data-act="paydel" data-id="${t.id}" data-who="${esc(id)}" aria-label="${T('delete')}" title="${T('delete')}">${CROSS}</button><span class="muted small pconv" id="pcv-${t.id}" aria-live="polite"></span></span>`;
     return `<div class="prow"><div class="pt"><span class="num small muted">${esc(dateText(t))}</span><b class="ptitle">${esc(t.title)}</b> ${disputeTag(disputeOf(t.id, id))}</div><div class="pm">${chips}${id === me().id && !adm ? `<button class="lnk small dplnk" data-act="dispute" data-id="${t.id}">${msi('flag')}${T('dp_btn')}</button>` : ''}</div><div class="pv">${amt}</div></div>`;
   }
   // Corrections: date, reason (plain text), amount and currency, then tick (save) and cross (delete). The guide sees the same row without the buttons.
@@ -3660,6 +3702,7 @@
       ${maintHtml() || ''}${state.newVersion && !state.viewAs ? `<button class="banner small setupban nvban" data-act="reload"><span>${T('nv_text')}</span><b>${T('nv_btn')} ›</b></button>` : ''}${state.viewAs ? `<div class="vabar" title="${esc(T('va_readonly'))}"><span class="vatxt" title="${esc(T('va_now', { name: me().name }))}">${T('va_now', { name: '\u0001' }).split('\u0001').map(x => (x ? `<span class="vapre">${esc(x)}</span>` : '')).join(`<span class="vaname">${esc(me().name)}</span>`)}</span><button class="btn sm" data-act="vaexit">${T('va_exit')}</button></div>` : ''}<main class="${/class="[^"]*\bfab\b/.test(body) ? 'hasfab' : ''} ${/class="[^"]*\bincbar\b/.test(body) ? 'hasinc' : ''}" data-key="v-${state.view}-${state.view === 'admin' ? (state.adminTab || '') : state.view === 'me' ? state.meTab : ''}">${demo}${body}</main><nav class="tabs" aria-label="Main">${nav}</nav>`;
     const t1 = performance.now(); morph(app, shell + '<div id="modal"></div><div id="toasts"></div>');
     const hd = app.querySelector('header.top'); if (hd) document.documentElement.style.setProperty('--toph', hd.offsetHeight + 'px'); if (hd) { const bg = getComputedStyle(hd).backgroundColor; if (bg && bg !== state.themeBg) { state.themeBg = bg; document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.setAttribute('content', bg)); } } { const vb = app.querySelector('.vabar'); document.documentElement.style.setProperty('--vabar-h', (vb ? vb.offsetHeight : 0) + 'px'); } const sp = app.querySelector('.strip'); if (sp && sp.offsetHeight) document.documentElement.style.setProperty('--striph', sp.offsetHeight + 'px');
+    stripPlace(app);
     { const mt = app.querySelector('.metabs'); if (mt) { mt.classList.remove('more'); if (mt.scrollWidth > mt.clientWidth + 1) mt.classList.add('more'); const on = mt.querySelector('[aria-pressed="true"]'); if (on) { const l = on.offsetLeft, r = l + on.offsetWidth; if (l - 16 < mt.scrollLeft) mt.scrollLeft = Math.max(0, l - 16); else if (r + 16 > mt.scrollLeft + mt.clientWidth) mt.scrollLeft = r + 16 - mt.clientWidth; } } }   // Me tabs: the chosen tab is always in view; only the row scrolls, never the page
     window.__rt = { build: Math.round(t1 - t0), patch: Math.round(performance.now() - t1) }; syncNotice(); watchConn();
   }
@@ -3810,7 +3853,7 @@
     rpst(el) { rpState().st = el.dataset.v; render(); },
     rpquick(el) { const f = rpState(), td = today(), v = el.dataset.v, first = d => d.slice(0, 8) + '01', last = d => addDays(first(addDays(first(d), 32)), -1); if (v === 'month') { f.from = first(td); f.to = last(td); } else if (v === 'last') { const p = addDays(first(td), -1); f.from = first(p); f.to = last(p); } else { f.from = td.slice(0, 4) + '-01-01'; f.to = td.slice(0, 4) + '-12-31'; } render(); },
     mine(el) { state.mine = isAdmin() ? el.dataset.v === '1' : true; render(); },   // guides and drivers see their own schedule only
-    day(el) { state.date = el.dataset.date; render(); const x = document.getElementById('day-' + state.date); if (x) x.scrollIntoView({ block: 'start', behavior: 'smooth' }); },
+    day(el) { { const row = el.closest('.strip.sroll'); if (row) state.stripX = { wk: monday(el.dataset.date), date: el.dataset.date, off: el.getBoundingClientRect().left - row.getBoundingClientRect().left - row.clientLeft }; } state.date = el.dataset.date; render(); const x = document.getElementById('day-' + state.date); if (x) x.scrollIntoView({ block: 'start', behavior: 'smooth' }); },
     pickday(el) { state.date = el.dataset.date; render(); const x = document.getElementById('day-' + state.date); if (x && window.matchMedia('(max-width:760px)').matches) x.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); },
     tour(el) { let at = null; try { if (el.getBoundingClientRect && !state.modal) { const r = el.getBoundingClientRect(); if (r.width) at = { left: r.left, right: r.right, top: r.top }; } } catch (e) { /* no place */ } openTour(el.dataset.id); if (at && state.modal && state.modal.type === 'tour') { state.modal.at = at; renderModal(); } },
     newtour(el) { state.fabOpen = false; const who = el.dataset.who ? person(el.dataset.who) : null; const pre = {}; if (el.dataset.date) pre.date = el.dataset.date; if (who) pre[who.role === 'driver' ? 'driver_id' : 'guide_id'] = who.id; openTour(null, pre); },
@@ -3823,8 +3866,13 @@
     adjdel(el) { const x = db.pay_adjustments.find(q => q.id === el.dataset.id); if (!x) return; const back = state.modal; confirmDo(T('adj_del_q'), T('delete'), async () => { await S.remove('pay_adjustments', x.id); logAct(`Pay correction removed: ${pname(x.user_id)}, ${x.month}, ${x.amount}`); state.modal = back; redoPay(); }); },
     async paysave(el) {
       const t = db.tours.find(q => q.id === el.dataset.id), inp = $('#pi-' + el.dataset.id), who = el.dataset.who; if (!t || !inp || inp.value === '') return;
-      const v = Number(inp.value); if (!(v >= 0)) { toast(T('dp_need_amount')); return; }
-      await S.save('tours', payRowWith(t, who, v)); logAct(`Pay set by office: ${t.title}, ${t.date}, ${pname(who)} → ${v}`); toast(T('saved')); redoPay();
+      const typed = Number(String(inp.value).replace(',', '.')); if (!(typed >= 0)) { toast(T('dp_need_amount')); return; }
+      // 3.98: the office may type the amount in another currency; it is turned into the pay currency at that tour day's rate and saved like that.
+      const cur = rules().currency || 'GEL', sel = ($('#pcs-' + el.dataset.id) || {}).value || cur, r = sel === cur ? 1 : rateOf(sel, t.date);
+      if (!r) { toast(T('pd_norate', { c: sel })); return; }
+      const v = Math.round(typed * r * 100) / 100;
+      await S.save('tours', payRowWith(t, who, v)); logAct(`Pay set by office: ${t.title}, ${t.date}, ${pname(who)} → ${v}${sel !== cur ? ` ${cur} (from ${typed} ${sel})` : ''}`); toast(sel !== cur ? T('pd_conv_saved', { a: nf2(typed), c: sel, v: nf2(v), cur }) : T('saved')); redoPay();
+      { const i2 = $('#pi-' + el.dataset.id), s2 = $('#pcs-' + el.dataset.id), o2 = $('#pcv-' + el.dataset.id); if (i2) { i2.value = String(v); i2.dataset.orig = String(v); } if (s2) { s2.value = cur; s2.dataset.orig = cur; } if (o2) o2.textContent = ''; const bt = $('#pc-' + el.dataset.id); if (bt) bt.disabled = true; }   // the screen keeps typed values: show what was saved
     },
     paydel(el) {
       const t = db.tours.find(q => q.id === el.dataset.id), who = el.dataset.who; if (!t) return; const back = state.modal;
@@ -3919,7 +3967,7 @@
     expnew(el) { state.modal = { type: 'exp', draft: { kind: 'meal', date: (el && el.dataset.date) || today(), tour_id: (el && el.dataset.tour) || '', currency: rules().currency || 'GEL' } }; renderModal(); },
     expdel(el) { return run(() => S.remove('expenses', el.dataset.id), T('saved')); },
     exppaid(el) { const x = (db.expenses || []).find(y => y.id === el.dataset.id); if (x) return run(() => S.save('expenses', { ...x, paid_back: true }), T('saved')); },
-    xctake(el) { const t = db.tours.find(x => x.id === el.dataset.id); if (!t) return; { const busy = dayWork(me().id, t); if (busy.length) { toast(T('xc_busy', { what: workText(busy) })); return; } } const role = el.dataset.role === 'driver' ? 'driver_id' : 'guide_id';
+    xctake(el) { const t = db.tours.find(x => x.id === el.dataset.id); if (!t) return; { const busy = dayWork(me().id, t); if (busy.length) { toast(T('xc_busy', { what: workText(busy) })); return; } } { const gap = langGap(t, me(), el.dataset.role === 'driver' ? 'driver' : 'guide'); if (gap.length) { toast(T('xc_lang', { tour: gap.map(langUi).join(', '), mine: myLangs(me()).map(langUi).join(', ') })); return; } } const role = el.dataset.role === 'driver' ? 'driver_id' : 'guide_id';
       return run(async () => { await S.save('change_requests', { id: S.uid(), tour_id: t.id, user_id: me().id, patch: { [role]: me().id }, cant: false, swap_with: null, agreed: false, message: null, status: 'pending', created_at: new Date().toISOString(), decided_by: null }); await notify(admins(), 'creq_new', { name: me().name, title: t.title, date: t.date, tour: t.id }); }, T('xc_sent')); },
     xcback(el) { const q = db.change_requests.find(x => x.id === el.dataset.id); if (q) return run(() => S.remove('change_requests', q.id), T('xc_backed')); },
     async install() { if (!installEvt) return; installEvt.prompt(); try { await installEvt.userChoice; } catch (e) { /* closed */ } installEvt = null; render(); },
@@ -4337,6 +4385,10 @@
   });
   document.addEventListener('focusout', ev => { const box = ev.target.closest && ev.target.closest('.csrch'); if (!box) return; setTimeout(() => { if (!box.contains(document.activeElement)) { state.csug = false; const sg = $('#csug'); if (sg) { sg.hidden = true; sg.innerHTML = ''; } } }, 150); });
   document.addEventListener('focusin', ev => { if (ev.target && ev.target.id === 'cq' && !(ev.relatedTarget && ev.relatedTarget.closest && ev.relatedTarget.closest('.csrch')) && String(state.q || '').trim().length >= 2) { state.csug = true; clientLive(); } });
+  // Pay typed in another currency: show what it becomes before ✓ is pressed.
+  document.addEventListener('input', ev => { const el = ev.target; if (!el || !el.dataset || !el.dataset.pconv) return; const id = el.dataset.pconv, t = db.tours.find(x => x.id === id), inp = $('#pi-' + id), sel = $('#pcs-' + id), out = $('#pcv-' + id); if (!t || !inp || !sel || !out) return;
+    const cur = rules().currency || 'GEL', c = sel.value, a = Number(String(inp.value).replace(',', '.')); if (c === cur || inp.value === '' || !(a >= 0)) { out.textContent = ''; return; }
+    const r = rateOf(c, t.date); out.textContent = r ? T('pd_conv', { a: nf2(a), c, v: nf2(Math.round(a * r * 100) / 100), cur, r: nf2(Math.round(r * 100) / 100) }) : T('pd_norate', { c }); });
   document.addEventListener('input', ev => { const el = ev.target; if (el && el.dataset && el.dataset.conf) { const bt = document.getElementById(el.dataset.conf); if (bt) bt.disabled = ![...document.querySelectorAll('[data-conf="' + el.dataset.conf + '"]')].some(i => i.value !== i.dataset.orig); } });
   document.addEventListener('input', ev => {
     const el = ev.target, m = state.modal; if (!m || !m.draft) return;
@@ -4351,7 +4403,8 @@
     else if (el.dataset.bm) { const b = m.draft.bookings[Number(el.dataset.bi)], st = new Set(b.marks || []); el.checked ? st.add(el.dataset.bm) : st.delete(el.dataset.bm); b.marks = [...st]; const sm = $('#ms-' + el.dataset.bi); if (sm) { sm.textContent = optSummary(b); const cn = sm.nextElementSibling; if (cn) cn.textContent = b.marks.length || ''; } if (el.dataset.bm === 'pickup' || el.dataset.bm === 'dropoff' || el.dataset.bm === 'stays') setTimeout(renderModal, 0); }
     else if (el.dataset.bi) { const bi = Number(el.dataset.bi), b = m.draft.bookings[bi]; b[el.dataset.bf] = el.dataset.bf === 'email' && /mailto:/i.test(el.value) ? (el.value = cleanEmail(el.value)) : el.value;
       if (el.dataset.bf === 'ref' || el.dataset.bf === 'email') { const g = srcFromCodes(b.ref) || (/^#?\d{7,9}$/.test(String(b.ref || '').trim()) ? 'Website' : '') || srcFromMail(b.email); if (g && (!b.source || (state.autoSrc || {})[bi] === b.source)) { b.source = g; state.autoSrc = { ...(state.autoSrc || {}), [bi]: g }; const sel = document.querySelector(`select[data-bi="${bi}"][data-bf="source"]`); if (sel) sel.value = g; } }
-      if (['price', 'source', 'ref', 'currency'].includes(el.dataset.bf)) { const gm = $('#gm-' + bi); if (gm) gm.innerHTML = gmoneyHtml(b, m.draft); }
+      if (['price', 'source', 'ref', 'currency'].includes(el.dataset.bf)) { const gm = $('#gm-' + bi); if (gm) gm.innerHTML = gmoneyHtml(b, m.draft, bi); }
+      if (el.dataset.bf === 'net_amount') { const c = $('#gmc-' + bi); if (c) c.outerHTML = gmCommHtml(b, m.draft, bi); const lab = el.closest('.gmin'); if (lab) { const t = lab.querySelector('.muted'); if (t) t.textContent = T(netTyped(b) === null ? 'gm_keep_auto' : 'gm_keep'); } }
       if (['guest', 'phone', 'email', 'ref'].includes(el.dataset.bf)) { const box = $('#gsug-' + bi); if (box) box.innerHTML = suggHtml(b, bi); }
       if (el.dataset.bf === 'phone') { const f = $('#pflag-' + bi); if (f) f.textContent = phoneFlag(normPhone(el.value)); } }
     else if (el.dataset.cq) m.draft[el.dataset.cq] = el.checked;
@@ -4538,7 +4591,7 @@
     if (S.recall && window.showDirectoryPicker && isAdmin()) S.recall('offdir').then(async h => { if (h && h.queryPermission) { OFFDIR.handle = h; OFFDIR.ok = (await h.queryPermission({ mode: 'readwrite' })) === 'granted'; } }).catch(() => {});
     if (S.remember) S.remember('lang', lang()); if ((S.pending || 0) > 0) setTimeout(() => toast(T('st_waiting_open', { n: S.pending || 0 })), 600);
     if (S.warming) { let warm = true; S.onChange((t, r, type) => { if (warm && type === 'STATE' && !S.warming) { warm = false; PH.asked.clear(); displayFromAccount(); saveHello(); weekCheck(); setTimeout(xcNudge, 4000); } }); }
-    if (S.mode === 'demo') window.__test = { dupClients, parseSetmore, openTour: id => { openTour(id); }, placeholderName, isVip, clientHits: (q, n) => clientHits(q, n).list.map(c => c.name), nf2, tmTxt, preTripMail: (tid, bid) => { const t = db.tours.find(x => x.id === tid); return preTripMail({ ...t, bookings: tourBookings(t.id) }, bid ? db.bookings.find(x => x.id === bid) : null); }, impPayDiff, impPayApply, setImp: v => { state.imp = v; state.impPay = null; }, getImpPay: () => state.impPay, setImpPay: v => { state.impPay = v; }, parseReview, isReview, rrHtml: id => revreqModalHtml({ id }), rrTours: () => db.tours.filter(t => tourBookings(t.id).some(b => b.guest)).map(t => t.id), trackOpen, flushUsage, tourPhase, dupClients, dupTours, parseBooking, T: (k, v) => T(k, v), payFor, setGrid: v => { state.wgrid = !!v; render(); }, dayBlock, tasksOnDay, withPhones, taskLineHtml, pushBanner, xcNudge, relayEmail, guestEmail, parseBooking, badgeNote: () => { const b = game(me().id).list.find(x => x.done); if (b) badgeNote([b]); }, checkBadges, newVersion: v => { state.newVersion = !!v; render(); }, pageFor: (title, kind) => { const u = pageFor({ title, kind }), m = /\/activity\/(\d+)/.exec(u); return m ? { id: Number(m[1]) } : null; } };          // for the automatic tests only
+    if (S.mode === 'demo') window.__test = { dupClients, parseSetmore, openTour: id => { openTour(id); }, placeholderName, isVip, netOf: b => netOf(b), myLangs, clientHits: (q, n) => clientHits(q, n).list.map(c => c.name), nf2, tmTxt, preTripMail: (tid, bid) => { const t = db.tours.find(x => x.id === tid); return preTripMail({ ...t, bookings: tourBookings(t.id) }, bid ? db.bookings.find(x => x.id === bid) : null); }, impPayDiff, impPayApply, setImp: v => { state.imp = v; state.impPay = null; }, getImpPay: () => state.impPay, setImpPay: v => { state.impPay = v; }, parseReview, isReview, rrHtml: id => revreqModalHtml({ id }), rrTours: () => db.tours.filter(t => tourBookings(t.id).some(b => b.guest)).map(t => t.id), trackOpen, flushUsage, tourPhase, dupClients, dupTours, parseBooking, T: (k, v) => T(k, v), payFor, setGrid: v => { state.wgrid = !!v; render(); }, dayBlock, tasksOnDay, withPhones, taskLineHtml, pushBanner, xcNudge, relayEmail, guestEmail, parseBooking, badgeNote: () => { const b = game(me().id).list.find(x => x.done); if (b) badgeNote([b]); }, checkBadges, newVersion: v => { state.newVersion = !!v; render(); }, pageFor: (title, kind) => { const u = pageFor({ title, kind }), m = /\/activity\/(\d+)/.exec(u); return m ? { id: Number(m[1]) } : null; } };          // for the automatic tests only
     if (me() && !isAdmin()) state.mine = true;
     displayFromAccount();
     try { history.scrollRestoration = 'manual'; } catch (e) { /* old browser */ }

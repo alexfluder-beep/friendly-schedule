@@ -640,3 +640,6 @@ alter table public.payout_details add column if not exists car_docs jsonb not nu
 
 -- 3.92: more guides on one tour (each with an own pay)
 alter table public.tours add column if not exists extra_guides jsonb not null default '[]'::jsonb;
+
+-- 3.98: what the agent / platform really pays us for this booking (promo codes, non-standard commission). Empty = price minus the fixed commission.
+alter table public.bookings add column if not exists net_amount numeric;
