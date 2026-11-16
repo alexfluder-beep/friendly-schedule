@@ -1880,3 +1880,6 @@ body:has(.incbar) .tabs{border-top-color:transparent}
 .nrt{min-height:36px;text-align:left}
 .qfits{display:flex;flex-direction:column;gap:6px;margin:-2px 0 10px}
 .qfit{width:100%;text-align:left}
+
+/* 3.97 result of a pasted e-mail */
+.card.pbres.ok{border-color:var(--ok)}.card.pbres.warn{border-color:var(--warn,#b8441c)}.card.pbres .msi{vertical-align:-4px}
