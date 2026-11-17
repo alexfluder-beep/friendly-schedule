@@ -27,6 +27,7 @@ A plain JavaScript PWA for Friendly.ge guides and drivers (replaces Setmore). Li
 - Data added in a test goes through `S.save(...)`, not `db.x.push(...)`: the lookup index (`idx()`) is a memo and does not see a plain push.
 - Since 3.98 the day row (`.strip.sroll`) holds 70 days (2 weeks back, 8 ahead). Tests must count or target the days on screen (`.strip button.inwk` = the shown week), never "all buttons" or `.last()`.
 - Choosing a person in the demo "View as" list rebuilds the sample data: save test data after choosing.
+- Scrolling to a day goes through `dayJump()` (keeps the page still during the redraw, then one move that ends under the sticky day row). Do not use `scrollIntoView` there: on iPhone Safari it made the page jump to the top and slide back (17 Nov). Test t175.
 - When editing a long one-line test, never insert a `//` comment mid-line (it hides the rest of the line); use `/* */`.
 
 ## Cleaning rules

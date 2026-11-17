@@ -18,7 +18,7 @@
         if (!live(t) || t.date > td || t.date < from) continue;
         for (const [th, re] of THEMES) if (re.test(t.title)) for (const [role, id] of [['guide', t.guide_id], ['driver', t.driver_id]]) if (id) { const c = cnt[th + ':' + role] = cnt[th + ':' + role] || {}; c[id] = (c[id] || 0) + 1; }
       }
-      for (const key of Object.keys(cnt)) { const [th, role] = key.split(':'), max = Math.max(...Object.values(cnt[key])); if (max < 5) continue; for (const id of Object.keys(cnt[key])) if (cnt[key][id] === max && (person(id) || {}).active !== false) (out[id] = out[id] || []).push({ th, role, n: max, key: titleKey(th, role), icon: THEMES.find(x => x[0] === th)[2] }); }
+      for (const key of Object.keys(cnt)) { const [th, role] = key.split(':'), max = Math.max(...Object.values(cnt[key])); if (max < 5) continue; for (const id of Object.keys(cnt[key])) if (cnt[key][id] === max && (person(id) || {}).active !== false) { const k = titleKey(th, role), list = out[id] = out[id] || [], same = list.find(x => x.key === k); if (same) { if (max > same.n) Object.assign(same, { role, n: max }); } else list.push({ th, role, n: max, key: k, icon: THEMES.find(x => x[0] === th)[2] }); } }   /* A14: one title per name (top guide and top driver of the same theme gave two "Border runner") */
       return getMemo().hold = out;
     }
     const titlesOf = id => (holders()[id] || []).map(x => T('ti_' + x.key));

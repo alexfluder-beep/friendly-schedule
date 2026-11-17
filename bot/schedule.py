@@ -31,6 +31,13 @@ WEEKDAYS = {
 }
 TEXT = {
     "en": {
+        "menu": "Choose what you need:", "b_week": "📅 My week", "b_tomorrow": "Tomorrow", "b_open": "🙋 Open tours", "b_off": "🏖 Day off", "b_sick": "🤒 I am sick today", "b_bug": "🐞 Report a problem",
+        "open_none": "No open tours for you in the next 14 days.", "open_title": "Tours that still need a {role} (next 14 days). Tap one to ask for it; the office approves:",
+        "take_btn": "Take: {line}", "take_ok": "Sent. The office will confirm: {title}, {date}.", "take_twice": "You already asked for this tour.", "take_gone": "This tour is no longer open.",
+        "off_ask": "Which day? Send the date like 24.12 or a range like 24.12-26.12. Add a reason after a space if you want.", "off_bad": "I did not understand the date. Example: 24.12 or 24.12-26.12",
+        "off_ok": "Day off requested: {range}. The office will answer here and in the app.", "off_twice": "You already have time off on these days.", "off_past": "This date is in the past.",
+        "sick_ask": "Mark today as a sick day? The office is told at once.", "sick_yes": "Yes, I am sick today", "sick_ok": "Get well soon. Today is marked as a sick day and the office is told.",
+        "role_guide": "guide", "role_driver": "driver",
         "week": "Your next 7 days", "tomorrow": "Tomorrow", "none": "No tours.", "off": "Day off", "sick": "Sick day",
         "guests": "guests", "meet": "Meeting point", "with": "with", "open": "Open schedule",
         "linked": "Connected. Hello, {name}! Schedule notices will come here.",
@@ -52,6 +59,13 @@ TEXT = {
         "n_default": "New notice in Friendly Schedule.",
     },
     "ru": {
+        "menu": "Выберите, что нужно:", "b_week": "📅 Моя неделя", "b_tomorrow": "Завтра", "b_open": "🙋 Свободные туры", "b_off": "🏖 Выходной", "b_sick": "🤒 Я заболел(а)", "b_bug": "🐞 Сообщить о проблеме",
+        "open_none": "Свободных туров для вас на ближайшие 14 дней нет.", "open_title": "Туры, где ещё нужен {role} (ближайшие 14 дней). Нажмите, чтобы попросить тур; офис подтвердит:",
+        "take_btn": "Взять: {line}", "take_ok": "Отправлено. Офис подтвердит: {title}, {date}.", "take_twice": "Вы уже просили этот тур.", "take_gone": "Этот тур уже занят.",
+        "off_ask": "Какой день? Отправьте дату, например 24.12, или период 24.12-26.12. Можно добавить причину через пробел.", "off_bad": "Не понял дату. Пример: 24.12 или 24.12-26.12",
+        "off_ok": "Выходной запрошен: {range}. Офис ответит здесь и в приложении.", "off_twice": "На эти дни у вас уже есть выходной.", "off_past": "Эта дата уже прошла.",
+        "sick_ask": "Отметить сегодня как больничный? Офис узнает сразу.", "sick_yes": "Да, я болею сегодня", "sick_ok": "Выздоравливайте. Сегодня отмечено как больничный, офис в курсе.",
+        "role_guide": "гид", "role_driver": "водитель",
         "week": "Ваши ближайшие 7 дней", "tomorrow": "Завтра", "none": "Туров нет.", "off": "Выходной", "sick": "Больничный",
         "guests": "гостей", "meet": "Место встречи", "with": "с", "open": "Открыть расписание",
         "linked": "Готово. Привет, {name}! Уведомления о расписании будут приходить сюда.",
@@ -73,6 +87,13 @@ TEXT = {
         "n_default": "Новое уведомление в Friendly Schedule.",
     },
     "ka": {
+        "menu": "აირჩიეთ, რა გჭირდებათ:", "b_week": "📅 ჩემი კვირა", "b_tomorrow": "ხვალ", "b_open": "🙋 თავისუფალი ტურები", "b_off": "🏖 დასვენება", "b_sick": "🤒 დღეს ავად ვარ", "b_bug": "🐞 პრობლემის შეტყობინება",
+        "open_none": "მომდევნო 14 დღეში თქვენთვის თავისუფალი ტური არ არის.", "open_title": "ტურები, სადაც ჯერ კიდევ საჭიროა {role} (მომდევნო 14 დღე). შეეხეთ ტურს მოსათხოვად; ოფისი დაადასტურებს:",
+        "take_btn": "აღება: {line}", "take_ok": "გაიგზავნა. ოფისი დაადასტურებს: {title}, {date}.", "take_twice": "ეს ტური უკვე მოითხოვეთ.", "take_gone": "ეს ტური აღარ არის თავისუფალი.",
+        "off_ask": "რომელი დღე? გამოგზავნეთ თარიღი, მაგ. 24.12, ან პერიოდი 24.12-26.12. მიზეზი შეგიძლიათ დაამატოთ სივრცის შემდეგ.", "off_bad": "თარიღი ვერ გავიგე. მაგალითი: 24.12 ან 24.12-26.12",
+        "off_ok": "დასვენება მოთხოვნილია: {range}. ოფისი აქ და აპში გიპასუხებთ.", "off_twice": "ამ დღეებში უკვე გაქვთ დასვენება.", "off_past": "ეს თარიღი უკვე გავიდა.",
+        "sick_ask": "მოვნიშნოთ დღე ავადმყოფობის დღედ? ოფისი მაშინვე გაიგებს.", "sick_yes": "დიახ, დღეს ავად ვარ", "sick_ok": "გამოჯანმრთელდით. დღე მონიშნულია ავადმყოფობის დღედ, ოფისმა იცის.",
+        "role_guide": "გიდი", "role_driver": "მძღოლი",
         "week": "თქვენი მომდევნო 7 დღე", "tomorrow": "ხვალ", "none": "ტურები არ არის.", "off": "დასვენების დღე", "sick": "ბიულეტენი",
         "guests": "სტუმარი", "meet": "შეხვედრის ადგილი", "with": "ერთად:", "open": "განრიგის გახსნა",
         "linked": "მზადაა. გამარჯობა, {name}! განრიგის შეტყობინებები აქ მოვა.",
@@ -196,6 +217,49 @@ class ScheduleClient:
         for uid in user_ids:
             self._call("POST", "notifications", body={"user_id": uid, "kind": kind, "params": params, "read": False})
 
+    # --- shortcuts for guides and drivers (17 Nov): every one creates the same request the app makes; the office approves in the app ---
+    NO_CAR = ("walking", "walk ", "night tour", "free tour", "brutal tbilisi", "old tbilisi")
+
+    def open_tours(self, profile: dict, today: date | None = None, days: int = 14) -> list:
+        """Confirmed tours in the next days that still need this person's role, on days the person is free."""
+        today = today or date.today()
+        role = "driver_id" if profile.get("role") == "driver" else "guide_id"
+        d0, d1 = today.isoformat(), (today + timedelta(days=days)).isoformat()
+        rows = self._call("GET", "tours", {role: "is.null", "status": "eq.confirmed", "date": "gte." + d0, "and": f"(date.lte.{d1})",
+                                           "select": "id,date,date_to,start_time,title,pax,language,guide_id,driver_id", "order": "date.asc,start_time.asc"})
+        if role == "driver_id":
+            rows = [t for t in rows if not any(w in (t.get("title") or "").lower() for w in self.NO_CAR)]
+        busy = {t["date"] for t in self.tours(profile["id"], d0, d1)}
+        for o in self.time_off(profile["id"], d0, d1):
+            d = date.fromisoformat(o["date_from"])
+            while d.isoformat() <= o["date_to"]:
+                busy.add(d.isoformat()); d += timedelta(days=1)
+        asked = {r["tour_id"] for r in self._call("GET", "change_requests", {"user_id": "eq." + profile["id"], "status": "eq.pending", "select": "tour_id"})}
+        return [t for t in rows if t["date"] not in busy and t["id"] not in asked]
+
+    def take(self, profile: dict, tour_id: str) -> str:
+        """Ask for an open tour. Returns 'ok', 'twice' or 'gone'."""
+        role = "driver_id" if profile.get("role") == "driver" else "guide_id"
+        ts = self._call("GET", "tours", {"id": "eq." + tour_id, "select": "id,title,date,status,guide_id,driver_id"})
+        if not ts or ts[0].get("status") != "confirmed" or ts[0].get(role):
+            return "gone"
+        if self._call("GET", "change_requests", {"user_id": "eq." + profile["id"], "tour_id": "eq." + tour_id, "status": "eq.pending", "select": "id"}):
+            return "twice"
+        t = ts[0]
+        self._call("POST", "change_requests", body={"tour_id": tour_id, "user_id": profile["id"], "patch": {role: profile["id"]}, "cant": False, "swap_with": None,
+                                                    "agreed": False, "message": "Telegram", "status": "pending"})
+        self.notify(self.admins(), "creq_new", {"name": profile["name"], "title": t["title"], "date": t["date"], "tour": tour_id})
+        return "ok"
+
+    def day_off(self, profile: dict, date_from: str, date_to: str, note: str = "", kind: str = "dayoff") -> str:
+        """Ask for time off ('dayoff', waits for the office) or report a sick day ('sick', counted at once like in the app)."""
+        if self.time_off(profile["id"], date_from, date_to):
+            return "twice"
+        self._call("POST", "time_off", body={"user_id": profile["id"], "date_from": date_from, "date_to": date_to, "type": kind,
+                                             "status": "approved" if kind == "sick" else "pending", "note": (note or "")[:300] or None})
+        self.notify(self.admins(), "sick_reported" if kind == "sick" else "off_requested", {"name": profile["name"], "from": date_from, "to": date_to})
+        return "ok"
+
     # --- notices ---
     def pending_notices(self, limit: int = 40) -> list:
         """Schedule notices not yet sent to Telegram, each with the receiver's telegram_id and language."""
@@ -274,3 +338,32 @@ def notice_text(row: dict) -> str:
         return tr(lang, "n_default")
     status = tr(lang, "st_" + str(p.get("status"))) if p.get("status") else ""
     return tr(lang, key, title=p.get("title", ""), date=p.get("date", ""), time=p.get("time", ""), reason=p.get("reason", ""), status=status).rstrip(". ")
+
+
+def parse_days(text: str, today: date | None = None) -> tuple | None:
+    """'24.12', '24.12.2026', '24.12-26.12', '2026-12-24' (and a reason after a space) -> (from, to, reason). A day before today means next year."""
+    import re
+    today = today or date.today()
+    m = re.match(r"\s*(\d{4}-\d\d-\d\d|\d{1,2}[./]\d{1,2}(?:[./]\d{2,4})?)(?:\s*[-–]\s*(\d{4}-\d\d-\d\d|\d{1,2}[./]\d{1,2}(?:[./]\d{2,4})?))?\s*(.*)$", text or "")
+    if not m:
+        return None
+
+    def one(x: str) -> date | None:
+        try:
+            if "-" in x:
+                return date.fromisoformat(x)
+            p = re.split(r"[./]", x)
+            y = int(p[2]) if len(p) > 2 else today.year
+            y = y + 2000 if y < 100 else y
+            d = date(y, int(p[1]), int(p[0]))
+            return d.replace(year=d.year + 1) if len(p) < 3 and d < today - timedelta(days=1) else d
+        except (ValueError, IndexError):
+            return None
+    a = one(m.group(1)); b = one(m.group(2)) if m.group(2) else a
+    if not a or not b or b < a or (b - a).days > 31:
+        return None
+    return a.isoformat(), b.isoformat(), m.group(3).strip()
+
+
+def open_line(t: dict, lang: str) -> str:
+    return f"{day_label(t['date'], lang)} {t.get('start_time') or ''} {t.get('title') or ''}".replace("  ", " ").strip()[:60]

@@ -893,7 +893,7 @@ html[data-os="ios"] input,html[data-os="ios"] select,html[data-os="ios"] textare
   .dayhd > b.tdy{color:var(--ink);font-weight:700}
 }
 .calhd{min-width:0;gap:4px}
-.calttl{font-size:var(--t-h2);min-width:0;flex:0 1 auto;white-space:nowrap;overflow:hidden}
+.calttl{font-size:var(--t-h2);min-width:0;flex:0 1 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .calhd .spacer{flex:1 1 0;min-width:0}
 .calhd .iconbtn,.calhd .whochip,.calnow{flex:none}
 .calnow{padding:0 12px}
@@ -901,6 +901,8 @@ html[data-os="ios"] input,html[data-os="ios"] select,html[data-os="ios"] textare
 .fabmenu .fabitem{box-shadow:none;animation:none;border-radius:var(--r-s);font-weight:500;justify-content:flex-start;width:100%}
 @media (max-width:760px){.strip{margin:0}}
 .calhd .jump{flex:none}
+.calhd:has(.calnow) .jump{display:none}
+@media (max-width:420px){.calhd .iconbtn{width:36px}.calnow{padding:0 10px}}
 
 /* 3.22 special dates: open list with icons, add/edit in a sheet, rolling date wheels */
 .pdlist{display:flex;flex-direction:column}
@@ -1957,8 +1959,9 @@ html.fs-noclip,html.fs-noclip body{overflow-x:visible}   /* tests only (tests/de
 /* ---------- Money module (money.js): tiles, bars, bank card, activity list ---------- */
 .mn .mn-top{flex-wrap:wrap;gap:8px}
 .mn .seg button .msi{margin-right:4px}
-.mn-top>.seg:first-child{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%;border-radius:16px}
-.mn-top>.seg:first-child button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border-radius:14px;font-size:.95rem}
+.mn-top>.seg:first-child{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));width:100%;border-radius:16px}
+.mn-top>.seg:first-child button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 2px;border-radius:14px;font-size:.9rem;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;position:relative}
+.mn-top>.seg:first-child button .badge{position:absolute;top:2px;right:4px}
 .mn-top>.seg:first-child button .msi{margin:0;width:22px;height:22px}
 .mn-hero{display:flex;flex-direction:column;gap:4px}
 .mn-hero .bignum{font-size:2.4rem;line-height:1.1}
@@ -2034,3 +2037,12 @@ html.fs-noclip,html.fs-noclip body{overflow-x:visible}   /* tests only (tests/de
 .mn-fr .grow-l{flex:1 1 100%}
 .mn-fr .mn-fp{max-width:110px}.mn-fr .mn-fc{max-width:90px}.mn-fr .mn-fy{max-width:150px}
 @media (max-width:420px){.mn-wf{grid-template-columns:1fr auto}.mn-wf .mn-wb{grid-column:1/-1;order:3}.mn-pr{grid-template-columns:1fr auto}.mn-pr .mn-wb{display:none}.mn-bn{font-size:2.2rem}}
+
+.approx{color:var(--muted);font-weight:600}
+.mchip.cash{background:color-mix(in srgb,var(--warn) 18%,var(--surface));color:var(--ink);font-weight:600}
+/* Holiday availability */
+.holcard,.holadm{gap:8px}.holcard>b,.holadm>b{display:flex;gap:8px;align-items:center}
+.holper{display:flex;flex-direction:column;gap:4px;padding:8px 0;border-top:1px solid var(--line)}
+.holday{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;min-height:48px}
+.holday .seg button{min-height:44px;min-width:96px}
+.holcard.done{gap:4px}

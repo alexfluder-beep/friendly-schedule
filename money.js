@@ -10,7 +10,7 @@
   'use strict';
   window.FSMoney = function (d) {
     const { getMemo, setMemo, db, state, S, T, me, isAdmin, run, toast, logAct, render, msi, esc, nf, fmt, fmtDay, today, iso, opt, crew, pname, rules, rateOf, fxOn, manualRate, statKey, aliasOf, srcName, sourceOf, netOf, guestCur, live, statement, CURRENCIES, SOURCES,
-      payFor, extraPay, costOf, tourBookings, monthEnd, payFrom, avatar, shortName } = d;
+      salaryHtml, payFor, extraPay, costOf, tourBookings, monthEnd, payFrom, avatar, shortName } = d;
     const STAFF_METHODS = ['cash', 'card', 'bank'], PAYS = ['prepaid', 'cash', 'unpaid'];
     const ADDONS = ['wine', 'front_seat', 'bear_food', 'private_room', 'stays', 'pickup', 'dropoff'];
     const NOT_PLATFORM = ['Direct', 'Website', 'FreeTour'];
@@ -182,7 +182,7 @@
           return `<div class="card f mn-person ${open ? 'open' : ''}"><button class="mn-ph" data-act="mnopen" data-id="${p.id}" aria-expanded="${open}"><span class="row nw">${avatar(p.id)}<span class="grow-l"><b>${esc(p.name)}</b><span class="muted small">${T('role_' + p.role)}${L.lastPay ? ' · ' + T('mn_last', { d: esc(fmtDay(L.lastPay.paid_at)) }) : ''}</span></span></span>
               <span class="mn-pb"><b class="num ${L.total < -0.5 ? 'neg' : ''}">${L.total < -0.5 ? T('mn_owes_us', { v: money(-L.total, c) }) : L.total > 0.5 ? money(L.total, c) : T('mn_settled')}</b><span class="small">${balLine(L.bal)}</span></span>${msi(open ? 'keyboard_arrow_up' : 'keyboard_arrow_down')}</button>
             ${Object.keys(cash).length ? `<span class="small muted">${msi('payments')}${T('mn_holds', { v: balLine(cash) })}</span>` : ''}
-            ${isAdmin() && !pay ? `<div class="bar"><button class="btn sm primary" data-act="mnpay" data-id="${p.id}" data-k="pay">${msi('wallet')}${T('mn_pay_btn')}</button>${Object.keys(cash).length ? `<button class="btn sm" data-act="mnpay" data-id="${p.id}" data-k="gave">${msi('savings')}${T('mn_gave_btn')}</button>` : ''}</div>` : ''}
+            ${isAdmin() && !pay ? `<div class="bar"><button class="btn sm primary" data-act="mnpay" data-id="${p.id}" data-k="pay">${msi('wallet')}${T('mn_pay_btn')}</button>${Object.keys(cash).length ? `<button class="btn sm" data-act="mnpay" data-id="${p.id}" data-k="gave">${msi('savings')}${T('mn_gave_btn')}</button>` : ''}<button class="btn sm" data-act="statement" data-id="${p.id}" data-m="${mo}">${msi('receipt_long')}${T('mn_statement')}</button></div>` : ''}
             ${pay ? payForm(p.id, L, pay) : ''}
             ${open ? `${bankCard(p.id, L)}${feedHtml(L, state.mnFeed ? 400 : 25)}` : ''}</div>`;
         }).join('') || `<p class="muted">${T('mn_team_none')}</p>`}</div>`;
@@ -221,10 +221,10 @@
 
     function moneyHtml() {
       const mo = state.moneyMo || today().slice(0, 7), tab = state.mnTab || 'ov';
-      const tabs = [['ov', 'balance', 'mn_tab_ov'], ['team', 'groups', 'mn_tab_team'], ['guests', 'receipt_long', 'mn_tab_guests'], ['setup', 'settings', 'mn_tab_setup']];
-      return `<div class="mn"><div class="bar mn-top"><div class="seg">${tabs.map(([k, ic, l]) => `<button data-act="mntab" data-v="${k}" aria-pressed="${tab === k}">${msi(ic)}${T(l)}</button>`).join('')}</div>
-          ${tab !== 'setup' ? `<div class="seg"><button data-act="mmo" data-d="-1" aria-label="${T('prev')}">‹</button><button disabled>${esc(moName(mo))}</button><button data-act="mmo" data-d="1" aria-label="${T('next')}">›</button></div>` : ''}</div>
-        ${tab === 'team' ? teamHtml(mo) : tab === 'guests' ? guestsHtml(mo) : tab === 'setup' ? setupHtml() : overviewHtml(mo)}</div>`;
+      const tabs = [['ov', 'balance', 'mn_tab_ov'], ['team', 'groups', 'mn_tab_team'], ['pay', 'wallet', 'mn_tab_pay'], ['guests', 'receipt_long', 'mn_tab_guests'], ['setup', 'settings', 'mn_tab_setup']];
+      return `<div class="mn"><div class="bar mn-top"><div class="seg">${tabs.map(([k, ic, l]) => `<button data-act="mntab" data-v="${k}" aria-pressed="${tab === k}">${msi(ic)}${T(l)}${k === 'pay' && db.pay_disputes.some(q => q.status === 'open') ? ` <span class="badge">${db.pay_disputes.filter(q => q.status === 'open').length}</span>` : ''}</button>`).join('')}</div>
+          ${tab !== 'setup' && tab !== 'pay' ? `<div class="seg"><button data-act="mmo" data-d="-1" aria-label="${T('prev')}">‹</button><button disabled>${esc(moName(mo))}</button><button data-act="mmo" data-d="1" aria-label="${T('next')}">›</button></div>` : ''}</div>
+        ${tab === 'team' ? teamHtml(mo) : tab === 'pay' ? `<div class="mn-pay">${salaryHtml()}</div>` : tab === 'guests' ? guestsHtml(mo) : tab === 'setup' ? setupHtml() : overviewHtml(mo)}</div>`;
     }
 
     // Me > Pay: the person's own balance. Shown when the office has switched it on in Setup (the admin also sees it in "View as").
