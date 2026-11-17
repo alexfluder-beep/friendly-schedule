@@ -1,5 +1,7 @@
 # Schedule in the crew Telegram bot
 
+> The live bot is kept by the bot agent on the `telegram-bot` branch, with newer copies of these files. Do not copy these files to the server by hand: the bot agent merges changes from here into its own files, runs the tests and pushes; the server updates itself.
+
 These three files add the schedule to the existing bot (branch `telegram-bot`). Nothing is live until they are copied into the bot folder and the bot is restarted.
 
 ## What guides and drivers get

@@ -759,7 +759,7 @@ details.sect.avpick summary{font-size:var(--t-body);font-weight:500;color:var(--
 .ctlist .grow-l > span:first-child{white-space:normal;overflow-wrap:anywhere}
 
 /* 3.13 speed and motion: screens slide like a native app, scrolling never waits, long lists draw only what is on screen */
-.top{view-transition-name:fs-top}.tabs{view-transition-name:fs-tabs}
+/* .top and .tabs are no longer separate view-transition layers: on iPhone the fixed bars could be left drawn mid-page (17 Nov) */
 ::view-transition-group(root){animation-duration:var(--dur);animation-timing-function:var(--ease)}
 ::view-transition-old(root){animation:fs-out .12s cubic-bezier(.4,0,1,1) both}
 ::view-transition-new(root){animation:fs-in var(--dur) var(--ease) both}
@@ -1917,14 +1917,16 @@ body:has(.incbar) .tabs{border-top-color:transparent}
    screen made the whole app zoom out a little (uneven margins, top bar not reaching the right edge). Rows meant to swipe (day row, tables,
    tabs) keep their own scrolling; only the page itself is held to the screen width. On the root element this applies to the window, so the
    sticky top bar and day row keep working. */
-html{overflow-x:hidden}
-@supports (overflow:clip){html{overflow-x:clip}main,#modal,.overlay .sheet{overflow-x:clip}}
+/* 3.102: no overflow on html/body any more: on iPhone Safari it made the fixed bottom bar drift up the page and the sticky day row shake
+   during scrolling (owner's videos, 17 Nov). The width guard now sits on the content only. */
+@supports (overflow:clip){main,#modal,.overlay .sheet{overflow-x:clip}}
+@supports not (overflow:clip){main{overflow-x:hidden}}
 body{max-width:100%}
 
 /* 3.99 Nothing may make the page wider than the phone: Safari would zoom the whole app out (owner's screenshot, 17 Nov).
    clip (not hidden) keeps sticky headers working. */
-html,body{max-width:100%;overflow-x:clip}
-html.fs-noclip,html.fs-noclip body{overflow-x:visible}   /* tests only (tests/demo-config.js) */
+html,body{max-width:100%}
+html.fs-noclip main,html.fs-noclip #modal{overflow-x:visible}   /* tests only (tests/demo-config.js) */
 
 /* 3.99 Micro animations (owner, 17 Nov). Short, transform/opacity only (cheap on old phones). The global
    prefers-reduced-motion rule at the top switches all of them off; the JS skips its waits then too. */

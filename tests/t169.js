@@ -14,8 +14,8 @@ const { chromium, devices } = require('playwright');
   const dates = await p.evaluate(() => [...document.querySelectorAll('.xcard .xrow [data-act=tour]')].map(b => b.dataset.id).map(id => window.Store.db.tours.find(t => t.id === id)).filter(Boolean).map(t => t.date + (t.start_time || '')));
   ok(dates.length > 1 && dates.every((x, i) => !i || dates[i - 1] <= x), 'tours without staff are in date order: ' + dates.map(x => x.slice(5, 10)).join(' '));
   await p.evaluate(() => document.documentElement.classList.remove('fs-noclip'));   /* the live app has the guard on */
-  const ov = await p.evaluate(() => [getComputedStyle(document.documentElement).overflowX, getComputedStyle(document.body).overflowX]);
-  ok(ov.join() === 'clip,clip', 'page sideways overflow is clipped: ' + ov.join());
+  const ov = await p.evaluate(() => [getComputedStyle(document.querySelector('main')).overflowX, getComputedStyle(document.documentElement).overflowX]);
+  ok(ov[0] === 'clip' && ov[1] === 'visible', 'sideways overflow is clipped on the content, not on html/body (iPhone, 17 Nov): ' + ov.join());
   // a too-wide element cannot widen the page
   ok(await p.evaluate(() => { const d = document.createElement('div'); d.style.width = '1200px'; d.style.height = '2px'; document.querySelector('main').appendChild(d); const w = document.documentElement.scrollWidth; d.remove(); return w <= innerWidth; }), 'a 1200 px element does not widen the page');
   // sticky day row still sticks
