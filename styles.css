@@ -1910,3 +1910,43 @@ body:has(.incbar) .tabs{border-top-color:transparent}
 .prow .pcursel{width:auto;min-width:72px;min-height:40px;padding-right:28px}
 .prow .pconv{flex-basis:100%;text-align:right}.prow .pconv:empty{display:none}
 @media (max-width:760px){.prow .pconv{text-align:left}}
+
+/* 3.99 (owner's iPhone screenshots, 16 Nov): the page must never be wider than the phone. On iPhone Safari something ~36px wider than the
+   screen made the whole app zoom out a little (uneven margins, top bar not reaching the right edge). Rows meant to swipe (day row, tables,
+   tabs) keep their own scrolling; only the page itself is held to the screen width. On the root element this applies to the window, so the
+   sticky top bar and day row keep working. */
+html{overflow-x:hidden}
+@supports (overflow:clip){html{overflow-x:clip}main,#modal,.overlay .sheet{overflow-x:clip}}
+body{max-width:100%}
+
+/* 3.99 Nothing may make the page wider than the phone: Safari would zoom the whole app out (owner's screenshot, 17 Nov).
+   clip (not hidden) keeps sticky headers working. */
+html,body{max-width:100%;overflow-x:clip}
+html.fs-noclip,html.fs-noclip body{overflow-x:visible}   /* tests only (tests/demo-config.js) */
+
+/* 3.99 Micro animations (owner, 17 Nov). Short, transform/opacity only (cheap on old phones). The global
+   prefers-reduced-motion rule at the top switches all of them off; the JS skips its waits then too. */
+@media (prefers-reduced-motion:no-preference){
+  /* 1 messages slide up and fade out */
+  .toast{animation:fx-toast .22s cubic-bezier(.2,0,0,1) both}
+  .toast.fx-out{animation:fx-toast-out .2s ease-in both}
+  @keyframes fx-toast{from{opacity:0;transform:translateY(10px) scale(.98)}}
+  @keyframes fx-toast-out{to{opacity:0;transform:translateY(6px)}}
+  /* 2 a saved row glows green once */
+  .fx-saved{animation:fx-saved .9s ease-out}
+  @keyframes fx-saved{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ok) 55%,transparent);background-color:color-mix(in srgb,var(--ok) 14%,transparent)}100%{box-shadow:0 0 0 10px transparent;background-color:transparent}}
+  /* 3 a count that changed pops once */
+  .fx-bump{animation:fx-bump .36s cubic-bezier(.3,1.6,.5,1)}
+  @keyframes fx-bump{0%{transform:scale(1)}40%{transform:scale(1.35)}100%{transform:scale(1)}}
+  /* 4 an assigned tour / suggestion slides away */
+  .fx-leave{animation:fx-leave .22s ease-in forwards;pointer-events:none}
+  @keyframes fx-leave{to{opacity:0;transform:translateX(24px)}}
+  /* 5 a task ticked done: the tick pops, the row dims */
+  .fx-done{transition:opacity .25s ease;opacity:.5}
+  .fx-done input[type=checkbox]{animation:fx-bump .3s cubic-bezier(.3,1.6,.5,1)}
+  /* 6 the selected day changes colour smoothly; result cards and new rows fade in */
+  .strip>button,.strip>button b,.strip>button span{transition:background-color .16s ease,color .16s ease,border-color .16s ease}
+  .card.pbres{animation:fresh .24s ease-out}
+}
+/* 3.99 guest names on the calendar card */
+.acard .gnames{display:flex;align-items:center;gap:4px;min-width:0;margin-top:2px}.acard .gnames>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.acard .gnames .msi{font-size:16px}

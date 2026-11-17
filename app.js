@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.98';
+  const APP_VERSION = '3.99';
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -646,7 +646,16 @@
   function toast(text) {
     const box = $('#toasts'); if (!box) return; const same = [...box.children].find(x => x.textContent === text);
     const el = same || document.createElement('div'); if (!same) { el.className = 'toast'; el.textContent = text; while (box.children.length >= 2) box.firstChild.remove(); box.appendChild(el); }
-    clearTimeout(el._t); el._t = setTimeout(() => el.remove(), 3500);
+    clearTimeout(el._t); el._t = setTimeout(() => { el.classList.add('fx-out'); setTimeout(() => el.remove(), motionOk() ? 200 : 0); }, 3500);
+  }
+  // Micro animations (owner, 17 Nov): short, CSS only, off when the phone asks for less motion.
+  const motionOk = () => !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const glow = el => { if (!el || !motionOk()) return; el.classList.remove('fx-saved'); void el.offsetWidth; el.classList.add('fx-saved'); setTimeout(() => el.classList.remove('fx-saved'), 900); };
+  const leaveThen = (els, then) => { els = [].concat(els).filter(Boolean); if (!els.length || !motionOk()) { then(); return; } els.forEach(e => e.classList.add('fx-leave')); setTimeout(then, 220); };
+  const badgePrev = new Map();
+  // After a render: a count that changed since the last render pops once.
+  function bumpCounts(root) {
+    root.querySelectorAll('.badge, .segn').forEach(b => { const host = b.closest('[data-v], [data-act]'), k = (host ? (host.dataset.act || '') + ':' + (host.dataset.v || '') : '') + ':' + b.className, v = b.textContent.trim(), was = badgePrev.get(k); badgePrev.set(k, v); if (was !== undefined && was !== v && motionOk()) { b.classList.remove('fx-bump'); void b.offsetWidth; b.classList.add('fx-bump'); } });
   }
   const initials = n => ((n || '').replace(/\(.*?\)/g, ' ').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(x => [...x][0]).join('') || '?').toUpperCase();
   const avatar = (id, big) => { const p = person(id); if (!p) return ''; const c = big ? 'avatar big' : 'avatar', lib = avLib(p.avatar); const art = avArt(p.avatar); if (art) return `<img class="${c}" src="${art}" alt="${esc(p.name)}" title="${esc(p.name)}" loading="lazy" decoding="async">`; if (lib) return `<span class="${c} avlib" style="background:${esc(lib.color)}" title="${esc(p.name)}">${msi(lib.icon)}</span>`; return p.avatar ? `<img class="${c}" src="${esc(p.avatar)}" alt="${esc(p.name)}" title="${esc(p.name)}">` : `<span class="${c} ${!big && IC[p.role] ? 'role' : ''}" style="background:${esc(p.color || '#66737f')}" title="${esc(p.name + ' · ' + T('role_' + p.role))}">${!big && IC[p.role] ? ico(p.role) : esc(initials(p.name))}</span>`; };
@@ -824,6 +833,13 @@
       ${!dts.length && !offs.length && !cxs.length && !tkd.length ? `<div class="muted small nothing" data-drop="${d}">${T('no_tours')}</div>` : ''}`;
   }
   // Small facts under the tour name. Admin: where the booking came from and how it is paid. Everyone: their own pay (the admin sees both).
+  // Guest names on the calendar card (owner, 17 Nov): up to 3, "Anna S." style, "+N" for the rest. Office: every tour; staff: own tours only.
+  const shortName = n => { const w = String(cleanName(n) || n || '').trim().split(/\s+/).filter(Boolean); return !w.length ? '' : w.length === 1 ? w[0] : `${w[0]} ${[...w[w.length - 1]][0].toUpperCase()}.`; };
+  function guestNamesHtml(t, bks) {
+    if (!isAdmin() && !(me() && involves(t, me().id))) return '';
+    const ns = bks.filter(b => !isCx(b) && b.guest && !placeholderName(b.guest)).map(b => shortName(b.guest)).filter(Boolean); if (!ns.length) return '';
+    return `<span class="gnames small muted">${msi('person')}<span>${esc(ns.slice(0, 3).join(', '))}${ns.length > 3 ? ` +${ns.length - 3}` : ''}</span></span>`;
+  }
   const srcIcon = s => (/^(website|direct)$/i.test(s) ? 'language' : 'storefront'), srcShort = s => ({ GetYourGuide: 'GYG', Website: 'Web', FreeTour: 'Free tour' }[s] || s);
   function metaHtml(t) {
     if (!live(t)) return ''; const cur = esc(rules().currency || 'GEL'), bks = tourBookings(t.id), chips = [];
@@ -840,7 +856,7 @@
   }
   function agendaCard(t) {
     const off = !live(t), w = off ? [] : tourWarnings(t), ppl = [...new Set([t.guide_id, t.driver_id, ...(t.extra_guides || []).map(x => x.id)].filter(Boolean))];
-    return `<button class="acard ${off ? 'cancelled' : ''}" data-key="t${t.id}" style="--k:${esc(tourStyle(t.title).color)}" data-act="tour" data-id="${t.id}"${isAdmin() && !off ? ` data-drag="${t.id}"` : ''} data-drop="${t.date}"><span class="ttl">${emblem(t, true)}<span>${t.start_time && t.start_time !== '00:00' ? `<span class="num st">${esc(t.start_time)}</span> ` : `<span class="st muted small">${T('time_unset')}</span> `}<span class="tname">${esc(t.title)}</span></span></span><span class="kindrow"><span class="kind k-${esc(t.kind || 'private')}">${msi(t.kind === 'group' ? 'groups' : t.kind === 'transfer' ? 'airport_shuttle' : 'person')}${T('kind_' + (t.kind || 'private'))}</span><span class="num cnt">${paxText(t)}</span>${w.length ? ` <span class="chk">${T('chk')}</span>` : ''}${off ? ` <span class="tag t-danger">${T('cancelled')}</span>` : ''}${chgTag(t)}${!off && staysN(tourBookings(t.id)) ? ` <span class="tag t-stay num">${T('stay_n', { n: staysN(tourBookings(t.id)) })}</span>` : ''}<span class="row crew">${ppl.length ? ppl.map(id => `<span class="p">${avatar(id)}${esc(pname(id))}</span>`).join('') : `<span class="tag t-warn">${T('unassigned')}</span>`}</span></span>${metaHtml(t)}${endOf(t) !== t.date ? `<span class="num muted small">${esc(fmtRange(t.date, endOf(t)))}</span>` : ''}${wxLine(t)}</button>`;
+    return `<button class="acard ${off ? 'cancelled' : ''}" data-key="t${t.id}" style="--k:${esc(tourStyle(t.title).color)}" data-act="tour" data-id="${t.id}"${isAdmin() && !off ? ` data-drag="${t.id}"` : ''} data-drop="${t.date}"><span class="ttl">${emblem(t, true)}<span>${t.start_time && t.start_time !== '00:00' ? `<span class="num st">${esc(t.start_time)}</span> ` : `<span class="st muted small">${T('time_unset')}</span> `}<span class="tname">${esc(t.title)}</span></span></span><span class="kindrow"><span class="kind k-${esc(t.kind || 'private')}">${msi(t.kind === 'group' ? 'groups' : t.kind === 'transfer' ? 'airport_shuttle' : 'person')}${T('kind_' + (t.kind || 'private'))}</span><span class="num cnt">${paxText(t)}</span>${w.length ? ` <span class="chk">${T('chk')}</span>` : ''}${off ? ` <span class="tag t-danger">${T('cancelled')}</span>` : ''}${chgTag(t)}${!off && staysN(tourBookings(t.id)) ? ` <span class="tag t-stay num">${T('stay_n', { n: staysN(tourBookings(t.id)) })}</span>` : ''}<span class="row crew">${ppl.length ? ppl.map(id => `<span class="p">${avatar(id)}${esc(pname(id))}</span>`).join('') : `<span class="tag t-warn">${T('unassigned')}</span>`}</span></span>${guestNamesHtml(t, tourBookings(t.id))}${metaHtml(t)}${endOf(t) !== t.date ? `<span class="num muted small">${esc(fmtRange(t.date, endOf(t)))}</span>` : ''}${wxLine(t)}</button>`;
   }
   // ---------- Sunday evening: every guide and driver checks next week's schedule ----------
   const taskTitle = k => (k.kind === 'week_check' ? T('wk_title') : k.title);
@@ -1367,7 +1383,10 @@
   function fitList(d, role) {
     if (!d.date || !d.title) return [];
     const cat = catFind(d.title), lng = String(d.language || '').toUpperCase().slice(0, 2), wk = monday(d.date), wkEnd = addDays(wk, 6), wdx = (D(d.date).getDay() + 6) % 7;
-    return staff().filter(p => p.role === role || (role === 'driver' && p.role === 'guide' && p.vehicle)).map(p => {
+    // A guide with a car may be suggested as driver only for tours on her "Tours I do" list (owner, 17 Nov); an empty list means no limit.
+    // Schedule names rarely equal catalogue names, so when the tour is not in the catalogue, "her tour" = she has done this tour before.
+    const guideDrives = p => !(p.skills || []).length || (cat ? (p.skills || []).includes(String(cat.id)) : db.tours.some(t => t.title === d.title && t.date < today() && live(t) && involves(t, p.id)));
+    return staff().filter(p => p.role === role || (role === 'driver' && p.role === 'guide' && p.vehicle && guideDrives(p))).map(p => {
       const why = [], warn = []; let sc = 0;
       if (offOn(p.id, d.date)) return null;
       const clash = db.tours.some(t => t.id !== d.id && live(t) && involves(t, p.id) && t.date <= (d.date_to || d.date) && endOf(t) >= d.date && (!t.start_time || !d.start_time || !t.end_time || !d.end_time || (t.start_time < d.end_time && d.start_time < t.end_time)));
@@ -2157,7 +2176,7 @@
     const rows = roles.map(r => { const x = fitList(t, r)[0]; return x ? `<button type="button" class="sgrow qfit" data-act="fitassign" data-id="${t.id}" data-f="${r}_id" data-p="${x.p.id}">${avatar(x.p.id)}<span class="grow-l"><b>${T('qf_assign', { name: esc(x.p.name), role: T(r) })}</b><span class="muted small">${esc(x.why.join(' · '))}${x.warn.length ? ' · ' : ''}<span class="warnt">${esc(x.warn.join(' · '))}</span></span></span><span class="btn sm primary">${T('qf_btn')}</span></button>` : ''; }).join('');
     return rows ? `<div class="qfits">${rows}</div>` : '';
   }
-  function unstaffed() { if (!isAdmin()) return []; const td = today(), to = addDays(td, 30), asked = new Set(pendingTakes().map(q => q.tour_id)); return db.tours.filter(t => live(t) && t.date >= td && t.date <= to && (!t.guide_id || (!t.driver_id && kmOf(t.title) > 0))).sort((x, y) => (asked.has(y.id) ? 1 : 0) - (asked.has(x.id) ? 1 : 0) || (x.date + (x.start_time || '')).localeCompare(y.date + (y.start_time || ''))); }
+  function unstaffed() { if (!isAdmin()) return []; const td = today(), to = addDays(td, 30); return db.tours.filter(t => live(t) && t.date >= td && t.date <= to && (!t.guide_id || (!t.driver_id && kmOf(t.title) > 0))).sort((x, y) => (x.date + (x.start_time || '')).localeCompare(y.date + (y.start_time || ''))); }   // date order (owner, 17 Nov); who asked is shown by the faces on each row
   // "Needs review": what the office should look at in the next days. Read only, worked out from the schedule; a folded card above the calendar.
   function needsReview() {
     if (!isAdmin()) return []; const td = today(), to = addDays(td, 14), soon = addDays(td, 1), ts = db.tours.filter(t => live(t) && t.date >= td && t.date <= to).sort((x, y) => (x.date + (x.start_time || '')).localeCompare(y.date + (y.start_time || ''))), out = [];
@@ -3021,7 +3040,11 @@
   function pbMatch(pb) {
     const old = pb.ref ? db.bookings.find(b => (b.ref || '').toUpperCase() === pb.ref.toUpperCase()) : null;
     const cat = catalog().map(x => ({ x, s: pbSim(pb.title, x.title) + (pb.kind && x.kind === pb.kind ? 0.2 : 0) })).sort((p, q) => q.s - p.s)[0];
-    const tours = pb.date ? db.tours.filter(x => x.date === pb.date && live(x)).map(x => ({ x, s: pbSim(pb.title, x.title) + (cat && cat.s >= 0.4 && x.title === cat.x.title ? 1 : 0) + (pb.time && x.start_time === pb.time ? 0.5 : 0) })).filter(y => y.s >= 0.5).sort((p, q) => q.s - p.s) : [];
+    // Not the same tour when private vs group differ, or the start times are more than 30 min apart (owner, 17 Nov: a 10:30 small-group
+    // Viator booking was offered for the 08:00 private tour of the same name).
+    const mins = h => { const m = /^(\d{1,2}):(\d{2})/.exec(h || ''); return m ? +m[1] * 60 + +m[2] : null; }, pk = k => (k === 'private' ? 'p' : k === 'group' ? 'g' : '');
+    const fits = x => { const a = pk(pb.kind), c = pk(x.kind); if (a && c && a !== c) return false; const t1 = mins(pb.time), t2 = x.start_time && x.start_time !== '00:00' ? mins(x.start_time) : null; return t1 === null || t2 === null || Math.abs(t1 - t2) <= 30; };
+    const tours = pb.date ? db.tours.filter(x => x.date === pb.date && live(x) && fits(x)).map(x => ({ x, s: pbSim(pb.title, x.title) + (cat && cat.s >= 0.4 && x.title === cat.x.title ? 1 : 0) + (pb.time && x.start_time === pb.time ? 0.5 : 0) })).filter(y => y.s >= 0.5).sort((p, q) => q.s - p.s) : [];
     return { old, oldTour: old ? db.tours.find(x => x.id === old.tour_id) : null, cat: cat && cat.s >= 0.4 ? cat.x : null, tour: tours[0] ? tours[0].x : null };
   }
 
@@ -3702,7 +3725,7 @@
       ${maintHtml() || ''}${state.newVersion && !state.viewAs ? `<button class="banner small setupban nvban" data-act="reload"><span>${T('nv_text')}</span><b>${T('nv_btn')} ›</b></button>` : ''}${state.viewAs ? `<div class="vabar" title="${esc(T('va_readonly'))}"><span class="vatxt" title="${esc(T('va_now', { name: me().name }))}">${T('va_now', { name: '\u0001' }).split('\u0001').map(x => (x ? `<span class="vapre">${esc(x)}</span>` : '')).join(`<span class="vaname">${esc(me().name)}</span>`)}</span><button class="btn sm" data-act="vaexit">${T('va_exit')}</button></div>` : ''}<main class="${/class="[^"]*\bfab\b/.test(body) ? 'hasfab' : ''} ${/class="[^"]*\bincbar\b/.test(body) ? 'hasinc' : ''}" data-key="v-${state.view}-${state.view === 'admin' ? (state.adminTab || '') : state.view === 'me' ? state.meTab : ''}">${demo}${body}</main><nav class="tabs" aria-label="Main">${nav}</nav>`;
     const t1 = performance.now(); morph(app, shell + '<div id="modal"></div><div id="toasts"></div>');
     const hd = app.querySelector('header.top'); if (hd) document.documentElement.style.setProperty('--toph', hd.offsetHeight + 'px'); if (hd) { const bg = getComputedStyle(hd).backgroundColor; if (bg && bg !== state.themeBg) { state.themeBg = bg; document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.setAttribute('content', bg)); } } { const vb = app.querySelector('.vabar'); document.documentElement.style.setProperty('--vabar-h', (vb ? vb.offsetHeight : 0) + 'px'); } const sp = app.querySelector('.strip'); if (sp && sp.offsetHeight) document.documentElement.style.setProperty('--striph', sp.offsetHeight + 'px');
-    stripPlace(app);
+    stripPlace(app); bumpCounts(document);
     { const mt = app.querySelector('.metabs'); if (mt) { mt.classList.remove('more'); if (mt.scrollWidth > mt.clientWidth + 1) mt.classList.add('more'); const on = mt.querySelector('[aria-pressed="true"]'); if (on) { const l = on.offsetLeft, r = l + on.offsetWidth; if (l - 16 < mt.scrollLeft) mt.scrollLeft = Math.max(0, l - 16); else if (r + 16 > mt.scrollLeft + mt.clientWidth) mt.scrollLeft = r + 16 - mt.clientWidth; } } }   // Me tabs: the chosen tab is always in view; only the row scrolls, never the page
     window.__rt = { build: Math.round(t1 - t0), patch: Math.round(performance.now() - t1) }; syncNotice(); watchConn();
   }
@@ -3872,7 +3895,7 @@
       if (!r) { toast(T('pd_norate', { c: sel })); return; }
       const v = Math.round(typed * r * 100) / 100;
       await S.save('tours', payRowWith(t, who, v)); logAct(`Pay set by office: ${t.title}, ${t.date}, ${pname(who)} → ${v}${sel !== cur ? ` ${cur} (from ${typed} ${sel})` : ''}`); toast(sel !== cur ? T('pd_conv_saved', { a: nf2(typed), c: sel, v: nf2(v), cur }) : T('saved')); redoPay();
-      { const i2 = $('#pi-' + el.dataset.id), s2 = $('#pcs-' + el.dataset.id), o2 = $('#pcv-' + el.dataset.id); if (i2) { i2.value = String(v); i2.dataset.orig = String(v); } if (s2) { s2.value = cur; s2.dataset.orig = cur; } if (o2) o2.textContent = ''; const bt = $('#pc-' + el.dataset.id); if (bt) bt.disabled = true; }   // the screen keeps typed values: show what was saved
+      { const i2 = $('#pi-' + el.dataset.id), s2 = $('#pcs-' + el.dataset.id), o2 = $('#pcv-' + el.dataset.id); if (i2) { i2.value = String(v); i2.dataset.orig = String(v); glow(i2.closest('.prow')); } if (s2) { s2.value = cur; s2.dataset.orig = cur; } if (o2) o2.textContent = ''; const bt = $('#pc-' + el.dataset.id); if (bt) bt.disabled = true; }   // the screen keeps typed values: show what was saved
     },
     paydel(el) {
       const t = db.tours.find(q => q.id === el.dataset.id), who = el.dataset.who; if (!t) return; const back = state.modal;
@@ -4131,7 +4154,7 @@
     tmmove(el) { lsSet('fs-team-order', moveIn(teamOrder(), el.dataset.k, Number(el.dataset.d))); render(); },
     jumpto(el) { const x = document.getElementById(el.dataset.id); if (x) x.scrollIntoView({ behavior: 'smooth', block: 'start' }); },
     klclear() { state.kl = null; render(); },
-    fitassign(el) { const t = db.tours.find(x => x.id === el.dataset.id), f = el.dataset.f, p = el.dataset.p; if (!t || !f || !p || t[f]) return; run(async () => { await S.save('tours', { ...t, [f]: p }); await notify([p], 'tour_assigned', { title: t.title, date: t.date, time: t.start_time || '' }); logAct(`Assigned ${pname(p)} to ${t.title}, ${t.date}`); toast(T('qf_done', { name: pname(p) })); }); },
+    fitassign(el) { const t = db.tours.find(x => x.id === el.dataset.id), f = el.dataset.f, p = el.dataset.p; if (!t || !f || !p || t[f]) return; const still = f === 'guide_id' ? !t.driver_id && kmOf(t.title) > 0 : !t.guide_id; leaveThen(still ? el : (() => { const q = el.closest('.qfits'), r = q && q.previousElementSibling; return r && r.classList.contains('xrow') ? [r, q] : [el]; })(), () => run(async () => { /* fully staffed: the tour line and its suggestions slide away together */ await S.save('tours', { ...t, [f]: p }); await notify([p], 'tour_assigned', { title: t.title, date: t.date, time: t.start_time || '' }); logAct(`Assigned ${pname(p)} to ${t.title}, ${t.date}`); toast(T('qf_done', { name: pname(p) })); })); },
     fitpick(el) { const m = state.modal; if (!m || !m.draft) return; m.draft[el.dataset.f] = el.dataset.id; const s = $(el.dataset.f === 'guide_id' ? '#t-guide' : '#t-driver'); if (s) s.value = el.dataset.id; const b = $('#fitbox'); if (b) b.innerHTML = fitHtml(m.draft); refreshTourWarn(); },
     msdone(el) { const d = el.closest('details'); if (d) d.open = false; },
     msclear(el) { const m = state.modal, b = m && m.draft && m.draft.bookings[Number(el.dataset.i)]; if (!b) return; const had = needsAddr(b); b.marks = []; el.closest('.mspanel').querySelectorAll('input[type=checkbox]').forEach(x => { x.checked = false; }); const sm = $('#ms-' + el.dataset.i); if (sm) { sm.textContent = optSummary(b); sm.nextElementSibling.textContent = ''; } if (had) setTimeout(renderModal, 0); },
@@ -4249,7 +4272,7 @@
     payto(el) { if (el.value) { (state.pay = state.pay || {}).to = el.value; render(); } },
     mutepref(el) { const s = new Set(me().mute || []); el.checked ? s.delete(el.dataset.g) : s.add(el.dataset.g); run(() => S.save('profiles', { ...stripEmail(me()), mute: [...s] })); },
     demoas(el) { S.demoViewAs(el.value); state.mine = !isAdmin(); state.mode = 'week'; render(); weekCheck(); },
-    taskdone(el) { track('taskdone'); const k = db.tasks.find(x => x.id === el.dataset.id), done = el.checked; run(async () => { await S.save('tasks', { ...k, status: done ? 'done' : 'open', done_by: done ? me().id : null, done_at: done ? new Date().toISOString() : null }); if (done) await notify([k.created_by], 'task_done', { name: me().name, title: k.title }); }); },
+    taskdone(el) { track('taskdone'); const k = db.tasks.find(x => x.id === el.dataset.id), done = el.checked, row = el.closest('.tkline') || el.closest('.card'); if (done && row && motionOk()) row.classList.add('fx-done'); setTimeout(() => run(async () => { await S.save('tasks', { ...k, status: done ? 'done' : 'open', done_by: done ? me().id : null, done_at: done ? new Date().toISOString() : null }); if (done) await notify([k.created_by], 'task_done', { name: me().name, title: k.title }); }), done && motionOk() ? 260 : 0); },
     restorefile(el) { const f = el.files && el.files[0]; if (f) run(() => readRestore(f)); },
     impfile(el) { const f = el.files && el.files.length ? el.files : null; if (f) run(() => readImport(f)); },
     klfile(el) { const f = el.files && el.files[0]; if (f) run(async () => { try { await readKlook(f); } finally { el.value = ''; } }); },
@@ -4591,7 +4614,7 @@
     if (S.recall && window.showDirectoryPicker && isAdmin()) S.recall('offdir').then(async h => { if (h && h.queryPermission) { OFFDIR.handle = h; OFFDIR.ok = (await h.queryPermission({ mode: 'readwrite' })) === 'granted'; } }).catch(() => {});
     if (S.remember) S.remember('lang', lang()); if ((S.pending || 0) > 0) setTimeout(() => toast(T('st_waiting_open', { n: S.pending || 0 })), 600);
     if (S.warming) { let warm = true; S.onChange((t, r, type) => { if (warm && type === 'STATE' && !S.warming) { warm = false; PH.asked.clear(); displayFromAccount(); saveHello(); weekCheck(); setTimeout(xcNudge, 4000); } }); }
-    if (S.mode === 'demo') window.__test = { dupClients, parseSetmore, openTour: id => { openTour(id); }, placeholderName, isVip, netOf: b => netOf(b), myLangs, clientHits: (q, n) => clientHits(q, n).list.map(c => c.name), nf2, tmTxt, preTripMail: (tid, bid) => { const t = db.tours.find(x => x.id === tid); return preTripMail({ ...t, bookings: tourBookings(t.id) }, bid ? db.bookings.find(x => x.id === bid) : null); }, impPayDiff, impPayApply, setImp: v => { state.imp = v; state.impPay = null; }, getImpPay: () => state.impPay, setImpPay: v => { state.impPay = v; }, parseReview, isReview, rrHtml: id => revreqModalHtml({ id }), rrTours: () => db.tours.filter(t => tourBookings(t.id).some(b => b.guest)).map(t => t.id), trackOpen, flushUsage, tourPhase, dupClients, dupTours, parseBooking, T: (k, v) => T(k, v), payFor, setGrid: v => { state.wgrid = !!v; render(); }, dayBlock, tasksOnDay, withPhones, taskLineHtml, pushBanner, xcNudge, relayEmail, guestEmail, parseBooking, badgeNote: () => { const b = game(me().id).list.find(x => x.done); if (b) badgeNote([b]); }, checkBadges, newVersion: v => { state.newVersion = !!v; render(); }, pageFor: (title, kind) => { const u = pageFor({ title, kind }), m = /\/activity\/(\d+)/.exec(u); return m ? { id: Number(m[1]) } : null; } };          // for the automatic tests only
+    if (S.mode === 'demo') window.__test = { dupClients, parseSetmore, openTour: id => { openTour(id); }, placeholderName, isVip, netOf: b => netOf(b), myLangs, parseBooking, pbMatch: pb => { const m = pbMatch(pb); return { tour: m.tour && m.tour.id, old: m.old && m.old.id }; }, fitIds: (t, role) => fitList(t, role).map(x => x.p ? x.p.id : x.id), catalogTitles: () => catalog().slice(0, 5).map(c => ({ id: String(c.id), title: c.title })), clientHits: (q, n) => clientHits(q, n).list.map(c => c.name), nf2, tmTxt, preTripMail: (tid, bid) => { const t = db.tours.find(x => x.id === tid); return preTripMail({ ...t, bookings: tourBookings(t.id) }, bid ? db.bookings.find(x => x.id === bid) : null); }, impPayDiff, impPayApply, setImp: v => { state.imp = v; state.impPay = null; }, getImpPay: () => state.impPay, setImpPay: v => { state.impPay = v; }, parseReview, isReview, rrHtml: id => revreqModalHtml({ id }), rrTours: () => db.tours.filter(t => tourBookings(t.id).some(b => b.guest)).map(t => t.id), trackOpen, flushUsage, tourPhase, dupClients, dupTours, parseBooking, T: (k, v) => T(k, v), payFor, setGrid: v => { state.wgrid = !!v; render(); }, dayBlock, tasksOnDay, withPhones, taskLineHtml, pushBanner, xcNudge, relayEmail, guestEmail, parseBooking, badgeNote: () => { const b = game(me().id).list.find(x => x.done); if (b) badgeNote([b]); }, checkBadges, newVersion: v => { state.newVersion = !!v; render(); }, pageFor: (title, kind) => { const u = pageFor({ title, kind }), m = /\/activity\/(\d+)/.exec(u); return m ? { id: Number(m[1]) } : null; } };          // for the automatic tests only
     if (me() && !isAdmin()) state.mine = true;
     displayFromAccount();
     try { history.scrollRestoration = 'manual'; } catch (e) { /* old browser */ }

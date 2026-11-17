@@ -8,3 +8,5 @@ window.APP_CONFIG = {
   reportTo: "Alex",       // who gets the screenshots
   reportWhatsApp: "+995599044390"      // optional: that person's WhatsApp number with country code; adds a "Send to Alex" button
 };
+// Tests only: switch off the page-width guard (styles.css, html.fs-noclip) so "nothing sticks out" checks still see real overflow.
+document.documentElement.classList.add('fs-noclip');

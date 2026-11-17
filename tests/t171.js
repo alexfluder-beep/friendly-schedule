@@ -1,0 +1,24 @@
+// A guide with a car is suggested as driver only for tours on her "Tours I do" list (owner, 17 Nov); an empty list means no limit;
+// a guide without a car is never suggested as driver. Invented data only.
+const { chromium } = require('playwright');
+(async () => { const b = await chromium.launch(); const errs = []; let bad = 0; const ok = (c, m) => { console.log(c ? '  ok  ' : '  FAIL', m); if (!c) bad = 1; };
+  const p = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage(); p.on('pageerror', e => errs.push(e.message));
+  await p.addInitScript(() => { window.__noCelebrate = true; try { localStorage.setItem('fs-test-seen', '1'); } catch (e) {} });
+  await p.goto('http://localhost:8765/index.html'); await p.waitForSelector('.strip'); await p.selectOption('#demo-as', { label: 'Sample Admin · Admin' }); await p.waitForTimeout(600);
+  const r = await p.evaluate(async () => { const S = window.Store, T = window.__test, cats = T.catalogTitles(), A = cats[0], B = cats[1], d = new Date(Date.now() + 40 * 864e5).toISOString().slice(0, 10);
+    const base = { kind: 'private', date: d, start_time: '10:00', end_time: '16:00', status: 'confirmed', capacity: 0, pax: 2, adults: 2, children: 0, guide_id: null, driver_id: null };
+    const ta = { ...base, id: 'zd1', title: A.title }, tb = { ...base, id: 'zd2', title: B.title }, tc = { ...base, id: 'zd3', title: 'Zz Tour Not In Catalogue' };
+    const f = t => T.fitIds(t, 'driver');
+    await S.save('profiles', { id: 'zg1', name: 'Zed Carguide', role: 'guide', active: true, vehicle: 'sedan', skills: [A.id], languages: 'EN' });
+    const a = f(ta), b = f(tb), c = f(tc);
+    await S.save('tours', { ...base, id: 'zd4', title: tc.title, date: new Date(Date.now() - 20 * 864e5).toISOString().slice(0, 10), driver_id: 'zg1' }); const c2 = f(tc);
+    await S.save('profiles', { ...S.db.profiles.find(x => x.id === 'zg1'), skills: [] }); const open = [f(ta), f(tb), f(tc)].every(x => x.includes('zg1'));
+    await S.save('profiles', { ...S.db.profiles.find(x => x.id === 'zg1'), vehicle: null }); const nocar = [f(ta), f(tb), f(tc)].some(x => x.includes('zg1'));
+    return { a, b, c, c2, open, nocar }; });
+  ok(r.a.includes('zg1'), 'guide with a car is suggested as driver for a tour on her list');
+  ok(!r.b.includes('zg1'), 'not for a tour missing from her list');
+  ok(!r.c.includes('zg1'), 'tour outside the catalogue that she never did: not suggested');
+  ok(r.c2.includes('zg1'), 'tour outside the catalogue that she did before: suggested');
+  ok(r.open, 'empty list = no limit: suggested for all');
+  ok(!r.nocar, 'a guide without a car is never suggested as driver');
+  ok(!errs.length, 'errors ' + errs.join('|')); await b.close(); process.exit(bad); })();
