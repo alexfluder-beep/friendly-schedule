@@ -643,3 +643,7 @@ alter table public.tours add column if not exists extra_guides jsonb not null de
 
 -- 3.98: what the agent / platform really pays us for this booking (promo codes, non-standard commission). Empty = price minus the fixed commission.
 alter table public.bookings add column if not exists net_amount numeric;
+
+-- 3.100 (17 Nov 2026, approved by the owner): guides and drivers read their own payouts (Me > Pay balance)
+drop policy if exists staff_payments_read_own on public.staff_payments;
+create policy staff_payments_read_own on public.staff_payments for select to authenticated using (user_id = (select auth.uid()));

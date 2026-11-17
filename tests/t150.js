@@ -7,6 +7,7 @@ const { chromium } = require('playwright');
     await p.goto('http://localhost:8765/index.html'); await p.waitForSelector('.strip'); await p.selectOption('#demo-as', { label: 'Sample Admin · Admin' }); await p.waitForTimeout(600);
     await p.evaluate(() => { const t = document.querySelector('[data-v=admin]'); if (t) t.click(); }); await p.waitForTimeout(300);
     await p.evaluate(() => { const el = document.createElement('button'); el.dataset.act = 'admintab'; el.dataset.v = 'money'; el.hidden = true; document.querySelector('main').appendChild(el); el.click(); }); await p.waitForTimeout(400);
+    await p.click('[data-act=mntab][data-v=setup]'); await p.waitForTimeout(300); /* commission moved to Money > Setup (17 Nov) */
     const rows = p.locator('.crow'); ok(await rows.count() >= 5, W + ': commission table has a line per platform (' + await rows.count() + ')');
     const r0 = rows.first(); await r0.locator('input[name=percent]').fill('21'); await r0.locator('button').click(); await p.waitForTimeout(600);
     ok(await p.locator('.crow').first().locator('input[name=percent]').inputValue() === '21', W + ': percent kept after Confirm');

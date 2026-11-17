@@ -3,7 +3,7 @@
   'use strict';
   const CFG = window.APP_CONFIG || {};
   const TABLES = ['profiles', 'expenses', 'tours', 'bookings', 'clients', 'client_ratings', 'tour_ratings', 'payout_details', 'log', 'change_requests', 'pay_adjustments', 'personal_dates', 'usage', 'offers', 'time_off', 'holidays', 'tasks', 'notifications', 'settings', 'invites', 'pay_disputes', 'tour_costs', 'photos', 'thanks', 'badge_likes', 'tickets', 'guest_reviews', 'commission_rules', 'payments', 'staff_payments', 'tour_tips'];
-  const ADMIN_ONLY = ['commission_rules', 'payments', 'staff_payments'];   // the database shows these to admins only; other phones do not ask
+  const ADMIN_ONLY = ['commission_rules', 'payments'];   // the database shows these to admins only; other phones do not ask (staff_payments: everyone reads their own since 3.100)
   const DEMO_KEY = 'fs-demo-v18';
   const db = {}; TABLES.forEach(t => db[t] = []);
   const listeners = [];
