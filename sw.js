@@ -1,11 +1,27 @@
 // Service worker: keeps the app shell available offline and shows push notifications.
-const CACHE = 'fs-shell-v134';
-const SHELL = ['./', 'index.html', 'styles.css', 'config.js', 'catalog.js', 'icons.js', 'cute.js', 'i18n-en.js', 'i18n-ru.js', 'i18n-ka.js', 'i18n.js', 'store.js', 'app.js', 'parse.js', 'game.js', 'money.js', 'vendor/qrcode.js', 'vendor/supabase.js', 'vendor/591.supabase.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'badge-96.png'];
-// A new version is fetched whole and fresh (past the browser's own cache) before it replaces the old one, so the app never runs a mix of old and new files.
-self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting())); });
+const CACHE = 'fs-shell-v135';
+const SHELL = {'./': 'e378c193da9d', 'index.html': 'e378c193da9d', 'styles.css': 'ab0766c7e6dc', 'config.js': 'e2f8fc2a4d2e', 'catalog.js': 'd91ee7fd6858', 'icons.js': 'fac2f27eb6f5', 'cute.js': '60607c1899ab', 'i18n-en.js': 'e6767b6caa4d', 'i18n-ru.js': '9e5a69144711', 'i18n-ka.js': 'a208dfe28b8a', 'i18n.js': 'ca66c39e3637', 'store.js': '71273df9ed3c', 'app.js': 'bd98eb2549e7', 'parse.js': 'add462882638', 'game.js': '18131fca0fd3', 'money.js': '95e93b5dbeb7', 'vendor/qrcode.js': '79ec86f82856', 'vendor/supabase.js': '8596965fe918', 'vendor/591.supabase.js': '9c305b77dab6', 'manifest.webmanifest': 'c5674186c83b', 'icon-192.png': '48d52afe257e', 'icon-512.png': '4931a4bfce77', 'apple-touch-icon.png': 'ea6f7b3fdf73', 'badge-96.png': 'cd8e2b352e6a'};   /* file -> start of its SHA-256; written by tools/shell-hash.py at each release, never by hand */
+// Updating: each file is saved under its own fingerprint (file?h=…). A file whose fingerprint did not change is copied from the
+// phone's previous copy; only changed files are downloaded (18 Nov: a fix in one file no longer costs the whole 550 KB).
+// A downloaded file must match its fingerprint, otherwise the update stops and is tried again later, so the app never runs a mix of versions.
+const hex = b => Array.from(new Uint8Array(b), x => x.toString(16).padStart(2, '0')).join('');
+async function fileFor(f, h, olds) {
+  const key = f + '?h=' + h;
+  for (const o of olds) { const hit = await o.match(key); if (hit) return [key, hit]; }
+  const r = await fetch(new Request(key, { cache: 'reload' }));   // the ?h= address also gets past the web host's own short cache
+  if (!r.ok) throw new Error('fetch ' + f);
+  if (h && hex(await crypto.subtle.digest('SHA-256', await r.clone().arrayBuffer())).slice(0, h.length) !== h) throw new Error('changed ' + f);
+  return [key, r];
+}
+self.addEventListener('install', e => { e.waitUntil((async () => {
+  const olds = await Promise.all((await caches.keys()).filter(k => k !== CACHE).map(k => caches.open(k)));
+  const got = await Promise.all(Object.entries(SHELL).map(([f, h]) => fileFor(f, h, olds)));
+  const c = await caches.open(CACHE); await Promise.all(got.map(([k, r]) => c.put(k, r)));
+  await self.skipWaiting();
+})()); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 // The app's own files come from the saved copy of this version: it opens at once, also on a weak connection, and every file is from the same version.
-// A new version arrives as a whole (see install above) and the app then offers to reload. Anything not in the saved copy goes to the network.
+// A new version arrives complete (see install above) and the app then offers to reload. Anything not in the saved copy goes to the network.
 self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);
   if (e.request.method !== 'GET' || u.origin !== location.origin) return;

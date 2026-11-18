@@ -20,7 +20,7 @@ A plain JavaScript PWA for Friendly.ge guides and drivers (replaces Setmore). Li
 ## Release checklist (only on "release")
 1. Set `APP_VERSION` in app.js to the release date, year.month.day (`'26.11.18'`; a second release the same day adds b, c; owner 18 Nov) and bump `CACHE` in sw.js; add a README bullet. A new file must be added to `index.html` and to the `SHELL` list in sw.js.
 2. Run `sh tests/run-all.sh` (all tests, a throw-away demo copy, sample data). New tests go in `tests/` with invented data only; they need `window.__noCelebrate = true` and localStorage `fs-test-seen`.
-3. Secret scan, copy files into the release clone, commit, push.
+3. Secret scan, copy files into the release clone, then in the release clone run `python3 tools/shell-hash.py` (writes each file's fingerprint into `SHELL` in sw.js, so phones download only changed files; a new file in `SHELL` needs a `'name': ''` entry first), commit, push.
 4. Ask the owner to confirm the version shows on the live site.
 
 ## Test rules

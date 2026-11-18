@@ -7,6 +7,7 @@ Team scheduling for guides and drivers: tours (private, group, customised), days
 With `config.js` left empty the app runs in **demo mode**: sample data, stored only in that browser, no login.
 
 ## What is included
+- 26.11.18f: smaller updates: every app file has a fingerprint, and phones download only the files that changed (the first update after this one still downloads everything once).
 - 26.11.18e: on iPhone, screens switch without the slide (the bottom bar could be left in the middle of the page). New agent-api door (supabase/functions/agent-api) for Claude's scheduled checks: read-only, key-protected, no guest phones or e-mails.
 - 26.11.18d: Me › Settings in order of how often it is needed: language and display, phone notifications, report a problem, what I see, then connections, the app on the phone, data use, set-up guide, privacy and sign out.
 - 26.11.18c: check-in on guest cards is two small pills (Arrived / No-show) on the WhatsApp / Call row instead of two big buttons; the calendar opens on today for everyone (also guides, drivers and "Looking as"), without the iPhone jump.
