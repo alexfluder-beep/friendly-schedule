@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '26.11.18c';   /* from 18 Nov 2026 the version is the release date, year.month.day (owner); a second release the same day adds b, c */
+  const APP_VERSION = '26.11.18d';   /* from 18 Nov 2026 the version is the release date, year.month.day (owner); a second release the same day adds b, c */
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -3835,13 +3835,15 @@
       ${S.mode === 'supabase' ? `<form class="cnrow cnpw" data-form="setpw"><span class="cni pw">${msi('lock')}</span><span class="grow-l"><b>${T('cn_pw')}</b><input class="inp" name="password" type="password" minlength="8" autocomplete="new-password" placeholder="${esc(T('cn_pw_ph'))}" aria-label="${esc(T('cn_pw'))}"></span><button class="btn sm">${T('cn_pw_btn')}</button></form>` : ''}
     </div>`;
   }
+  /* Settings, most needed first (owner 18 Nov 09:39): language and how the app looks, notifications, report a problem (stays below Display, t119), what I see;
+     then the things set once: connections, the app on the phone, data use, set-up guide, privacy, sign out. */
   function settingsHtml(m, perm) {
-    return `<div class="cols"><div class="list">${connHtml(m, perm)}<div class="card f">
-      <label>${T('language')}<select id="me-lang" data-ch="lang">${opt('en', 'English', lang())}${opt('ru', 'Русский', lang())}${opt('ka', 'ქართული', lang())}</select></label>
-      <div class="f" id="me-see"><b>${T('pf_title')}</b><div class="checks col"><label><input type="checkbox" data-ch="pref" data-k="game" ${gameOn() ? 'checked' : ''}>${T('pf_game')}</label>${gameOn() ? '' : `<span class="muted small" id="me-see-off">${T('pf_game_off')}</span>`}<label><input type="checkbox" data-ch="pref" data-k="photo" ${photoOn() ? 'checked' : ''}>${T('pf_photo')}</label><label><input type="checkbox" data-ch="pref" data-k="mood" ${pref('mood') !== 'off' ? 'checked' : ''}>${T('pf_mood')}</label><label><input type="checkbox" data-ch="pref" data-k="rate" ${pref('rate') !== 'off' ? 'checked' : ''}>${T('pf_rate')}</label></div><span class="muted small">${T('pf_note')}</span></div>
-      <div class="f"><b>${T('ds_title')}</b>${displayHtml()}</div>
+    return `<div class="cols"><div class="list">
+      <div class="card f"><label>${T('language')}<select id="me-lang" data-ch="lang">${opt('en', 'English', lang())}${opt('ru', 'Русский', lang())}${opt('ka', 'ქართული', lang())}</select></label>
+      <div class="f"><b>${T('ds_title')}</b>${displayHtml()}</div></div>
       ${notifCardHtml(perm)}<div class="checks col">${Object.keys(NOTE_GROUPS).map(g => `<label><input type="checkbox" id="mute-${g}" data-ch="mutepref" data-g="${g}" ${(m.mute || []).includes(g) ? '' : 'checked'}>${T('note_' + g)}</label>`).join('')}</div></div>
-      ${ticketCardHtml()}${trafficHtml()}</div></div><div class="list">${installCardHtml(true)}<div class="card f">
+      ${ticketCardHtml()}<div class="card f"><div class="f" id="me-see"><b>${T('pf_title')}</b><div class="checks col"><label><input type="checkbox" data-ch="pref" data-k="game" ${gameOn() ? 'checked' : ''}>${T('pf_game')}</label>${gameOn() ? '' : `<span class="muted small" id="me-see-off">${T('pf_game_off')}</span>`}<label><input type="checkbox" data-ch="pref" data-k="photo" ${photoOn() ? 'checked' : ''}>${T('pf_photo')}</label><label><input type="checkbox" data-ch="pref" data-k="mood" ${pref('mood') !== 'off' ? 'checked' : ''}>${T('pf_mood')}</label><label><input type="checkbox" data-ch="pref" data-k="rate" ${pref('rate') !== 'off' ? 'checked' : ''}>${T('pf_rate')}</label></div><span class="muted small">${T('pf_note')}</span></div></div>
+      </div><div class="list">${connHtml(m, perm)}${installCardHtml(true)}<div class="card f">${trafficHtml()}
       <button class="btn" data-act="welcome">${T('wl_again')}</button>
       <details class="sect"><summary>${T('privacy_link')}</summary><p class="muted small">${T('privacy_text', { n: pv().guideDays })}</p></details>
       <button class="btn" data-act="signout">${T('signout')}</button>${testOn() ? `<button class="lnk" data-act="testinfo">${T('tb_title')}</button>` : ''}<span class="muted small num">${T('version')} ${APP_VERSION}${S.syncedAt ? ' · ' + T('updated_at', { time: new Intl.DateTimeFormat(LOCALES[lang()], { hour: '2-digit', minute: '2-digit' }).format(new Date(S.syncedAt)) }) : ''}</span></div></div></div>`;
