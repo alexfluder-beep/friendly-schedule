@@ -18,7 +18,7 @@ A plain JavaScript PWA for Friendly.ge guides and drivers (replaces Setmore). Li
 - `parseBooking`, `parseReview` read pasted platform e-mails (10 platforms). Test file `t120` style: anonymised layouts only.
 
 ## Release checklist (only on "release")
-1. Bump `APP_VERSION` in app.js and `CACHE` in sw.js; add a README bullet. A new file must be added to `index.html` and to the `SHELL` list in sw.js.
+1. Set `APP_VERSION` in app.js to the release date, year.month.day (`'26.11.18'`; a second release the same day adds b, c; owner 18 Nov) and bump `CACHE` in sw.js; add a README bullet. A new file must be added to `index.html` and to the `SHELL` list in sw.js.
 2. Run `sh tests/run-all.sh` (all tests, a throw-away demo copy, sample data). New tests go in `tests/` with invented data only; they need `window.__noCelebrate = true` and localStorage `fs-test-seen`.
 3. Secret scan, copy files into the release clone, commit, push.
 4. Ask the owner to confirm the version shows on the live site.
