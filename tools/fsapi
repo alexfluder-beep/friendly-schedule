@@ -1,0 +1,44 @@
+#!/bin/sh
+# fsapi: small checker for the Friendly Schedule agent-api (Supabase Edge Function).
+# Usage:  sh tools/fsapi health
+# The key is read from the environment variable FS_AGENT_KEY. It is never printed or stored.
+# Exit code: 0 = healthy, 1 = problem, 2 = bad usage.
+
+A="${FS_AGENT_URL:-https://scqqmnwzglbgnvgzqifu.supabase.co/functions/v1/agent-api}"
+
+health() {
+  # 1. Is the function deployed and answering? Without a key it must say 401.
+  open=$(curl -s -m 20 -o /dev/null -w '%{http_code}' "$A/health") || open=000
+  if [ "$open" = "000" ]; then
+    echo "DOWN: no answer from the agent-api (network problem or function not deployed)."
+    return 1
+  fi
+  if [ "$open" != "401" ]; then
+    echo "ODD: without a key it answered $open, but it should answer 401. Check the function settings."
+  else
+    echo "Function is deployed and answering (401 without a key, as it should)."
+  fi
+
+  # 2. Does the key work? Then the function can also reach the database.
+  if [ -z "$FS_AGENT_KEY" ]; then
+    echo "NOT CHECKED: FS_AGENT_KEY is not set in this session, so the database check was skipped."
+    return 1
+  fi
+  out=$(curl -s -m 20 -w '\n%{http_code} %{time_total}' "$A/health" -H "x-agent-key: $FS_AGENT_KEY") || out=""
+  code=$(printf '%s' "$out" | tail -n 1 | cut -d' ' -f1)
+  secs=$(printf '%s' "$out" | tail -n 1 | cut -d' ' -f2)
+  case "$code" in
+    200) echo "HEALTHY: key accepted and the database answered (${secs}s)."; return 0 ;;
+    401) echo "KEY REJECTED: FS_AGENT_KEY does not match the AGENT_API_KEY secret in Supabase."
+         echo "  Fix: make both the same value (new session needed after changing the environment)."; return 1 ;;
+    429) echo "BUSY: more than 60 calls a minute. Wait a minute and try again."; return 1 ;;
+    500) echo "BROKEN: the function answered 500. Either the secret AGENT_API_KEY is missing or shorter"
+         echo "  than 32 characters, or the database did not answer."; return 1 ;;
+    *)   echo "UNEXPECTED: answered $code."; return 1 ;;
+  esac
+}
+
+case "$1" in
+  health) health ;;
+  *) echo "Usage: sh tools/fsapi health"; exit 2 ;;
+esac
