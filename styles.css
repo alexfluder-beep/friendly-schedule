@@ -2337,3 +2337,12 @@ button.d14c{border:0;background:none;padding:0;margin:0;color:inherit;font:inher
 html[data-accent="terra"],html[data-accent="amber"]{--accent:#2f6fdf;--action:#2f6fdf;--accent-soft:#e8f0fd;--accent-ink:#fff}
 @media (prefers-color-scheme:dark){html:not([data-theme="light"])[data-accent="terra"],html:not([data-theme="light"])[data-accent="amber"]{--accent:#8db8f5;--action:#8db8f5;--accent-ink:#0f1a2b;--accent-soft:#1f2c40}}
 html[data-theme="dark"][data-accent="terra"],html[data-theme="dark"][data-accent="amber"]{--accent:#8db8f5;--action:#8db8f5;--accent-ink:#0f1a2b;--accent-soft:#1f2c40}
+/* Check-in on guest cards: two small pills at the right of the WhatsApp / Call row (owner 18 Nov 08:15: big buttons were too big).
+   Neither is filled until tapped: Arrived turns green, No-show turns rose. */
+.gfoot{justify-content:space-between}
+.picks.sm{display:inline-flex;gap:6px;margin-left:auto}
+.picks.sm .pick{min-height:40px;padding:0 12px;border-radius:999px;font-size:var(--t-sm);background:var(--surface);color:var(--muted);border:1px solid var(--line);box-shadow:none}
+.picks.sm .pick svg{width:15px;height:15px}
+.picks.sm .pick.ok.on{background:var(--p-mint-e);border-color:var(--p-mint-e);color:#fff;box-shadow:none}
+.picks.sm .pick.no.on{background:var(--p-rose);border-color:var(--p-rose-e);color:var(--p-rose-e)}
+.gcard.st-arrived .picks.sm .pick.ok:not(.on),.gcard.st-noshow .picks.sm .pick.ok{background:var(--surface);color:var(--muted);border-color:var(--line)}
