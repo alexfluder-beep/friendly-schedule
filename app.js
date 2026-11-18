@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '26.11.18d';   /* from 18 Nov 2026 the version is the release date, year.month.day (owner); a second release the same day adds b, c */
+  const APP_VERSION = '26.11.18e';   /* from 18 Nov 2026 the version is the release date, year.month.day (owner); a second release the same day adds b, c */
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -3894,7 +3894,7 @@
   const VIEW_ORDER = ['calendar', 'team', 'tasks', 'timeoff', 'clients', 'admin', 'me'];
   function slideTo(a, b, go) {   // a, b: positions of the old and new screen
     const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (!document.startViewTransition || reduce || a === b) { go(); return; }
+    if (!document.startViewTransition || reduce || a === b || isIOS()) { go(); return; }   /* iPhone: the screen snapshot could leave the fixed bottom bar drawn mid-page (17-18 Nov), so it just switches */
     document.documentElement.dataset.dir = b > a ? 'fwd' : 'back';
     quietMorph = true;
     try { const vt = document.startViewTransition(() => { try { go(); } finally { quietMorph = false; } }); vt.finished.catch(() => { /* screen turned or resized: the page is already drawn */ }).finally(() => { delete document.documentElement.dataset.dir; }); if (vt.ready) vt.ready.catch(() => { /* same */ }); if (vt.updateCallbackDone) vt.updateCallbackDone.catch(() => { /* same */ }); } catch (e) { quietMorph = false; go(); }
