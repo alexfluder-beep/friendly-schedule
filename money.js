@@ -10,7 +10,7 @@
   'use strict';
   window.FSMoney = function (d) {
     const { getMemo, setMemo, db, state, S, T, me, isAdmin, run, toast, logAct, render, msi, esc, nf, fmt, fmtDay, today, iso, opt, crew, pname, rules, rateOf, fxOn, manualRate, statKey, aliasOf, srcName, sourceOf, netOf, guestCur, live, statement, CURRENCIES, SOURCES,
-      salaryHtml, payFor, extraPay, costOf, tourBookings, monthEnd, payFrom, avatar, shortName } = d;
+      salaryHtml, payFor, extraPay, costOf, tourBookings, monthEnd, payFrom, avatar, shortName, involves, stripEmail, addDays, person } = d;
     const STAFF_METHODS = ['cash', 'card', 'bank'], PAYS = ['prepaid', 'cash', 'unpaid'];
     const ADDONS = ['wine', 'front_seat', 'bear_food', 'private_room', 'stays', 'pickup', 'dropoff'];
     const NOT_PLATFORM = ['Direct', 'Website', 'FreeTour'];
@@ -104,6 +104,64 @@
     const balLine = bal => Object.entries(bal).filter(([, v]) => Math.abs(v) >= 0.5).sort((a, b) => (a[0] === base() ? -1 : b[0] === base() ? 1 : a[0].localeCompare(b[0]))).map(([c, v]) => `<span class="num ${v < 0 ? 'neg' : ''}">${sign(v, c)}</span>`).join(' · ') || `<span class="num">0 ${esc(base())}</span>`;
     const cashOf = L => { const o = {}; Object.entries(L.now ? L.now.cash : {}).forEach(([c, v]) => { if (v) o[c] = v; }); return o; };
 
+    // ---------- Day reports (idea from the Sava demo, 18 Nov) ----------
+    // A guide or driver sends the day: tour pay, cash taken from guests, money spent -> what the office owes (or is owed).
+    // Sent: on the person's own profile (display.dayrep[day] = { at, note }). Office answer: settings row "dayrep" (office-only):
+    // { [person]: { [day]: { st: 'ok' | 'back' | 'paid', note, by, at } } }. Paying writes one staff_payments row, so the balance stays right.
+    const repCfg = () => (db.settings.find(x => x.id === 'dayrep') || {}).value || {};
+    const repSent = (id, day) => { const p = person(id), r = p && p.display && p.display.dayrep; return (r && r[day]) || null; };
+    const repOffice = (id, day) => ((repCfg()[id] || {})[day]) || null;
+    function dayRep(id, day) {
+      const ts = db.tours.filter(t => live(t) && t.date === day && involves(t, id)), pays = [], cash = {}, exp = {}, add = (o, c, v) => { if (v) o[c] = r2((o[c] || 0) + v); };
+      ts.forEach(t => { const role = t.guide_id === id ? 'guide' : t.driver_id === id ? 'driver' : 'extra', x = (t.extra_guides || []).find(e => e.id === id);
+        const v = role === 'guide' ? payFor(t, 'guide') : role === 'driver' ? payFor(t, 'driver') : x ? extraPay(t, x) : 0, bks = tourBookings(t.id);
+        pays.push({ t, v, bk: bks.length, pax: bks.reduce((n, b) => n + (Number(b.pax) || 1), 0) });
+        if (t.guide_id === id || (!t.guide_id && t.driver_id === id)) bks.forEach(b => { if ((b.payment === 'cash' || b.payment === 'unpaid') && b.attendance !== 'noshow') add(cash, b.currency || guestCur(), Number(b.amount_due) || 0); }); });
+      (db.expenses || []).filter(e => e.user_id === id && e.date === day).forEach(e => add(exp, e.currency || 'GEL', Number(e.amount) || 0));
+      const pay = r2(pays.reduce((n, x) => n + x.v, 0)), owe = {}; add(owe, base(), pay); Object.entries(exp).forEach(([c, v]) => add(owe, c, v)); Object.entries(cash).forEach(([c, v]) => add(owe, c, -v));
+      const total = r2(Object.entries(owe).reduce((n, [c, v]) => n + (toBase(v, c, day) || 0), 0)), sent = repSent(id, day), off = repOffice(id, day);
+      const st = off && off.st === 'paid' ? 'paid' : !sent ? 'none' : off && off.at >= sent.at ? off.st : 'wait';
+      return { id, day, ts, pays, pay, cash, exp, owe, total, sent, off, st };
+    }
+    const repDays = id => { const td = today(), out = []; for (let i = 0; i < 10; i++) { const d0 = addDays(td, -i); if (db.tours.some(t => live(t) && t.date === d0 && involves(t, id))) out.push(d0); } return out; };
+    const sumTxt = o => Object.entries(o).filter(([, v]) => Math.abs(v) >= 0.5).map(([c, v]) => money(v, c)).join(' + ') || '0';
+    const stTag = st => `<span class="tag ${st === 'paid' ? 't-ok' : st === 'ok' ? 't-muted' : st === 'back' ? 't-danger' : 't-warn'}">${T('dr_st_' + st)}</span>`;
+    function repBody(r, office) {
+      const c = base();
+      const tot = o => sumTxt(o);
+      return `<div class="drsec k-tours"><div class="drh"><span class="dri">${msi('directions_car')}</span><b class="grow-l">${T('dr_h_tours')}</b><b class="num">${money(r.pay, c)}</b></div>${r.pays.map(x => `<div class="drrow"><span class="grow-l">${esc(aliasOf(x.t.title))}</span><span class="small muted">${T('dr_bk', { b: x.bk, g: x.pax })}</span><b class="num">${money(x.v, c)}</b></div>`).join('') || `<span class="muted small">—</span>`}</div>
+        <div class="drsec k-cash"><div class="drh"><span class="dri">${msi('payments')}</span><b class="grow-l">${T('dr_cash')}</b><b class="num">${tot(r.cash)}</b></div></div>
+        <div class="drsec k-exp"><div class="drh"><span class="dri">${msi('local_gas_station')}</span><b class="grow-l">${T('dr_spent')}</b><b class="num">${tot(r.exp)}</b></div></div>
+        <div class="drres ${r.total < -0.5 ? 'neg' : ''}"><span class="dri">${msi('wallet')}</span><span class="grow-l">${T(r.total < -0.5 ? (office ? 'dr_owes_office' : 'dr_you_owe') : (office ? 'dr_office_owes' : 'dr_we_owe'))}</span><b class="num">${money(Math.abs(r.total), c)}</b></div>
+        ${Object.keys(r.owe).length > 1 ? `<span class="small muted">${T('dr_by_cur')}: ${balLine(r.owe)}</span>` : ''}`;
+    }
+    // Me > Pay: the person's own reports for the last work days.
+    function dayRepMineHtml(id) {
+      const p = person(id); if (!p || p.role === 'admin') return '';
+      const days = repDays(id); if (!days.length) return '';
+      const day = days.includes(state.drDay) ? state.drDay : days[0], r = dayRep(id, day);
+      return `<div class="card f drcard"><div class="row nw"><b class="grow-l">${msi('receipt_long')}${T('dr_title')}</b>${stTag(r.st)}</div>
+        ${(() => { const i = days.indexOf(day), older = days[i + 1], newer = days[i - 1], x = dayRep(id, day); return `<div class="drstep"><button type="button" class="drarr" data-act="drday" data-v="${older || ''}" ${older ? '' : 'disabled'} aria-label="${esc(T('dr_prev'))}">‹</button><span class="drdate">${msi('event')}<b>${esc(fmt(day, { weekday: 'short', day: 'numeric', month: 'short' }))}</b>${x.st === 'back' ? '<span class="tag t-danger">!</span>' : ''}</span><button type="button" class="drarr" data-act="drday" data-v="${newer || ''}" ${newer ? '' : 'disabled'} aria-label="${esc(T('dr_next'))}">›</button></div>`; })()}
+
+        ${r.off && r.off.st === 'back' && r.off.note ? `<div class="banner small">${msi('undo')}<span>${T('dr_back_note', { n: esc(r.off.note) })}</span></div>` : ''}
+        ${repBody(r, false)}
+        ${r.st === 'paid' ? `<span class="tag t-ok">${T('dr_paid_on', { d: esc(fmtDay(r.off.at.slice(0, 10))) })}</span>` : `<form class="f" data-form="drsend"><input type="hidden" name="day" value="${day}"><label>${T('dr_note')}<input class="inp" name="note" value="${esc((r.sent && r.sent.note) || '')}" placeholder="${esc(T('dr_note_ph'))}"></label>
+          <div class="actions"><button type="button" class="btn" data-act="expnew" data-date="${day}">${msi('add')}${T('ex_add')}</button></div><button class="btn primary big drsend">${T(r.sent ? 'dr_resend' : 'dr_send')}</button></form>`}</div>`;
+    }
+    // Money > Team: the office list.
+    function dayRepAdminHtml() {
+      const f = state.drF || 'wait', all = [];
+      crew().forEach(p => { if (p.role === 'admin') return; const r = (p.display && p.display.dayrep) || {}; Object.keys(r).forEach(day => { const x = dayRep(p.id, day); if (f === 'all' || (f === 'wait' && x.st === 'wait') || (f === 'open' && x.st !== 'paid')) all.push(x); }); });
+      all.sort((a, b) => b.day.localeCompare(a.day));
+      const waitN = crew().reduce((n, p) => n + Object.keys((p.display && p.display.dayrep) || {}).filter(day => dayRep(p.id, day).st === 'wait').length, 0);
+      return `<div class="card f drcard"><div class="row nw"><b class="grow-l">${msi('receipt_long')}${T('dr_list')}</b>${waitN ? `<span class="badge">${waitN}</span>` : ''}</div>
+        <div class="seg">${[['wait', T('dr_f_wait')], ['open', T('dr_f_open')], ['all', T('all')]].map(([k, l]) => `<button data-act="drf" data-v="${k}" aria-pressed="${f === k}">${l}</button>`).join('')}</div>
+        ${all.slice(0, 40).map(x => { const open = state.drOpen === x.id + '|' + x.day; return `<div class="drli ${open ? 'open' : ''}"><button class="drhead" data-act="dropen" data-v="${x.id}|${x.day}">${avatar(x.id)}<span class="grow-l"><b>${esc(pname(x.id))} · ${esc(fmtDay(x.day))}</b><span class="small muted">${T('dr_line', { c: sumTxt(x.cash), e: sumTxt(x.exp) })}</span></span><span class="tag ${x.total < -0.5 ? 't-danger' : 't-warn'} num">${T(x.total < -0.5 ? 'dr_owes_office_s' : 'dr_office_owes_s', { v: money(Math.abs(x.total), base()) })}</span>${stTag(x.st)}</button>
+          ${open ? `<div class="drbody">${repBody(x, true)}${x.sent && x.sent.note ? `<span class="small">${T('dr_their_note')}: ${esc(x.sent.note)}</span>` : ''}
+            <form class="f" data-form="drdecide"><input type="hidden" name="who" value="${x.id}"><input type="hidden" name="day" value="${x.day}"><label>${T('dr_note_to')}<input class="inp" name="note" value="${esc((x.off && x.off.note) || '')}"></label>
+            <div class="actions">${x.st !== 'paid' ? `<button class="btn" name="st" value="back">${T('dr_back')}</button><button class="btn" name="st" value="ok">${T('dr_accept')}</button>${x.total > 0.5 ? `<button class="btn primary" name="st" value="paid">${T('dr_pay', { v: money(x.total, base()) })}</button>` : `<button class="btn primary" name="st" value="paid">${T('dr_settle')}</button>`}` : `<span class="tag t-ok">${T('dr_st_paid')}</span>`}</div></form></div>` : ''}</div>`; }).join('') || `<span class="muted small">${T('dr_none')}</span>`}</div>`;
+    }
+
     // ---------- Small drawing helpers (plain HTML and CSS, no chart library) ----------
     const tile = (icon, label, value, sub, act, tab, cls) => `<button class="mn-tile ${cls || ''}" ${act ? `data-act="${act}" data-v="${tab}"` : 'disabled'}>${msi(icon)}<span class="mn-tl">${label}</span><b class="num">${value}</b>${sub ? `<span class="muted small">${sub}</span>` : ''}</button>`;
     const wfRow = (label, v, max, cls, minus) => `<div class="mn-wf ${cls || ''}"><span class="mn-wl">${label}</span><span class="mn-wb"><i style="width:${max ? Math.max(1, Math.min(100, Math.abs(v) / max * 100)) : 0}%"></i></span><b class="num">${minus && v ? '− ' : ''}${sign(v)}</b></div>`;
@@ -153,7 +211,7 @@
     function monthChips(L) {
       const x = L.now; if (!x) return ''; const c = base(), sum = o => Object.entries(o).reduce((n, [k, v]) => n + (toBase(v, k, today()) || 0), 0);
       const earn = x.earned + sum(x.exp) + sum(x.gave), cash = sum(x.cash), paid = sum(x.paid);
-      return `<div class="mn-chips"><span><small>${T('mn_ch_in')}</small><b class="num">+${money(earn, c)}</b></span><span><small>${T('mn_ch_cash')}</small><b class="num">−${money(cash, c)}</b></span><span><small>${T('mn_ch_paid')}</small><b class="num">−${money(paid, c)}</b></span></div>`;
+      return `<div class="mn-chips"><span><small>${T('mn_ch_in')}</small><b class="num">${Math.round(earn) ? '+' : ''}${money(earn, c)}</b></span><span><small>${T('mn_ch_cash')}</small><b class="num">${Math.round(cash) ? '−' : ''}${money(cash, c)}</b></span><span><small>${T('mn_ch_paid')}</small><b class="num">${Math.round(paid) ? '−' : ''}${money(paid, c)}</b></span></div>`;   /* no sign in front of 0 (owner's screenshot 18 Nov: "−0 USD") */
     }
     // The balance card: total in USD, one "account" per currency, then quick buttons.
     function bankCard(id, L, mine) {
@@ -175,7 +233,7 @@
     }
     function teamHtml(mo) {
       const rows = teamRows(mo), c = base(), owe = rows.reduce((n, x) => n + Math.max(0, x.L.total), 0), they = rows.reduce((n, x) => n + Math.min(0, x.L.total), 0);
-      return `<p class="muted small">${T('mn_team_text', { c: esc(c) })}</p>
+      return `${dayRepAdminHtml()}<p class="muted small">${T('mn_team_text', { c: esc(c) })}</p>
         <div class="stats"><div class="stat"><b class="num">${money(owe, c)}</b>${T('mn_t_owe')}</div>${they ? `<div class="stat"><b class="num">${money(-they, c)}</b>${T('mn_they_owe')}</div>` : ''}</div>
         <div class="mn-team">${rows.map(({ p, L }) => {
           const open = state.mnOpen === p.id, pay = state.mnPay && state.mnPay.id === p.id ? state.mnPay.kind : '', cash = cashOf(L);
@@ -245,6 +303,9 @@
       mnclose() { state.mnPay = null; render(); },
       mnmore() { state.mnMore = 1; render(); },
       mnfeed() { state.mnFeed = 1; render(); },
+      drday(el) { state.drDay = el.dataset.v; render(); },
+      drf(el) { state.drF = el.dataset.v; render(); },
+      dropen(el) { state.drOpen = state.drOpen === el.dataset.v ? '' : el.dataset.v; render(); },
       mnhow() { state.mnHow = !state.mnHow; render(); },
       mndel(el) { if (!isAdmin() || !confirm(T('m_del_ask'))) return; run(() => S.remove('staff_payments', el.dataset.id)).then(() => { setMemo({}); render(); }); },
       mdel(el) { if (!isAdmin() || !confirm(T('m_del_ask'))) return; run(() => S.remove(el.dataset.t, el.dataset.id)).then(() => { setMemo({}); render(); }); },
@@ -270,6 +331,19 @@
       },
     };
     const forms = {
+      async drsend(fd) {
+        const m = me(), day = fd.get('day'); if (!m || !day) return; const d0 = (m.display && typeof m.display === 'object') ? m.display : {}, rep = { ...(d0.dayrep || {}) };
+        rep[day] = { at: new Date().toISOString(), note: String(fd.get('note') || '').trim().slice(0, 300) };
+        Object.keys(rep).forEach(k => { if (k < addDays(today(), -120)) delete rep[k]; });
+        await S.save('profiles', { ...stripEmail(m), display: { ...d0, dayrep: rep } }); logAct(`Day report sent: ${day}`); setMemo({}); toast(T('dr_sent')); render();
+      },
+      async drdecide(fd) {
+        if (!isAdmin()) return; const who = fd.get('who'), day = fd.get('day'), st = fd.get('st') || 'ok', note = String(fd.get('note') || '').trim();
+        const r = dayRep(who, day);
+        if (st === 'paid' && r.total > 0.5) { const rate = gelRate(base(), today()); await S.save('staff_payments', { id: S.uid(), user_id: who, payee_name: null, amount: r2(r.total), currency: base(), gel_rate: rate || null, gel_amount: rate ? r2(r.total * rate) : null, method: 'cash', bank: null, tx_code: null, paid_at: today(), for_month: day.slice(0, 7), note: T('dr_pay_note', { d: day }), created_by: me().id, created_at: new Date().toISOString() }); }
+        const cfg = repCfg(), mine = { ...(cfg[who] || {}) }; mine[day] = { st, note, by: me().id, at: new Date().toISOString() };
+        await S.save('settings', { id: 'dayrep', value: { ...cfg, [who]: mine } }); logAct(`Day report ${pname(who)} ${day}: ${st}`); state.drOpen = ''; setMemo({}); toast(T('saved')); render();
+      },
       async mnpay(fd) {
         const who = fd.get('user_id'), kind = fd.get('kind'), cur = fd.get('currency') || base(), date = fd.get('paid_at') || today(), amount = Math.abs(Number(String(fd.get('amount') || '').replace(',', '.')) || 0), rate = gelRate(cur, date), mo = fd.get('for_month') || date.slice(0, 7);
         if (!amount) { toast(T('m_amount')); return; }
@@ -295,6 +369,6 @@
         setMemo({}); logAct(`Commission rule ${fd.get('platform')} ${fd.get('percent')}%`); render();
       },
     };
-    return { moneyHtml, myMoneyHtml, ruleCommission, agg, ledger, acts, forms };
+    return { moneyHtml, myMoneyHtml, dayRepMineHtml, dayRep, ruleCommission, agg, ledger, acts, forms };
   };
 })();

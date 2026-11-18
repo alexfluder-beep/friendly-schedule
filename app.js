@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '3.102';
+  const APP_VERSION = '26.11.18';   /* from 18 Nov 2026 the version is the release date, year.month.day (owner); a second release the same day adds b, c */
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -127,7 +127,9 @@
     const ex = ix.byT.get(k); if (ex) return ex;
     const id = ix.links[tourKey(title)]; return id ? ix.byId.get(String(id)) || null : null;
   };
-  const TOUR_COLORS = ['#314b3c', '#22618c', '#5b4bb0', '#8a5a00', '#2f6f73', '#6b5b3e', '#3b5bbd', '#7a4b8a', '#4a6b1f', '#0e5a80', '#55606e', '#8a6a1f'];
+  const TOUR_COLORS = ['#314b3c', '#22618c', '#5b4bb0', '#9b4a7d', '#2f6f73', '#5a5f7a', '#3b5bbd', '#7a4b8a', '#4a6b1f', '#0e5a80', '#55606e', '#6d4f8f'];
+  /* 18 Nov, owner: no orange anywhere. Colours already saved for a tour or a person that are orange or brown are shown in a calm berry / plum instead (display only; the saved value stays). */
+  const calm = c => { const m = /^#([0-9a-f]{6})$/i.exec(c || ''); if (!m) return c; const n = parseInt(m[1], 16), r = (n >> 16) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn; if (d < 0.12) return c; let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h = (h * 60 + 360) % 360; return h >= 12 && h <= 50 ? (l < 0.3 ? '#5b3a6e' : '#9b4a7d') : c; };
   const SKIP = /^(\d.*|4x4|private|tour|tours|the|a|of|from|in|to|and|day|trip|group|small-group|half-day|full|&|-)$/i;
   // Rough geography for statistics and badges. Each tour can be corrected in Back office > Tour list.
   const REGIONS = ['Tbilisi', 'Mtskheta-Mtianeti', 'Kakheti', 'Shida Kartli', 'Kvemo Kartli', 'Samtskhe-Javakheti', 'Imereti', 'Racha-Lechkhumi', 'Samegrelo-Zemo Svaneti', 'Guria', 'Adjara',
@@ -169,14 +171,14 @@
   }
   const wxLine = (t, full) => { const w = weather(t); if (!w) return ''; const rough = w.mm >= 10 || w.w >= 50 || w.cond === 'storm' || w.cond === 'snow'; return `<span class="wx ${rough ? 'rough' : ''}" title="${esc(w.place)}">${ico(wxIcon[w.cond])}<b class="num">${w.t}°</b><span>${T('wx_' + w.cond)}</span>${w.mm ? `<span class="num">${w.mm} ${T('wx_mm')}</span>` : ''}<span class="num">${T('wx_wind')} ${w.w} ${T('wx_kmh')}</span>${full ? `<span class="muted num">${esc(w.place)} · ${w.lo}°…${w.hi}°</span>` : ''}${w.sample ? `<span class="tag t-muted">${T('wx_sample')}</span>` : ''}</span>`; };
   // W11: the colour stripe of a tour card comes from the tour (default) or, if this phone chose so in Me › Settings, from its kind.
-  const KIND_COLOR = { private: '#7b4fd6', group: '#1e88e5', custom: '#ef8a17' };
+  const KIND_COLOR = { private: '#7b4fd6', group: '#1e88e5', custom: '#c2477f' };
   const cardColor = t => (dget('cardc') === 'kind' ? KIND_COLOR[t.kind] || KIND_COLOR.custom : tourStyle(t.title).color);
   function tourStyle(title) {
     const k = 'ts' + title; if (memo[k]) return memo[k];
     const c = catFind(title) || {}; let h = 0; for (const ch of String(title)) h = (h * 31 + ch.codePointAt(0)) >>> 0;
     const words = String(title).replace(/[:,()]/g, ' ').split(/\s+/).filter(w => w && !SKIP.test(w));
     const code = (c.code || (words.length > 1 ? [...words[0]][0] + [...words[1]][0] : (words[0] || title || '?').slice(0, 2))).toUpperCase().slice(0, 3);
-    return memo[k] = { color: c.color || TOUR_COLORS[h % TOUR_COLORS.length], code };
+    return memo[k] = { color: calm(c.color || TOUR_COLORS[h % TOUR_COLORS.length]), code };
   }
   // Material Symbols icons (icons.js): fill, 960 grid.
   const msi = (k, cls) => (window.MSI && window.MSI[k] ? `<svg class="msi${cls ? ' ' + cls : ''}" viewBox="0 -960 960 960" aria-hidden="true"><path fill="currentColor" d="${window.MSI[k]}"/></svg>` : '');
@@ -189,7 +191,7 @@
   const emblem = (t, big) => { const s = tourStyle(t.title), ic = tourIcon(t.title); return `<span class="emb${big ? ' big' : ''}${ic ? ' ic' : ''}" style="background:${esc(s.color)}" aria-hidden="true">${ic ? msi(ic) : esc(s.code)}</span>`; };
   // Pictures people can choose instead of a photo (Me > Choose a picture).
   const AV_ICONS = ['hiking', 'directions_car', 'landscape', 'forest', 'wine_bar', 'coffee', 'pets', 'sailing', 'photo_camera', 'music_note', 'sports_soccer', 'sunny', 'star', 'favorite', 'eco', 'local_florist', 'cottage', 'cake', 'rocket_launch', 'sentiment_satisfied'];
-  const AV_COLORS = ['#2f6b48', '#1d3b66', '#22618c', '#5b4bb0', '#a8325f', '#b8441c', '#8a5a00', '#4a3526'];
+  const AV_COLORS = ['#2f6b48', '#1d3b66', '#22618c', '#5b4bb0', '#a8325f', '#2f6fdf', '#6d4f8f', '#3c4a5c'];
   // Painted avatar pictures (Gemini, made once): saved on the profile as "art:<name>".
   const AV_ART = ['delica', 'gergeti', 'svaneti', 'tusheti', 'gareji', 'vardzia', 'ararat', 'sabaduri', 'mtskheta', 'sighnaghi', 'tbilisi', 'narikala', 'sulfur', 'cable', 'horse', 'eagle', 'dog', 'wine', 'grapes', 'khinkali', 'churchkhela', 'pomegranate', 'coffee', 'backpack', 'map', 'compass', 'camera', 'sun', 'snowflake', 'star'];
   const avArt = v => { const m = /^art:([a-z0-9]+)$/.exec(v || ''); return m && AV_ART.includes(m[1]) ? `art/avatars/${m[1]}.webp` : ''; };
@@ -209,7 +211,7 @@
     return '';
   }
   // Flag picture from the country code, e.g. GE -> flag of Georgia (the phone's own emoji font draws it).
-  const flagOf = iso => (iso && iso.length === 2 ? String.fromCodePoint(...[...iso.toUpperCase()].map(ch => 127397 + ch.charCodeAt(0))) : '');
+  const flagOf = iso => (iso && iso.length === 2 ? iso.toUpperCase() : '');   /* 18 Nov, owner: no emoji, so the country shows as its two letters (GE, DE) instead of a flag */
   const phoneFlag = phone => { const iso = phoneIso(phone); return iso ? `${flagOf(iso)} ${phoneCountry(phone)}` : ''; };
   // Local Georgian mobile numbers get +995; 00 becomes +.
   // Email as typed or pasted: drops "mailto:", <brackets>, spaces and trailing dots.
@@ -680,7 +682,7 @@
     root.querySelectorAll('.badge, .segn').forEach(b => { const host = b.closest('[data-v], [data-act]'), k = (host ? (host.dataset.act || '') + ':' + (host.dataset.v || '') : '') + ':' + b.className, v = b.textContent.trim(), was = badgePrev.get(k); badgePrev.set(k, v); if (was !== undefined && was !== v && motionOk()) { b.classList.remove('fx-bump'); void b.offsetWidth; b.classList.add('fx-bump'); } });
   }
   const initials = n => ((n || '').replace(/\(.*?\)/g, ' ').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(x => [...x][0]).join('') || '?').toUpperCase();
-  const avatar = (id, big) => { const p = person(id); if (!p) return ''; const c = big ? 'avatar big' : 'avatar', lib = avLib(p.avatar); const art = avArt(p.avatar); if (art) return `<img class="${c}" src="${art}" alt="${esc(p.name)}" title="${esc(p.name)}" loading="lazy" decoding="async">`; if (lib) return `<span class="${c} avlib" style="background:${esc(lib.color)}" title="${esc(p.name)}">${msi(lib.icon)}</span>`; return p.avatar ? `<img class="${c}" src="${esc(p.avatar)}" alt="${esc(p.name)}" title="${esc(p.name)}">` : `<span class="${c} ${!big && IC[p.role] ? 'role' : ''}" style="background:${esc(p.color || '#66737f')}" title="${esc(p.name + ' · ' + T('role_' + p.role))}">${!big && IC[p.role] ? ico(p.role) : esc(initials(p.name))}</span>`; };
+  const avatar = (id, big) => { const p = person(id); if (!p) return ''; const c = big ? 'avatar big' : 'avatar', lib = avLib(p.avatar); const art = avArt(p.avatar); if (art) return `<img class="${c}" src="${art}" alt="${esc(p.name)}" title="${esc(p.name)}" loading="lazy" decoding="async">`; if (lib) return `<span class="${c} avlib" style="background:${esc(calm(lib.color))}" title="${esc(p.name)}">${msi(lib.icon)}</span>`; return p.avatar ? `<img class="${c}" src="${esc(p.avatar)}" alt="${esc(p.name)}" title="${esc(p.name)}">` : `<span class="${c} ${!big && IC[p.role] ? 'role' : ''}" style="background:${esc(calm(p.color) || '#66737f')}" title="${esc(p.name + ' · ' + T('role_' + p.role))}">${!big && IC[p.role] ? ico(p.role) : esc(initials(p.name))}</span>`; };
   const acText = t => (t.children > 0 ? T('ad_ch', { a: t.adults || 0, c: t.children }) : (t.adults || t.pax || 0) === 1 ? T('ad_one') : T('ad_only', { a: t.adults || t.pax || 0 }));
   const dateText = t => (endOf(t) !== t.date ? fmtRange(t.date, endOf(t)) : fmtDay(t.date));
   // Pay before this date is not shown to guides and drivers and not used in their numbers (old figures can be wrong); the office still sees everything.
@@ -741,7 +743,7 @@
 
   // ---------- auth screens ----------
   // A small flat picture of our world (mountains, a hill church, the road and the van) for the login page.
-  const HERO_ART = '<svg class="authart" viewBox="0 0 400 150" aria-hidden="true"><rect width="400" height="150" fill="#e3ecf9"/><circle cx="318" cy="46" r="20" fill="#f0901e"/><path d="M0 118 70 52l44 44 40-58 62 80 46-46 138 60V150H0z" fill="#b9c4ae"/><path d="M154 38l22 30-14 8-10-10-12 10z" fill="#f7f5ef"/><path d="M0 150v-30c60-22 120-6 170-14s120-30 230-6v50z" fill="#314b3c"/><g fill="#20251f"><path d="M246 98l10-26 10 26z"/><path d="M262 100l8-20 8 20z"/><path d="M232 100l7-16 7 16z"/></g><path d="M20 150c40-26 110-18 170-26" fill="none" stroke="#f7f5ef" stroke-width="5" stroke-linecap="round" stroke-dasharray="14 12"/><g transform="translate(96 108)"><rect x="0" y="4" width="44" height="18" rx="5" fill="#f7f5ef" stroke="#20251f" stroke-width="2.5"/><path d="M26 6h10l6 8H26z" fill="#9fb7c9" stroke="#20251f" stroke-width="2"/><rect x="6" y="0" width="22" height="4" rx="2" fill="#20251f"/><circle cx="11" cy="23" r="5" fill="#20251f"/><circle cx="33" cy="23" r="5" fill="#20251f"/></g></svg>';
+  const HERO_ART = '<svg class="authart" viewBox="0 0 400 150" aria-hidden="true"><rect width="400" height="150" fill="#e3ecf9"/><circle cx="318" cy="46" r="20" fill="#f5c84c"/><path d="M0 118 70 52l44 44 40-58 62 80 46-46 138 60V150H0z" fill="#b9c4ae"/><path d="M154 38l22 30-14 8-10-10-12 10z" fill="#f7f5ef"/><path d="M0 150v-30c60-22 120-6 170-14s120-30 230-6v50z" fill="#314b3c"/><g fill="#20251f"><path d="M246 98l10-26 10 26z"/><path d="M262 100l8-20 8 20z"/><path d="M232 100l7-16 7 16z"/></g><path d="M20 150c40-26 110-18 170-26" fill="none" stroke="#f7f5ef" stroke-width="5" stroke-linecap="round" stroke-dasharray="14 12"/><g transform="translate(96 108)"><rect x="0" y="4" width="44" height="18" rx="5" fill="#f7f5ef" stroke="#20251f" stroke-width="2.5"/><path d="M26 6h10l6 8H26z" fill="#9fb7c9" stroke="#20251f" stroke-width="2"/><rect x="6" y="0" width="22" height="4" rx="2" fill="#20251f"/><circle cx="11" cy="23" r="5" fill="#20251f"/><circle cx="33" cy="23" r="5" fill="#20251f"/></g></svg>';
   function authHtml() {
     const a = state.auth, msg = state.authMsg ? `<div class="banner">${esc(state.authMsg)}</div>` : '', pw = state.showPw;
     // Language sits right under the form, next to the account links: a globe and three short buttons.
@@ -845,6 +847,13 @@
   const seenBy = () => (state.mine ? me().id : (isAdmin() && state.who) || '');
   const seen = t => { const id = seenBy(); return !id || involves(t, id); };
   // Agenda: one long list by date, like a printed schedule. Thirty days from the chosen date; days with nothing are left out.
+  /* 18 Nov (owner's screenshots): By-day list rows. Time and title; guide; a seats bar for group tours (red when full); a paid / to-pay pill for the office. */
+  function agDue(ts) { const o = {}; ts.forEach(t => tourBookings(t.id).forEach(b => { if ((b.payment === 'cash' || b.payment === 'unpaid') && !b.attendance && !isCx(b) && !isFree(b)) { const c = b.currency || guestCur(), v = Number(b.amount_due) || Number(b.price) || 0; if (v) o[c] = (o[c] || 0) + v; } })); return Object.keys(o).map(c => nf(Math.round(o[c])) + ' ' + c).join(' + '); }
+  function agRow(t) {
+    const g = t.guide_id && person(t.guide_id), cap = Number(t.capacity) || 0, pax = Number(t.pax) || 0, full = cap && pax >= cap, due = isAdmin() ? agDue([t]) : '';
+    const paid = isAdmin() && !due && tourBookings(t.id).some(b => b.payment === 'prepaid');
+    return `<button type="button" class="agr agt2" data-act="tour" data-id="${t.id}" style="--k:${esc(cardColor(t))}"><span class="ag1"><span class="agt num">${tmTxt(t)}</span><b class="agtitle">${esc(aliasOf(t.title))}</b></span><span class="ag2">${g ? `<span class="agp">${avatar(g.id)}<span>${esc(g.name.split(' ')[0])}</span></span>` : `<span class="tag t-danger">${T('bk_noguide1')}</span>`}${t.driver_id && person(t.driver_id) ? `<span class="agp">${avatar(t.driver_id)}</span>` : ''}${t.kind === 'group' && cap ? `<span class="agseat ${full ? 'full' : ''}"><span class="pbar"><i style="width:${Math.min(100, Math.round(pax / cap * 100))}%"></i></span><b class="num">${pax}/${cap}</b></span>` : `<span class="muted small num">${acText(t)}</span>`}${due ? `<span class="gpill due num">${esc(due)}</span>` : paid ? `<span class="gpill ok">${T('ag_paid')}</span>` : ''}</span></button>`;
+  }
   function agendaHtml() {
     const from = state.date, td = today(), who = seenBy(); let rows = '', any = 0;
     for (let i = 0; i < 30; i++) { const d = addDays(from, i), ts = toursOnDay(d).filter(seen).sort((x, y) => (x.start_time || '').localeCompare(y.start_time || '')), offs = db.time_off.filter(o => o.status !== 'declined' && o.date_from <= d && o.date_to >= d && (!who || twin(o.user_id) === who)), cx = state.cxOff ? [] : cancelledOnDay(d).filter(seen), ho = holidayOn(d);
@@ -852,10 +861,11 @@
       const line = (time, dot, body, right, cls, attr) => `<${attr ? 'button' : 'div'} class="agr ${cls || ''}" ${attr || ''}><i class="agdot" style="${dot}"></i><span class="agb"><span class="agtt">${body}</span>${time ? `<span class="agt num">${time}</span>` : ''}</span><span class="agw">${right}</span></${attr ? 'button' : 'div'}>`;
       const pe = id => { const x = person(id); return x ? `<span class="agp">${avatar(id)}<span>${esc(x.name)}</span></span>` : ''; };
       const list = [...offs.map(o => line('', 'background:var(--private)', `${msi(o.type === 'sick' ? 'sick' : 'beach_access')} ${T(o.type === 'sick' ? 'sick' : o.type === 'half' ? 'halfday' : 'dayoff')}${o.status === 'pending' ? ' · ' + T('pending') : ''}`, pe(o.user_id), 'off', offAttr(o, d).trim())),
-        ...ts.map(t => line(`${tmTxt(t)}${t.end_time ? '–' + esc(t.end_time) : ''}`, `background:${esc(cardColor(t))}`, `<b>${esc(t.title)}</b> <span class="muted num">${t.kind === 'group' ? `(${Number(t.pax) || 0}/${Number(t.capacity) || 0})` : acText(t)}</span>${!t.guide_id ? ` <span class="tag t-warn">${T('unassigned')}</span>` : ''}`, [...new Set([t.guide_id, t.driver_id].filter(Boolean))].map(pe).join(''), '', `data-act="tour" data-id="${t.id}"`)),
+        ...ts.map(agRow),
         ...tkd.map(k => line('', 'background:var(--accent)', `${msi('task_alt')} <b>${esc(taskTitle(k))}</b>`, (k.assignees || []).map(pe).join(''), 'tk', '')),
         ...cx.map(t => line(tmTxt(t), 'background:var(--muted)', `<s>${esc(t.title)}</s> <span class="tag t-danger">${T('cancelled')}</span>`, '', 'cx', `data-act="tour" data-id="${t.id}"`))].join('') || `<div class="agr none"><i></i><span class="agb muted">${T('no_tours')}</span><span></span></div>`;
-      rows += `<div class="agday ${d === td ? 'tdy' : ''}"><div class="agd"><b class="num">${D(d).getDate()}</b><span>${esc(fmt(d, { month: 'short', weekday: 'short' }))}</span>${ho ? `<span class="tag t-hol">${esc(trName(ho.name))}</span>` : ''}</div><div class="agl">${list}</div></div>`; }
+      const pax = ts.reduce((n, t) => n + (Number(t.pax) || 0), 0), dueTxt = isAdmin() ? agDue(ts) : '';
+      rows += `<div class="agday ${d === td ? 'tdy' : ''}"><div class="agd"><b class="num">${D(d).getDate()}</b><span>${esc(fmt(d, { month: 'short', weekday: 'short' }))}</span>${ho ? `<span class="tag t-hol">${esc(trName(ho.name))}</span>` : ''}</div><div class="agl">${ts.length ? `<div class="agsum">${d === td ? `<b class="agtd">${T('today')}</b>` : ''}<span>${T('ag_sum', { t: ts.length, g: pax })}</span>${dueTxt ? `<span class="agdue">${T('ag_due', { v: dueTxt })}</span>` : ''}</div>` : ''}${list}</div></div>`; }
     return `<div class="card agenda">${rows || `<div class="empty">${T('ag_none')}</div>`}</div>`;
   }
   function dayBlock(d) {
@@ -863,7 +873,7 @@
     const dts = toursOnDay(d).filter(seen).sort((x, y) => (x.start_time || '').localeCompare(y.start_time || ''));
     const offs = db.time_off.filter(o => o.status !== 'declined' && o.date_from <= d && o.date_to >= d && (!state.mine || o.user_id === me().id));
     const cxs = cancelledOnDay(d).filter(seen), tkd = tasksOnDay(d);
-    return `<div class="dayhd" id="day-${d}" data-drop="${d}">${state.mode === 'day' ? '' : `<b class="${d === td ? 'tdy' : ''}">${esc(fmt(d, { weekday: 'long', day: 'numeric', month: 'long' }))}</b>`}${dayCountHtml(d, state.mine ? me().id : '')}${ho ? `<span class="tag t-hol">${msi('celebration')}${esc(trName(ho.name))}</span>` : ''}${pubHolOn(d) && !ho ? `<span class="tag t-pub" title="${esc(T('ph_info'))}">${msi('flag')}${esc(T(pubHolOn(d)))}</span>` : ''}${ev ? `<span class="tag t-group">${esc(trName(ev.name))}</span>` : ''}<span class="spacer"></span>${dts.length ? `<button class="iconbtn" data-act="summary" data-date="${d}" title="${T('day_summary')}" aria-label="${T('day_summary')}">${msi('receipt_long')}</button>` : ''}${!isAdmin() && d > td && !offOn(me().id, d) ? `<button class="lnk" data-act="offnew" data-date="${d}">${T('ask_dayoff')}</button>` : ''}</div>
+    return `<div class="dayhd" id="day-${d}" data-drop="${d}">${state.mode === 'day' ? '' : `<b class="${d === td ? 'tdy' : ''}">${esc(fmt(d, { weekday: 'long', day: 'numeric', month: 'long' }))}</b>`}${dayCountHtml(d, state.mine ? me().id : '')}${dts.length ? (g => (g ? `<span class="daycnt muted small num">· ${T('ag_g', { g })}</span>` : ''))(dts.reduce((n, t) => n + (Number(t.pax) || 0), 0)) : ''}${isAdmin() && dts.length && agDue(dts) ? `<span class="agdue small num">· ${T('ag_due', { v: agDue(dts) })}</span>` : ''}${ho ? `<span class="tag t-hol">${msi('celebration')}${esc(trName(ho.name))}</span>` : ''}${pubHolOn(d) && !ho ? `<span class="tag t-pub" title="${esc(T('ph_info'))}">${msi('flag')}${esc(T(pubHolOn(d)))}</span>` : ''}${ev ? `<span class="tag t-group">${esc(trName(ev.name))}</span>` : ''}<span class="spacer"></span>${dts.length ? `<button class="iconbtn" data-act="summary" data-date="${d}" title="${T('day_summary')}" aria-label="${T('day_summary')}">${msi('receipt_long')}</button>` : ''}${!isAdmin() && d > td && !offOn(me().id, d) ? `<button class="lnk" data-act="offnew" data-date="${d}">${T('ask_dayoff')}</button>` : ''}</div>
       ${dts.map(agendaCard).join('')}${cxs.map(agendaCard).join('')}${tkd.map(taskLineHtml).join('')}${offLineHtml(offs, d)}
       ${!dts.length && !offs.length && !cxs.length && !tkd.length ? `<div class="muted small nothing" data-drop="${d}">${T('no_tours')}</div>` : ''}`;
   }
@@ -891,7 +901,7 @@
   }
   function agendaCard(t) {
     const off = !live(t), w = off ? [] : tourWarnings(t), ppl = [...new Set([t.guide_id, t.driver_id, ...(t.extra_guides || []).map(x => x.id)].filter(Boolean))];
-    return `<button class="acard ${off ? 'cancelled' : ''}" data-key="t${t.id}" style="--k:${esc(cardColor(t))}" data-act="tour" data-id="${t.id}"${isAdmin() && !off ? ` data-drag="${t.id}"` : ''} data-drop="${t.date}"><span class="ttl">${emblem(t, true)}<span>${t.start_time && t.start_time !== '00:00' ? `<span class="num st">${esc(t.start_time)}</span> ` : `<span class="st muted small">${T('time_unset')}</span> `}<span class="tname">${esc(t.title)}</span></span></span><span class="kindrow"><span class="kind k-${esc(t.kind || 'private')}">${msi(t.kind === 'group' ? 'groups' : t.kind === 'transfer' ? 'airport_shuttle' : 'person')}${T('kind_' + (t.kind || 'private'))}</span><span class="num cnt">${paxText(t)}</span>${w.length ? ` <span class="chk">${T('chk')}</span>` : ''}${off ? ` <span class="tag t-danger">${T('cancelled')}</span>` : ''}${chgTag(t)}${!off && staysN(tourBookings(t.id)) ? ` <span class="tag t-stay num">${T('stay_n', { n: staysN(tourBookings(t.id)) })}</span>` : ''}<span class="row crew">${ppl.length ? ppl.map(id => `<span class="p">${avatar(id)}${esc(pname(id))}</span>`).join('') : `<span class="tag t-warn">${T('unassigned')}</span>`}</span></span>${guestNamesHtml(t, tourBookings(t.id))}${metaHtml(t)}${endOf(t) !== t.date ? `<span class="num muted small">${esc(fmtRange(t.date, endOf(t)))}</span>` : ''}${wxLine(t)}</button>`;
+    return `<button class="acard ${off ? 'cancelled' : ''}" data-key="t${t.id}" style="--k:${esc(cardColor(t))}" data-act="tour" data-id="${t.id}"${isAdmin() && !off ? ` data-drag="${t.id}"` : ''} data-drop="${t.date}"><span class="ttl">${emblem(t, true)}<span>${t.start_time && t.start_time !== '00:00' ? `<span class="num st">${esc(t.start_time)}</span> ` : `<span class="st muted small">${T('time_unset')}</span> `}<span class="tname">${esc(t.title)}</span></span></span><span class="kindrow"><span class="kind k-${esc(t.kind || 'private')}">${msi(t.kind === 'group' ? 'groups' : t.kind === 'transfer' ? 'airport_shuttle' : 'person')}${T('kind_' + (t.kind || 'private'))}</span>${t.kind === 'group' && Number(t.capacity) ? (cap => { const pax = Number(t.pax) || 0, full = pax >= cap; return `<span class="agseat ${full ? 'full' : ''}"><span class="pbar"><i style="width:${Math.min(100, Math.round(pax / cap * 100))}%"></i></span><b class="num cnt">${pax}/${cap}</b></span>`; })(Number(t.capacity)) : `<span class="num cnt">${paxText(t)}</span>`}${w.length ? ` <span class="chk">${T('chk')}</span>` : ''}${off ? ` <span class="tag t-danger">${T('cancelled')}</span>` : ''}${chgTag(t)}${!off && staysN(tourBookings(t.id)) ? ` <span class="tag t-stay num">${T('stay_n', { n: staysN(tourBookings(t.id)) })}</span>` : ''}<span class="row crew">${ppl.length ? ppl.map(id => `<span class="p">${avatar(id)}${esc(pname(id))}</span>`).join('') : `<span class="tag t-danger">${T('unassigned')}</span>`}</span></span>${guestNamesHtml(t, tourBookings(t.id))}${metaHtml(t)}${endOf(t) !== t.date ? `<span class="num muted small">${esc(fmtRange(t.date, endOf(t)))}</span>` : ''}${wxLine(t)}</button>`;
   }
   // ---------- Sunday evening: every guide and driver checks next week's schedule ----------
   const taskTitle = k => (k.kind === 'week_check' ? T('wk_title') : k.title);
@@ -980,7 +990,12 @@
     const fr = isFree(b), marks = (b.marks || []).map(markLabel), bits = [...(lg && !/^EN/i.test(lg) ? [langName(String(lg).toUpperCase())] : []), ...marks], more = bits.length > 2 ? bits.length - 2 : 0;
     const trouble = (clientRating(b.client_id) || {}).rating === 'trouble';
     const sum = [fr ? `<span class="tag t-free">${esc(T('free_guest'))}</span>` : '', due ? `<b class="due num">${esc(due)}</b>` : b.payment === 'prepaid' ? `<span class="tag t-ok">${esc(T('pay_online'))}</span>` : '', ...bits.slice(0, 2).map(esc), more ? `+${more}` : ''].filter(Boolean).join(' · ');   // the guest count sits at the end of the name line; this second line shows only when there is something to say
-    return `<div class="grow gst ${fr ? 'free' : ''}"><span class="grid"><button class="gbtn" data-act="guest" data-id="${b.id}"><span class="avatar ini ${fr ? 'free' : ''}">${esc(initials(cleanName(b.guest) || b.guest))}</span><span class="gtxt"><span class="gline"><span class="gname">${esc(cleanName(b.guest) || b.guest)}</span><span class="gcnt num">${esc(acText(b))}</span></span>${sum ? `<span class="gsum">${sum}</span>` : ''}</span></button>${b.attendance ? `<span class="tag ${b.attendance === 'arrived' ? 't-ok' : 't-danger'}">${T('att_' + b.attendance)}</span>` : '<span></span>'}${b.phone ? `<span class="cbtns">${ib('wa', 'WhatsApp', waLink(b.phone))}${ib('call', T('call'), 'tel:' + b.phone)}</span>` : '<span class="cbtns" aria-hidden="true"></span>'}</span>${needAddr && b.pickup_addr && !sameAddr ? `<span class="gaddr">${ico('pin')}<span>${esc(b.pickup_addr)}</span></span>` : ''}${trouble ? `<span class="row">${ratingTag(b.client_id)}</span>` : ''}</div>`;
+    /* 18 Nov (owner's screenshots): a guest card. Name, VIP, guest count and a payment pill on top; address and notes; WhatsApp and Call;
+       on the tour day the two big buttons "Picked up" / "Did not come". The left edge is green when picked up, red when not. */
+    const can = t && (involves(t, me().id) || isAdmin()) && t.date <= today() && live(t) && !fr;
+    const pill = fr ? `<span class="gpill free">${esc(T('free_guest'))}</span>` : due ? `<span class="gpill due num">${esc(due)}</span>` : b.payment === 'prepaid' ? `<span class="gpill ok">${ico('check')}${esc(T('gc_paid'))}</span>` : '';
+    const note = [...bits.slice(0, 2).map(esc), more ? `+${more}` : ''].filter(Boolean).join(' · ');
+    return `<div class="grow gst gcard ${fr ? 'free' : ''} ${b.attendance ? 'st-' + b.attendance : ''}" data-key="g${b.id}"><span class="grid"><button class="gbtn" data-act="guest" data-id="${b.id}"><span class="avatar ini ${fr ? 'free' : ''}">${esc(initials(cleanName(b.guest) || b.guest))}</span><span class="gtxt"><span class="gline"><span class="gname">${esc(cleanName(b.guest) || b.guest)}</span>${vipTag(b.client_id)}</span><span class="gcnt num">${ico('user')}${esc(acText(b))}</span>${note ? `<span class="gsum">${note}</span>` : ''}</span></button>${pill}</span>${needAddr && b.pickup_addr && !sameAddr ? `<span class="gaddr">${ico('pin')}<span>${esc(b.pickup_addr)}</span></span>` : ''}${trouble ? `<span class="row">${ratingTag(b.client_id)}</span>` : ''}<span class="gfoot">${b.phone ? `<span class="cbtns">${ib('wa', 'WhatsApp', waLink(b.phone))}${ib('call', T('call'), 'tel:' + b.phone)}</span>` : '<span class="cbtns" aria-hidden="true"></span>'}${!can && b.attendance ? `<span class="tag ${b.attendance === 'arrived' ? 't-ok' : 't-danger'}">${T('att_' + b.attendance)}</span>` : ''}</span>${can ? `<span class="picks"><button type="button" class="pick ok ${b.attendance === 'arrived' ? 'on' : ''}" data-act="attend" data-id="${b.id}" data-s="arrived" aria-pressed="${b.attendance === 'arrived'}">${ico('check')}${T('gc_picked')}</button><button type="button" class="pick no ${b.attendance === 'noshow' ? 'on' : ''}" data-act="attend" data-id="${b.id}" data-s="noshow" aria-pressed="${b.attendance === 'noshow'}">${T('gc_nocome')}</button></span>` : ''}</div>`;
   }
   function guestRowsHtml(t) {
     const bks = tourBookings(t.id); if (!bks.length) return drvLimited(t) ? drvNote(t) : `<div class="empty">${guestsHidden(t) ? T('pv_hidden', { n: pv().guideDays }) : T('no_guests')}</div>`;
@@ -1224,7 +1239,7 @@
       if (i % 7 === 0) wkl = weekLanes(i);
       const all = toursOnDay(d), ts = all.filter(seen), myOff = offOn(my, d), ho = holidayOn(d), single = ts.filter(t => tourDays(t).length < 2);
       const lanes = [...Array(wkl.n).keys()].map(l => { const o = wkl.list.find(x => x.lane === l), sp = o ? o.b - o.a + 1 : 0; return `<span class="mrow lane">${o && o.a === i % 7 ? `<span class="mbar${live(o.t) ? '' : ' cx'}" data-act="tour" data-id="${o.t.id}" style="--k:${esc(tourStyle(o.t.title).color)};width:calc(${sp}*100% + ${sp - 1}px - 12px)"><span class="num">${esc(o.t.start_time || '')}</span> ${esc(o.t.title)}</span>` : ''}</span>`; }).join('');
-      cells += `${i % 7 === 0 ? `<span class="wk num" aria-hidden="true">${isoWk(d)}</span>` : ''}<button class="${d.slice(0, 7) !== mo ? 'out' : ''} ${i % 7 > 4 ? 'we' : ''} ${i % 7 === 6 ? 'sun' : ''} ${d === td ? 'today' : ''} ${d === sel ? 'sel' : ''} ${offCls(myOff)} ${ho ? 'hol' : ''} ${pubHolOn(d) ? 'pub' : ''}" title="${esc(pubHolOn(d) ? T(pubHolOn(d)) : '')}" data-act="pickday" data-date="${d}" data-drop="${d}" aria-pressed="${d === sel}" aria-label="${esc(fmtDay(d))}: ${ts.length} ${T('tours_n')}"><b class="num">${D(d).getDate()}</b><span class="dots">${ts.slice(0, 4).map(t => `<i style="background:${esc(cardColor(t))}"></i>`).join('')}${ts.length > 4 ? `<span class="num">+${ts.length - 4}</span>` : ''}</span><span class="mrows">${lanes}${single.slice().sort((x, y) => (x.start_time || '').localeCompare(y.start_time || '')).slice(0, 4).map(t => `<span class="mrow${live(t) ? '' : ' cx'}" data-act="tour" data-id="${t.id}"${isAdmin() && live(t) ? ` data-drag="${t.id}"` : ''}><i style="background:${esc(cardColor(t))}"></i><span class="num">${tmTxt(t)}</span> ${esc(t.title)} <span class="num muted">${paxText(t)}</span>${mpayHtml(t)}</span>`).join('')}${single.length > 4 ? `<span class="mrow more">${T('more_n', { n: single.length - 4 })}</span>` : ''}</span>${offMark(d)}</button>`;
+      cells += `${i % 7 === 0 ? `<span class="wk num" aria-hidden="true">${isoWk(d)}</span>` : ''}<button class="${d.slice(0, 7) !== mo ? 'out' : ''} ${i % 7 > 4 ? 'we' : ''} ${i % 7 === 6 ? 'sun' : ''} ${d === td ? 'today' : ''} ${d === sel ? 'sel' : ''} ${offCls(myOff)} ${ho ? 'hol' : ''} ${pubHolOn(d) ? 'pub' : ''}" title="${esc(pubHolOn(d) ? T(pubHolOn(d)) : '')}" data-act="pickday" data-date="${d}" data-drop="${d}" aria-pressed="${d === sel}" aria-label="${esc(fmtDay(d))}: ${ts.length} ${T('tours_n')}"><b class="num">${D(d).getDate()}</b>${ts.length ? `<span class="mcnt num" aria-hidden="true">${ts.length}</span>` : ''}<span class="dots">${ts.slice(0, 4).map(t => `<i style="background:${esc(cardColor(t))}"></i>`).join('')}${ts.length > 4 ? `<span class="num">+${ts.length - 4}</span>` : ''}</span><span class="mrows">${lanes}${single.slice().sort((x, y) => (x.start_time || '').localeCompare(y.start_time || '')).slice(0, 4).map(t => `<span class="mrow${live(t) ? '' : ' cx'}" data-act="tour" data-id="${t.id}"${isAdmin() && live(t) ? ` data-drag="${t.id}"` : ''}><i style="background:${esc(cardColor(t))}"></i><span class="num">${tmTxt(t)}</span> ${esc(t.title)} <span class="num muted">${paxText(t)}</span>${mpayHtml(t)}</span>`).join('')}${single.length > 4 ? `<span class="mrow more">${T('more_n', { n: single.length - 4 })}</span>` : ''}</span>${offMark(d)}</button>`;
     }
     const legend = `<div class="row small muted lgrow"><span class="lg"><i class="dotk"></i>${T('lg_tour')}</span><span class="lg"><i class="sq myoff"></i>${T('lg_myoff')}</span><span class="lg"><i class="sq myoff mysick"></i>${T('sick')}</span><span class="lg"><i class="sq hol"></i>${T('holidays')}</span><span class="lg"><i class="sq pub"></i>${T('ph_legend')}</span></div>`;
     const mAt = n => { const d = D(first); d.setMonth(d.getMonth() + n); return fmt(iso(d), { month: 'short' }); };
@@ -1288,19 +1303,23 @@
     const t = db.tours.find(x => x.id === b.tour_id) || {}, cl = db.clients.find(c => c.id === b.client_id) || {}, rl = reviewLink(b), msg = T('review_msg') + ' ' + rl;
     const can = (involves(t, me().id) || isAdmin()) && t.date <= today() && live(t);
     const row = (icon, label, attrs) => `<${attrs.href ? 'a' : 'button'} class="arow" ${Object.entries(attrs).map(([k, v]) => `${k}="${esc(v)}"`).join(' ')}>${icon ? ico(icon) : '<span style="width:16px"></span>'}<span>${esc(label)}</span></${attrs.href ? 'a' : 'button'}>`;
-    return `${m.back ? `<div class="hdr backrow">${backBtn(m)}</div>` : ''}<div class="hdr"><span class="avatar big ini">${esc(initials(cleanName(b.guest) || b.guest))}</span><h2>${esc(b.guest)}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>
-      <div class="muted small">${[acText(b), phoneFlag(b.phone), b.lang && T('guest_lang') + ' ' + b.lang, sourceOf(b)].filter(Boolean).map(esc).join(' · ')}${b.ref ? ` · <code class="ref">${esc(b.ref)}</code>` : ''}${[b.booked_at && T('bk_booked', { d: fmtDay(String(b.booked_at).slice(0, 10)) }), b.notes].filter(Boolean).map(x => ' · ' + esc(x)).join('')}</div>${isVip(b.client_id) ? (v => `<div class="banner small">${vipTag(b.client_id)}<span>${T('vip_text', { n: v.total, y: v.years || 1, a: v.addons || 0 })}</span></div>`)(guestStats(b.client_id)) : ''}${isFree(b) ? `<div class="banner small">${freeTag(b)}<span>${T('free_text')}</span>${tipUrl(t) ? `<button class="btn sm" data-act="tipqr" data-id="${t.id}">${T('tip_btn')}</button>` : ''}</div>` : ''}
+    /* 18 Nov (owner's screenshots): name with VIP and booking code on top; one contact card (phone with Copy and WhatsApp, e-mail, address);
+       the two check-in buttons; an action grid; the lasting note (office) and the guest's trips. */
+    const ec = shownEmail(b.email) || shownEmail(cl.email), rp = reviewPlaces(b), first = rp[0];
+    const act = (icon, title, sub, attrs, cls) => `<${attrs.href ? 'a' : 'button type="button"'} class="actcard${cls ? ' ' + cls : ''}" ${Object.entries(attrs).map(([k, v]) => `${k}="${esc(v)}"`).join(' ')}><span class="aci">${icon}</span><span class="act-t"><b>${esc(title)}</b>${sub ? `<span class="muted small">${esc(sub)}</span>` : ''}</span></${attrs.href ? 'a' : 'button'}>`;
+    const trips = b.client_id ? db.bookings.filter(x => x.client_id === b.client_id).map(x => ({ x, t: db.tours.find(y => y.id === x.tour_id) })).filter(o => o.t).sort((a, c) => String(c.t.date).localeCompare(String(a.t.date))).slice(0, 8) : [];
+    return `${m.back ? `<div class="hdr backrow">${backBtn(m)}</div>` : ''}<div class="hdr ghdr"><span class="avatar big ini">${esc(initials(cleanName(b.guest) || b.guest))}</span><span class="ghname"><h2>${esc(b.guest)}</h2><span class="row">${vipTag(b.client_id)}${b.ref ? `<button type="button" class="refchip" data-act="copy" data-v="${esc(b.ref)}" title="${esc(T('copy'))}">#${esc(b.ref)}</button>` : ''}</span></span><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>
+      <div class="muted small gfacts">${[acText(b), phoneFlag(b.phone), b.lang && T('guest_lang') + ' ' + b.lang, sourceOf(b)].filter(Boolean).map(esc).join(' · ')}${[b.booked_at && T('bk_booked', { d: fmtDay(String(b.booked_at).slice(0, 10)) }), b.notes].filter(Boolean).map(x => ' · ' + esc(x)).join('')}</div>${isVip(b.client_id) ? (v => `<div class="banner small">${vipTag(b.client_id)}<span>${T('vip_text', { n: v.total, y: v.years || 1, a: v.addons || 0 })}</span></div>`)(guestStats(b.client_id)) : ''}${isFree(b) ? `<div class="banner small">${freeTag(b)}<span>${T('free_text')}</span>${tipUrl(t) ? `<button class="btn sm" data-act="tipq" data-id="${esc(t.id)}">${T('tips_show')}</button>` : ''}</div>` : ''}
       ${isAdmin() && Number(b.price) ? `<div class="small num">${T('bk_price')}: <b>${esc(b.price)} ${esc(b.currency || guestCur())}</b>${netTyped(b) !== null ? ` · ${T('net_real', { v: nf2(netOf(b)), c: b.currency || guestCur() })}` : commOf(b) ? ` · ${T('net_after', { src: srcName(sourceOf(b) || b.source), p: commOf(b), v: Math.round(netOf(b) * 100) / 100, c: b.currency || guestCur() })}` : ''}</div>` : ''}
+      ${b.phone || ec || b.pickup_addr ? `<div class="ccard">${b.phone ? `<div class="ccrow"><a class="cnum num" href="tel:${esc(b.phone)}">${ico('call')}<span>${esc(b.phone)}</span></a><button type="button" class="cchip" data-act="copy" data-v="${esc(b.phone)}">${T('copy')}</button><a class="cchip wa" href="${esc(waLink(b.phone))}" target="_blank" rel="noopener">${ico('wa')}WhatsApp</a></div>` : ''}${ec ? `<div class="ccrow"><a class="cchip mail" href="mailto:${esc(ec)}">${ico('mail')}<span>${esc(ec)}</span></a></div>` : ''}${b.pickup_addr ? `<a class="ccrow caddr" href="${esc(mapFor(b.pickup_addr, b.pickup_url))}" target="_blank" rel="noopener">${ico('pin')}<span>${esc(T('guest_addr'))}: ${esc(b.pickup_addr)}</span></a>` : ''}</div>` : ''}
       ${!can && live(t) && t.date > today() && (involves(t, me().id) || isAdmin()) ? `<div class="muted small">${T('att_later', { date: fmtDay(t.date) })}</div>` : ''}
-      ${can ? `<div class="att"><button class="${b.attendance === 'arrived' ? 'on ok' : ''}" data-act="attend" data-id="${b.id}" data-s="arrived" aria-pressed="${b.attendance === 'arrived'}">${T('att_arrived')}</button><button class="${b.attendance === 'noshow' ? 'on no' : ''}" data-act="attend" data-id="${b.id}" data-s="noshow" aria-pressed="${b.attendance === 'noshow'}">${T('att_noshow')}</button></div>` : ''}
-      <div class="alist">${b.client_id ? row('', T('open_client') + ' ›', { 'data-act': 'client', 'data-id': b.client_id }) : ''}
-        ${reviewPlaces(b).map(([name, url]) => { const tx = T('review_msg') + ' ' + url; return (b.phone ? row('wa', T('review_wa_on', { place: name }), { href: waLink(b.phone, tx), target: '_blank', rel: 'noopener' }) : '') + row('copy', T('review_copy_on', { place: name }), { 'data-act': 'copy', 'data-v': tx }); }).join('')}
-        ${isAdmin() && live(t) && !isCx(b) ? `<form class="f gcxform" data-form="gcx"><input type="hidden" name="id" value="${esc(b.id)}"><label>${T('gcx_why')}<input name="why" placeholder="${esc(T('gcx_ph'))}" autocomplete="off"></label><button class="btn danger">${T('gcx_btn')}</button></form>` : ''}
-      ${b.ref ? row('copy', T('copy') + ' ' + b.ref, { 'data-act': 'copy', 'data-v': b.ref }) : ''}
-        ${b.pickup_addr ? row('pin', T('guest_addr') + ': ' + b.pickup_addr, { href: mapFor(b.pickup_addr, b.pickup_url), target: '_blank', rel: 'noopener' }) : ''}
-        ${b.phone ? row('wa', 'WhatsApp ' + b.phone, { href: waLink(b.phone), target: '_blank', rel: 'noopener' }) + row('call', T('call') + ' ' + b.phone, { href: 'tel:' + b.phone }) + row('copy', T('copy') + ' ' + b.phone, { 'data-act': 'copy', 'data-v': b.phone }) : ''}
-        ${(em => (em ? row('mail', em, { href: 'mailto:' + em }) : ''))(shownEmail(b.email) || shownEmail(cl.email))}
-        ${canOffer() ? row('', T('offer_title') + ' ›', { 'data-act': 'offer', 'data-b': b.id }) : ''}</div>${historyHtml(b)}`;
+      ${can ? `<div class="picks att"><button type="button" class="pick ok ${b.attendance === 'arrived' ? 'on' : ''}" data-act="attend" data-id="${b.id}" data-s="arrived" aria-pressed="${b.attendance === 'arrived'}">${ico('check')}${T('gc_picked')}</button><button type="button" class="pick no ${b.attendance === 'noshow' ? 'on' : ''}" data-act="attend" data-id="${b.id}" data-s="noshow" aria-pressed="${b.attendance === 'noshow'}">${T('gc_nocome')}</button></div>` : ''}
+      <div class="agrid">${b.client_id ? act(ico('user'), T('open_client'), T('ac_client_sub'), { 'data-act': 'client', 'data-id': b.client_id }) : ''}${isAdmin() && t.id ? act(ico('cal'), T('ac_book'), T('ac_book_sub'), { 'data-act': 'gedit', 'data-id': t.id }) : ''}${canOffer() ? act(ico('grid'), T('offer_title'), T('ac_offer_sub'), { 'data-act': 'offer', 'data-b': b.id }) : ''}${first && b.phone ? act(ico('wa'), T('ac_review'), first[0], { href: waLink(b.phone, T('review_msg') + ' ' + first[1]), target: '_blank', rel: 'noopener' }) : ''}</div>
+      <div class="alist">${rp.map(([name, url]) => { const tx = T('review_msg') + ' ' + url; return (b.phone && first && name !== first[0] ? row('wa', T('review_wa_on', { place: name }), { href: waLink(b.phone, tx), target: '_blank', rel: 'noopener' }) : '') + row('copy', T('review_copy_on', { place: name }), { 'data-act': 'copy', 'data-v': tx }); }).join('')}</div>
+      ${isAdmin() && b.client_id && cl.id ? `<form class="f lnote" data-form="clnote" data-id="${esc(cl.id)}"><label><span class="eyebrow">${T('ac_note')}</span><textarea name="notes" rows="2" placeholder="${esc(T('ac_note_ph'))}">${esc(cl.notes || '')}</textarea></label><button class="btn sm">${T('save')}</button></form>` : ''}
+      ${trips.length > 1 ? `<div class="trips"><span class="eyebrow">${T('ac_trips')}</span>${trips.map(o => `<button type="button" class="trow" data-act="tour" data-id="${esc(o.t.id)}"><span class="num muted">${esc(fmt(o.t.date, { day: 'numeric', month: 'short' }))}</span><span class="grow-l">${esc(aliasOf(o.t.title))}</span><span class="tpill ${o.t.date < today() ? 'past' : 'next'}">${T(o.t.date < today() ? 'ac_past' : 'ac_coming')}</span></button>`).join('')}</div>` : ''}
+      ${isAdmin() && live(t) && !isCx(b) ? `<form class="f gcxform" data-form="gcx"><input type="hidden" name="id" value="${esc(b.id)}"><label>${T('gcx_why')}<input name="why" placeholder="${esc(T('gcx_ph'))}" autocomplete="off"></label><button class="btn danger">${T('gcx_btn')}</button></form>` : ''}
+      ${historyHtml(b)}`;
   }
   const canOffer = () => me().role !== 'driver';
   function offerList() {
@@ -1354,6 +1373,16 @@
     return `<div class="card">${mine ? `<b>${T('score_title')}</b><div class="scores">${[...Array(11)].map((_, i) => `<button class="${my && my.score === i ? 'on' : ''}" data-act="score" data-id="${d.id}" data-s="${i}" aria-pressed="${!!(my && my.score === i)}">${i}</button>`).join('')}</div>` : ''}${isAdmin() && avg !== null ? `<div class="muted small">${T('score_avg')}: <b class="num">${avg}</b> (${rs.length})</div>` : ''}</div>`;
   }
   const ratingTag = cid => { const r = cid && clientRating(cid); return r ? `<span class="tag ${RATINGS[r.rating] || 't-muted'}">${T('rate_' + r.rating)}</span>` : ''; };
+  // Under the guest list: what was collected and what is still to pay (idea from the Sava demo, 18 Nov). Office and the tour's own guide only.
+  // Collected = prepaid bookings (their price) + cash bookings of guests who arrived; left to pay = cash / unpaid amounts of guests not checked in yet.
+  function moneyFoot(t) {
+    if (!(isAdmin() || involves(t, me().id))) return '';
+    const got = {}, left = {}, add = (o, c, v) => { if (v) o[c] = (o[c] || 0) + v; };
+    (t.bookings || tourBookings(t.id)).forEach(b => { const c = b.currency || guestCur(); if (b.payment === 'prepaid') add(got, c, Number(b.price) || 0); else if (b.payment === 'cash' || b.payment === 'unpaid') { const v = Number(b.amount_due) || Number(b.price) || 0; if (b.attendance === 'arrived') add(got, c, v); else if (b.attendance !== 'noshow') add(left, c, v); } });
+    const txt = o => Object.keys(o).map(c => `${nf(Math.round(o[c]))} ${esc(c)}`).join(' + ');
+    if (!Object.keys(got).length && !Object.keys(left).length) return '';
+    return `<div class="mfoot"><div><span class="mfi">${msi('payments')}</span><span><span class="muted small">${T('mf_got')}</span><b class="num">${txt(got) || '0'}</b></span></div><div><span class="mfi ${Object.keys(left).length ? 'due' : 'ok'}">${msi(Object.keys(left).length ? 'schedule' : 'check')}</span><span><span class="muted small">${T('mf_left')}</span><b class="num ${Object.keys(left).length ? '' : 'okc'}">${txt(left) || '0'}</b></span></div></div>`;
+  }
   function tourModalHtml(m) {
     const d = m.draft;
     if (!m.edit) {
@@ -1365,7 +1394,7 @@
       return `<div class="hdr thdr">${emblem(d, true)}<div class="ttlwrap"><h2>${esc(d.title)}</h2><span class="tag kindic t-${esc(d.kind)}" role="img" aria-label="${esc(T('kind_' + d.kind))}" title="${esc(T('kind_' + d.kind))}">${msi(KIND_ICO[d.kind] || 'person')}</span></div>${isAdmin() ? `<button class="btn sm hedit" data-act="touredit">${msi('edit')}${T('edit')}</button>` : ''}<button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>
         <div class="when"><b>${esc(dateText(d))}</b><b class="num">${tmTxt(d)}${d.end_time ? '–' + esc(d.end_time) : ''}</b>${d.status === 'cancelled' ? `<span class="tag t-danger">${T('cancelled')}</span>` : ''}</div>
         <div class="tfacts">${(() => { const cap = Number(d.capacity) || 0, pax = Number(d.pax) || 0, bits = [];
-          if (d.kind === 'group' && cap) bits.push(`<span class="tag ${pax > cap ? 't-danger' : pax === cap ? 't-warn' : 't-ok'} num">${T('tf_seats', { n: pax, c: cap })}</span><span class="small num ${pax >= cap ? 'muted' : ''}">${pax > cap ? T('tf_over', { n: pax - cap }) : pax === cap ? T('tf_full') : T('tf_free', { n: cap - pax })}</span>`);
+          if (d.kind === 'group' && cap) bits.push(`<span class="seatbar ${pax > cap ? 'over' : pax === cap ? 'full' : ''}">${msi('groups')}<b class="num">${pax}/${cap}</b><span class="sbtrack" role="progressbar" aria-valuemin="0" aria-valuemax="${cap}" aria-valuenow="${pax}" aria-label="${esc(T('tf_seats', { n: pax, c: cap }))}"><i style="width:${Math.min(100, Math.round(pax / cap * 100))}%"></i></span><span class="small num">${pax > cap ? T('tf_over', { n: pax - cap }) : pax === cap ? T('tf_full') : T('tf_free', { n: cap - pax })}</span></span>`);   /* seats bar (idea from the Sava demo, 18 Nov) */
           tourLangs(d).forEach(l => bits.push(`<span class="tag t-lang">${esc(l)}</span>`));
           if (isAdmin()) { const by = {}, got = {}; d.bookings.forEach(b => { if (Number(b.price) && !isCx(b)) { const c = b.currency || guestCur(); by[c] = (by[c] || 0) + Number(b.price); got[c] = (got[c] || 0) + netOf({ ...b, tour_id: b.tour_id || d.id }); } }); const tx = Object.keys(by).map(c => `${nf(Math.round(by[c]))} ${c}`).join(' + '), gx = Object.keys(got).map(c => `${nf(Math.round(got[c]))} ${c}`).join(' + '); if (tx) bits.push(`<span class="small num"><span class="muted">${T('tf_cost')}</span> <b>${esc(tx)}</b> · <span class="muted">${T('tf_got')}</span> <b>${esc(gx)}</b></span>`); }
           return bits.join(''); })()}</div>
@@ -1376,8 +1405,8 @@
         ${d.notes ? `<div class="tnotebox sel"><b>${T('notes')}</b><span>${withPhones(d.notes)}</span></div>` : ''}
         ${isAdmin() ? warnHtml : ''}${isAdmin() && live(d) && (d.pax || 0) > (rules().carSeats || 6) && kmOf(d.title) > 0 ? `<div><button class="btn sm" data-act="car2" data-id="${d.id}">${ico('car')}${T('car2_btn')}</button></div>` : ''}${isAdmin() && costOf(d.id).total ? `<div class="muted small num">${T('cost_title')}: <b>${nf(costOf(d.id).total)} ${esc(rules().currency || 'GEL')}</b></div>` : ''}
         <h3 class="gh">${T(drvLimited(d) ? 'pickups_title' : 'guests_title')}${d.bookings.length ? `<span class="gtot num">${(() => { const n = d.bookings.reduce((x, b) => x + (Number(b.pax) || (Number(b.adults) || 0) + (Number(b.children) || 0) || 1), 0); return n === 1 ? T('ppl_1') : T('ppl_n', { n }); })()}</span>` : ''}</h3>${drvNote(d)}${canCheck && d.bookings.some(b => b.attendance) ? `<div class="muted small num">${T('att_sum', { a: d.bookings.filter(b => b.attendance === 'arrived').length, n: d.bookings.length, x: d.bookings.filter(b => b.attendance === 'noshow').length })}</div>` : ''}
-        ${d.bookings.length ? `<div class="glist">${d.bookings.map(b => guestRow(b, d.bookings.some(x => x.pickup_addr), d)).join('')}</div>` : drvLimited(d) ? '' : guestsHidden(d) ? `<div class="empty">${T('pv_hidden', { n: pv().guideDays })}</div>` : `<div class="empty">${T('no_guests')}${isAdmin() ? ` <button class="btn sm" data-act="touredit">${T('add_guests')}</button>` : ''}</div>`}
-        <div class="glist crew">${[['guide', d.guide_id], ['driver', d.driver_id]].filter(x => x[1]).map(([r, id]) => `<div class="grow" style="--k:${esc((person(id) || {}).color || '#66737f')}"><span class="row nw">${avatar(id)}<span class="grow-l" style="flex-direction:column;align-items:flex-start;gap:0"><b>${esc(pname(id))}</b><span class="muted small">${esc(T('role_' + r))}</span></span>${staffBtns(person(id))}</span></div>`).join('') || `<div class="grow"><span class="tag t-warn">${T('unassigned')}</span></div>`}</div>
+        ${d.bookings.length ? `<div class="glist">${d.bookings.map(b => guestRow(b, d.bookings.some(x => x.pickup_addr), d)).join('')}</div>${moneyFoot(d)}` : drvLimited(d) ? '' : guestsHidden(d) ? `<div class="empty">${T('pv_hidden', { n: pv().guideDays })}</div>` : `<div class="empty">${T('no_guests')}${isAdmin() ? ` <button class="btn sm" data-act="touredit">${T('add_guests')}</button>` : ''}</div>`}
+        <div class="glist crew">${[['guide', d.guide_id], ['driver', d.driver_id]].filter(x => x[1]).map(([r, id]) => `<div class="grow" style="--k:${esc(calm((person(id) || {}).color) || '#66737f')}"><span class="row nw">${avatar(id)}<span class="grow-l" style="flex-direction:column;align-items:flex-start;gap:0"><b>${esc(pname(id))}</b><span class="muted small">${esc(T('role_' + r))}</span></span>${staffBtns(person(id))}</span></div>`).join('') || `<div class="grow"><span class="tag t-warn">${T('unassigned')}</span></div>`}</div>
         ${cxGuests(d.id).length && !drvLimited(d) ? `<h3>${T('gcx_title')} (${cxGuests(d.id).length})</h3><div class="glist">${cxGuests(d.id).map(b => `<div class="grow gcx"><span class="grow-l" style="flex-direction:column;align-items:flex-start"><b>${esc(b.guest)}</b><span class="muted small">${esc([acText(b), b.notes].filter(Boolean).join(' · '))}</span></span>${isAdmin() ? `<button class="btn sm" data-act="gcxback" data-id="${b.id}">${T('gcx_back')}</button>` : ''}</div>`).join('')}</div>` : ''}
         ${canCheck && d.bookings.length && d.bookings.every(b => b.attendance === 'noshow') ? `<div class="nhbox"><span>${msi('event_busy')}${T('nh_ask')}</span><button class="btn" data-act="nohappen" data-id="${d.id}">${T('nh_btn')}</button></div>` : ''}
         ${mine && d.date <= today() && live(d) ? `<button class="btn exptour" data-act="expnew" data-tour="${d.id}" data-date="${d.date}">${msi('receipt_long')} ${T('ex_tour')}</button>` : ''}
@@ -1396,7 +1425,7 @@
           ${live(d) ? '' : `<button class="btn" data-act="tourrestore" data-id="${d.id}">${msi('event_available')}${T('restore')}</button>`}
           <button class="btn" data-act="tourclone" data-id="${d.id}" title="${esc(T('clone'))}">${msi('content_copy')}${T('clone_short')}</button>
           <button class="btn tmore" data-act="tmore" aria-expanded="${!!m.more}" aria-controls="tmore">${T('t_other')}${msi('keyboard_arrow_down')}</button>
-          ${m.more ? `<div class="tmorebody" id="tmore">${d.date <= today() ? `<button class="btn" data-act="revreq" data-id="${d.id}">${msi('rate_review')}${T('rr_btn')}</button>` : ''}${live(d) ? `<button class="btn danger" data-act="cancelask" data-id="${d.id}">${msi('event_busy')}${T('cancel_tour')}</button>` : ''}<button class="btn danger" data-act="tourdelask" data-id="${d.id}">${msi('delete')}${T('del_tour')}</button></div>` : ''}</div>` : ''}`;
+          ${m.more ? `<div class="tmorebody" id="tmore">${d.date <= today() ? `<button class="btn" data-act="revreq" data-id="${d.id}">${msi('rate_review')}${T('rr_btn')}</button>` : ''}${live(d) ? `<button class="btn danger" data-act="cancelask" data-id="${d.id}">${msi('event_busy')}${T('cancel_tour')}</button>` : ''}<button class="btn danger" data-act="tourdelask" data-id="${d.id}">${msi('delete')}${T('del_tour')}</button></div>` : ''}</div>` : ''}${isAdmin() && live(d) ? `<div class="addbk"><button class="btn primary big" data-act="touredit" data-add="1">+ ${T('booking')}</button></div>` : ''}`;   /* big + Booking at the bottom (idea from the Sava demo, 18 Nov) */
     }
     const titles = [...new Set([...catalog().map(c => c.title), ...db.tours.map(t => t.title)])].sort(), marks = allMarks(), r = rules().pay || {};
     return `<div class="hdr"><h2>${T(m.isNew ? 'new_tour' : 'edit_tour')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>
@@ -1857,21 +1886,34 @@
     return `<form class="f" data-form="cars"><label>${T('car_lic')}<input data-car="lic" value="${esc(m.lic || '')}" autocomplete="off" autocapitalize="characters"></label><span class="muted small">${T('car_private')}</span>${boxes}${m.cars.length < 2 ? `<button type="button" class="btn" data-act="caradd">+ ${T('car_add2')}</button><span class="muted small">${T('car_add2_note')}</span>` : ''}
       <div class="actions"><button class="btn primary">${T('save')}</button></div></form>`;
   }
+  // Person editor in 3 steps (idea from the Sava demo, 18 Nov): 1 Who · 2 Which tours · 3 When not working. All three parts stay in one form,
+  // only one is shown at a time, so Save keeps working as before and nothing typed is lost when switching steps.
   function personModalHtml(m) {
-    const d = m.draft, self = d.id === me().id, old = !m.isNew;
-    return `<div class="hdr"><h2>${T(old ? 'person_edit' : 'add_person')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>
-      <form class="f" data-form="person"><label>${T('name')}<input id="pe-name" data-f="name" value="${esc(d.name || '')}" required autocomplete="off"></label>
+    const d = m.draft, self = d.id === me().id, old = !m.isNew, step = m.step || 1, guideLike = d.role === 'guide' || d.role === 'admin';
+    const tabs = [[1, T('ps_who')], [2, T('ps_tours')], [3, T('ps_off')]].filter(([k]) => k !== 2 || guideLike);
+    const offs = old ? db.time_off.filter(o => o.user_id === d.id && o.status !== 'declined' && o.date_to >= today()).sort((x, y) => x.date_from.localeCompare(y.date_from)) : [];
+    const cats = catalog().filter(c => c.id), sk = d.skills || [];
+    return `<div class="hdr"><h2>${old ? esc(d.name || T('person_edit')) : T('add_person')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>
+      <div class="psteps" role="tablist">${tabs.map(([k, l], i) => `<button type="button" role="tab" data-act="pstep" data-v="${k}" aria-selected="${step === k}" class="${k < step ? 'past' : ''}">${i + 1}. ${l}</button>`).join('')}</div>
+      <form class="f pform step-${step}" data-form="person">
+      <div class="pstep" data-s="1">
+      <label>${T('name')}<input id="pe-name" data-f="name" value="${esc(d.name || '')}" required autocomplete="off"></label>
       <label>${T('role')}<select id="pe-role" data-f="role" ${self ? 'disabled' : ''}>${['guide', 'driver', 'admin'].map(x => opt(x, T('role_' + x), d.role)).join('')}</select></label>
       ${!old && S.mode !== 'demo' ? `<label>${T('email_login')}<input id="pe-email" data-f="email" type="email" value="${esc(d.email || '')}" required autocomplete="off" inputmode="email"></label><span class="muted small">${T('invite_text')}</span>` : ''}
-      <div class="two"><label>${T('phone')}<input id="pe-phone" data-f="phone" type="tel" value="${esc(d.phone || '')}" placeholder="+995…" autocomplete="off"></label></div>${langPick(d.languages, true)}${d.role !== 'driver' ? `<label>${T('promo_own')}<input id="pe-promo" data-f="promo" value="${esc(d.promo ?? ((rules().promos || {})[d.id] || ''))}" placeholder="ANNA10" autocomplete="off"><span class="muted small">${T('promo_own_hint')}</span></label>` : ''}
+      <div class="two"><label>${T('phone')}<input id="pe-phone" data-f="phone" type="tel" value="${esc(d.phone || '')}" placeholder="+995…" autocomplete="off"></label></div>${langPick(d.languages, true)}${d.role !== 'driver' ? `<label>${T('promo_own')}<input id="pe-promo" data-f="promo" value="${esc(d.promo ?? ((rules().promos || {})[d.id] || ''))}" autocomplete="off" autocapitalize="characters"></label>` : ''}
       <label>Telegram<input id="pe-tg" data-f="telegram" value="${esc(d.telegram ? '@' + d.telegram : '')}" placeholder="@username" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
       <label>${T('colour')}<input id="pe-color" data-f="color" type="color" value="${esc(d.color || '#66737f')}" style="max-width:90px"></label>
       ${old && d.email ? `<div class="muted small">${T('email')}: ${esc(d.email)}</div>` : ''}
       ${old ? `<button type="button" class="btn" data-act="cars" data-id="${d.id}">${msi('directions_car')}${T('cars_btn')} (${carsOf(d).length})</button>` : ''}
       <label>${T('vehicle')}<select id="pe-veh" data-f="vehicle">${opt('', T('veh_none'), d.vehicle || '')}${opt('own', T('veh_own'), d.vehicle)}${opt('delica', T('veh_delica'), d.vehicle)}</select></label>
-      <details class="sect"><summary>${T('ws_person')}</summary><div class="f">${weekEditor(d)}</div></details>
-      ${d.role === 'guide' || d.role === 'admin' ? `<details class="sect"><summary>${T('skills_title')} (${(d.skills || []).length || T('skills_all')})</summary><div class="f"><span class="muted small">${T('skills_text')}</span><div class="checks col">${catalog().filter(c => c.id).map(c => `<label><input type="checkbox" data-sk="${esc(String(c.id))}" ${(d.skills || []).includes(String(c.id)) ? 'checked' : ''}>${esc(c.title)}</label>`).join('')}</div></div></details>` : ''}
-      <div class="actions">${old && !self ? `<button type="button" class="btn danger" data-act="pdelete" data-id="${d.id}">${T('delete_person')}</button><button type="button" class="btn" data-act="pactive" data-id="${d.id}">${T(d.active === false ? 'activate' : 'deactivate')}</button>` : ''}<button class="btn primary">${T('save')}</button></div></form>`;
+      </div>
+      ${guideLike ? `<div class="pstep" data-s="2"><span class="muted small">${T('skills_text')}</span>
+        <div class="bar"><input class="inp grow" type="search" data-ch="skfind" placeholder="${esc(T('ps_find'))}" aria-label="${esc(T('ps_find'))}"><button type="button" class="lnk" data-act="skall" data-v="1">${T('ps_all')}</button><button type="button" class="lnk" data-act="skall" data-v="0">${T('ps_none')}</button></div>
+        <span class="small skcount">${sk.length ? T('ps_n', { n: sk.length, all: cats.length }) : T('skills_all')}</span>
+        <div class="sklist">${cats.map(c => `<label class="skrow${sk.includes(String(c.id)) ? ' on' : ''}" data-t="${esc(String(c.title || '').toLowerCase())}"><input type="checkbox" data-sk="${esc(String(c.id))}" ${sk.includes(String(c.id)) ? 'checked' : ''}><span class="grow-l">${esc(c.title)}</span>${c.kind ? `<span class="tag t-muted">${esc(T('kind_' + c.kind))}</span>` : ''}</label>`).join('')}</div></div>` : ''}
+      <div class="pstep" data-s="3"><b>${T('ws_person')}</b>${weekEditor(d)}
+        ${old ? `<b>${T('ps_offlist')}</b>${offs.length ? `<div class="list">${offs.map(o => `<div class="exrow"><span class="grow-l num">${esc(fmtRange(o.date_from, o.date_to))}</span>${offTag(o)}</div>`).join('')}</div>` : `<span class="muted small">${T('ps_offnone')}</span>`}<button type="button" class="btn" data-act="offnew" data-who="${d.id}">${msi('beach_access')}${T('ps_offadd')}</button>` : ''}</div>
+      <div class="actions pacts">${old && !self ? `<button type="button" class="btn danger" data-act="pdelete" data-id="${d.id}">${T('delete_person')}</button><button type="button" class="btn" data-act="pactive" data-id="${d.id}">${T(d.active === false ? 'activate' : 'deactivate')}</button>` : ''}<span class="spacer"></span>${step < tabs[tabs.length - 1][0] ? `<button type="button" class="btn" data-act="pstep" data-v="${tabs[tabs.findIndex(x => x[0] === step) + 1][0]}">${T('ps_next')} ›</button>` : ''}<button class="btn primary">${T('save')}</button></div></form>`;
   }
   async function savePerson(week) {
     const m = state.modal, d = m.draft, name = (d.name || '').trim(); if (!name) return;
@@ -2499,7 +2541,7 @@
   const GI_KEYS = ['gi_fav', 'gi_cty', 'gi_src', 'gi_lead', 'gi_mon', 'gi_grp', 'gi_top', 'gi_ppl', 'gi_bad'];
   const lsGet = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d; } catch (e) { return d; } };
   const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* private mode */ } };
-  const orderOf = (key, all) => { const s = lsGet(key, []).filter(k => all.includes(k)); return s.concat(all.filter(k => !s.includes(k))); };
+  const orderOf = (key, all) => { const s = lsGet(key, []).filter(k => all.includes(k)); all.forEach((k, i) => { if (!s.includes(k)) s.splice(Math.min(i, s.length), 0, k); }); return s; };   /* a new block lands in its normal place, not at the end */
   const giOrder = () => orderOf('fs-gi-order', GI_KEYS);
   const moveIn = (list, k, d) => { const i = list.indexOf(k), j = i + d; if (i < 0 || j < 0 || j >= list.length) return list; const c = list.slice(); c.splice(i, 1); c.splice(j, 0, k); return c; };
   function guestInsightsHtml() {
@@ -2725,13 +2767,30 @@
     return bar + `<p class="muted small">${T('tk_admin_text')}</p>` + (list.map(t => `<div class="card f" data-key="tk${t.id}"><div class="row nw">${avatar(t.user_id)}<span class="grow-l"><b>${esc(pname(t.user_id))}</b> <span class="muted small">${esc(String(t.created_at || '').slice(0, 10))} · ${T('tk_via_' + (t.source || 'app'))}</span></span>${tkTag(t.status)}</div><div style="white-space:pre-wrap">${esc(t.body)}</div>${(t.shots || []).length ? `<div class="row">${t.shots.map(p => urls[p] ? `<a href="${urls[p]}" target="_blank" rel="noopener"><img src="${urls[p]}" alt="" style="width:96px;height:96px;object-fit:cover;border-radius:8px"></a>` : '').join('')}</div>` : ''}<form class="f" data-form="tkedit"><input type="hidden" name="id" value="${t.id}"><div class="two"><label>${T('tk_status')}<select name="status">${TK_ST.map(s => `<option value="${s}" ${s === t.status ? 'selected' : ''}>${T('tk_st_' + s)}</option>`).join('')}</select></label></div><label>${T('tk_reply')}<textarea name="reply" rows="2" maxlength="1000">${esc(t.reply || '')}</textarea></label><label>${T('tk_summary')}<textarea name="summary" rows="2" maxlength="2000" placeholder="${T('tk_summary_ph')}">${esc(t.summary || '')}</textarea></label><div class="actions"><button class="btn primary">${T('save')}</button></div></form></div>`).join('') || `<span class="muted small">${T('tk_none')}</span>`);
   }
   // ---------- Team (admin): what needs me, how busy the company is, who does what. Every block can be hidden. ----------
-  const TEAM_BLOCKS = ['needs', 'today', 'busy', 'people', 'mood', 'requests', 'timeoff'];
+  const TEAM_BLOCKS = ['days14', 'needs', 'today', 'busy', 'people', 'mood', 'requests', 'timeoff'];
   const teamOrder = () => orderOf('fs-team-order', TEAM_BLOCKS);
   const teamHidden = () => { try { return JSON.parse(localStorage.getItem('fs-team-hide') || '[]'); } catch (e) { return []; } };
   const workedOn = (id, d) => toursOnDay(d).some(t => live(t) && involves(t, id));
   function streakOf(id) { let n = 0, d = today(); if (!workedOn(id, d)) d = addDays(d, -1); while (n < 60 && workedOn(id, d)) { n++; d = addDays(d, -1); } return n; }
   function teamBlock(k) {
     const td = today(), ppl = crew(), cur = esc(rules().currency || 'GEL'), box = (title, body, extra) => `<div class="card f teamblk" id="tm-${k}"><div class="row nw"><b class="grow-l">${title}</b>${extra || ''}</div>${body}</div>`;
+    if (k === 'days14') {
+      // Idea from the Sava demo (18 Nov): each person with 14 coloured days (free / busy with a tour / not working), filters and a search.
+      const f = state.d14f || 'all', q = String(state.d14q || '').trim().toLowerCase(), days = [...Array(14)].map((_, i) => addDays(td, i));
+      const all = staff().filter(p => p.role !== 'admin' || db.tours.some(t => live(t) && t.date >= td && involves(t, p.id)));
+      const list = (f === 'archive' ? db.profiles.filter(p => p.active === false) : all.filter(p => f === 'all' || p.role === f)).filter(p => !q || String(p.name || '').toLowerCase().includes(q) || db.tours.some(t => live(t) && t.date >= td && involves(t, p.id) && aliasOf(t.title).toLowerCase().includes(q)));
+      const rows = list.map(p => { const cells = days.map(d => { const busy = db.tours.some(t => live(t) && tourDays(t).includes(d) && involves(t, p.id)); const off = !busy && (offOn(p.id, d) || !weekOf(p, d)[(new Date(d + 'T12:00:00').getDay() + 6) % 7]); return { d, st: busy ? 'busy' : off ? 'off' : 'free' }; });
+        const nb = cells.filter(c => c.st === 'busy').length, nf = cells.filter(c => c.st === 'free').length, nt = db.tours.filter(t => live(t) && t.date >= td && t.date <= days[13] && involves(t, p.id)).length;
+        return `<div class="d14row" data-q="${esc((String(p.name || '') + ' ' + db.tours.filter(t => live(t) && t.date >= td && involves(t, p.id)).map(t => t.title + ' ' + aliasOf(t.title)).join(' ')).toLowerCase())}"><button class="d14who" ${isAdmin() ? `data-act="pedit" data-id="${p.id}"` : 'disabled'}>${avatar(p.id)}<span class="grow-l"><b>${esc(p.name)}</b><span class="small muted">${T('role_' + p.role)} · ${T('mn_tours_n', { n: nt })} · ${T('ag_g', { g: db.tours.filter(t => live(t) && t.date >= td && t.date <= days[13] && involves(t, p.id)).reduce((n, t) => n + (Number(t.pax) || 0), 0) })}</span></span>${isAdmin() ? msi('edit') : ''}</button>
+          <div class="d14bar" role="group" aria-label="${esc(T('d14_sum', { b: nb, f: nf }))}">${cells.map(c => `<button type="button" class="d14c ${c.st}${c.d === td ? ' td' : ''}" data-act="d14go" data-v="${c.d}" title="${esc(fmtDay(c.d))}: ${esc(T('d14_' + c.st))}"><small>${esc(fmt(c.d, { weekday: 'narrow' }))}</small><i class="num">${Number(c.d.slice(8))}</i></button>`).join('')}</div>
+          <span class="small muted">${T('d14_sum', { b: nb, f: nf })}</span></div>`; }).join('');
+      const tabs = [['all', T('all')], ['guide', T('role_guide')], ['driver', T('role_driver')], ...(isAdmin() ? [['archive', T('d14_archive')]] : [])];
+      return box(T('d14_title'), `<div class="seg d14f">${tabs.map(([v, l]) => `<button data-act="d14f" data-v="${v}" aria-pressed="${f === v}">${l}</button>`).join('')}</div>
+        <input class="inp" type="search" data-ch="d14q" value="${esc(state.d14q || '')}" placeholder="${esc(T('d14_find'))}" aria-label="${esc(T('d14_find'))}">
+        <div class="d14key small"><span><i class="d14c free"><i></i></i>${T('d14_free')}</span><span><i class="d14c busy"><i></i></i>${T('d14_busy')}</span><span><i class="d14c off"><i></i></i>${T('d14_off')}</span></div>
+        ${isAdmin() && f !== 'archive' ? (ng => (ng.length ? `<div class="d14nog"><span class="d14who"><span class="nogi">?</span><span class="grow-l"><b>${T('bk_noguide1')}</b><span class="small muted">${T('d14_nog', { n: ng.length })}</span></span></span><div class="nogl">${ng.slice(0, 6).map(t => `<button type="button" class="chipf warn" data-act="tour" data-id="${t.id}">${esc(fmt(t.date, { day: 'numeric', month: 'short' }))} · ${esc(aliasOf(t.title))}</button>`).join('')}${ng.length > 6 ? `<span class="muted small">+${ng.length - 6}</span>` : ''}</div></div>` : ''))(db.tours.filter(t => live(t) && !t.guide_id && t.date >= td && t.date <= days[13]).sort((x, y) => (x.date + (x.start_time || '')).localeCompare(y.date + (y.start_time || '')))) : ''}
+        <div class="d14list">${rows || `<span class="muted">${T('mn_team_none')}</span>`}</div>`);
+    }
     if (k === 'needs') {
       let miss = 0; for (let i = 0; i < 7; i++) toursOnDay(addDays(td, i)).forEach(t => { if (live(t) && !t.guide_id) miss++; });
       const items = [[db.change_requests.filter(q => q.status === 'pending').length, 'tm_n_req', 'admintab', 'requests'], [db.time_off.filter(o => o.status === 'pending').length, 'tm_n_off', 'teamgo', 'timeoff'], [db.pay_disputes.filter(q => q.status === 'open').length, 'tm_n_pay', 'admintab', 'pay'], [miss, 'tm_n_miss', 'viewNow', 'calendar']];
@@ -2774,7 +2833,7 @@
     const mv = k => `<div class="row nw mover"><span class="grow-l muted small">${T('tmb_' + k)}</span><button class="iconbtn" data-act="tmmove" data-k="${k}" data-d="-1" aria-label="${T('move_up')}">${msi('keyboard_arrow_up')}</button><button class="iconbtn" data-act="tmmove" data-k="${k}" data-d="1" aria-label="${T('move_down')}">${msi('keyboard_arrow_down')}</button></div>`;
     return head + pick + teamOrder().filter(k => !hid.includes(k)).map(k => (edit ? mv(k) : '') + teamBlock(k)).join('');
   }
-  const ADMIN_GROUPS = [['g_daily', ['requests', 'tickets', 'tours', 'email', 'clients', 'dups']], ['g_team', ['team', 'avail', 'balance', 'plan', 'holidays']], ['g_numbers', ['stats', 'reports', 'money', 'achv', 'usage']], ['g_setup', ['catalog', 'tourlinks', 'rules', 'import', 'backup', 'privacy', 'log', 'problems']]];
+  const ADMIN_GROUPS = [['g_daily', ['bookings', 'requests', 'tickets', 'tours', 'email', 'clients', 'dups']], ['g_team', ['team', 'avail', 'balance', 'plan', 'holidays']], ['g_numbers', ['stats', 'reports', 'money', 'achv', 'usage']], ['g_setup', ['catalog', 'tourlinks', 'rules', 'import', 'backup', 'privacy', 'log', 'problems']]];
   // Back office: on a computer a left panel lists every section (like Setmore) and the chosen section opens on the right; phones keep the tiles.
   function adminHtml() {
     const tab = state.adminTab === 'guests' ? 'clients' : state.adminTab, badge = x => (x === 'requests' && db.change_requests.some(q => q.status === 'pending') ? ` <span class="badge">${db.change_requests.filter(q => q.status === 'pending').length}</span>` : x === 'money' && db.pay_disputes.some(q => q.status === 'open') ? ` <span class="badge">${db.pay_disputes.filter(q => q.status === 'open').length}</span>` : '');
@@ -2796,6 +2855,39 @@
         <form class="f card" data-form="paytable"><b>${T('pt_title')}</b><span class="muted small">${T('pt_text')}</span><div class="tablewrap"><table><tr><th>${T('tour')}</th><th>${T('pt_gb')}</th><th>${T('pt_gg')}</th><th>${T('pt_gk')}</th><th>${T('pt_db')}</th><th>${T('pt_dg')}</th><th>${T('pt_dk')}</th></tr>${payTitles().map((ti, i) => { const v = (r.payTable || {})[ti] || {}; const inp = k => `<td><input class="inp" type="number" min="0" step="any" name="${i}_${k}" aria-label="${k}" value="${esc(v[k] ?? '')}" style="width:90px"></td>`; return `<tr><td style="white-space:normal;min-width:180px">${esc(ti)}</td>${inp('guide_base')}${inp('guide_guest')}${inp('guide_book')}${inp('driver_base')}${inp('driver_guest')}${inp('driver_book')}</tr>`; }).join('')}</table></div><div class="actions"><button class="btn primary">${T('save')}</button></div></form>`;
     return h;
   }
+
+  /* ---------- Bookings (18 Nov, owner's screenshots): every booking of tours from 30 days back, with totals, filters, search and sort ---------- */
+  function bkStatus(b, t) {
+    if (isCx(b) || !live(t)) return 'cx';
+    if (isFree(b)) return 'free';
+    if (b.payment === 'prepaid' || ((b.payment === 'cash' || b.payment === 'unpaid') && b.attendance === 'arrived')) return 'paid';
+    if (b.payment === 'cash' || b.payment === 'unpaid') return b.attendance === 'noshow' ? 'cx' : 'debt';
+    return 'open';
+  }
+  function bookingsHtml() {
+    const td = today(), from = addDays(td, -30), f = state.bkF || 'all', ng = !!state.bkNg, srt = state.bkSort || 'near', lim = state.bkLim || 60;
+    const all = db.bookings.map(b => ({ b, t: db.tours.find(x => x.id === b.tour_id) })).filter(o => o.t && o.t.date >= from).map(o => ({ ...o, st: bkStatus(o.b, o.t), noG: live(o.t) && !o.t.guide_id && o.t.date >= td }));
+    const cnt = k => all.filter(o => k === 'all' ? true : k === 'debt' ? o.st === 'debt' : k === 'paid' ? o.st === 'paid' : o.st === 'cx').length, nNg = all.filter(o => o.noG).length;
+    const qq = String(state.bkQ || '').trim().toLowerCase();
+    let list = all.filter(o => (f === 'all' || o.st === f) && (!ng || o.noG) && (!qq || [cleanName(o.b.guest) || o.b.guest, o.b.phone, o.b.ref, o.b.email, o.t.title, aliasOf(o.t.title)].filter(Boolean).join(' ').toLowerCase().includes(qq)));
+    const bk = o => String(o.b.booked_at || o.b.created_at || ''), at = o => o.t.date + (o.t.start_time || '');
+    list.sort((x, y) => srt === 'new' ? bk(y).localeCompare(bk(x)) : srt === 'old' ? bk(x).localeCompare(bk(y)) : srt === 'far' ? at(y).localeCompare(at(x)) : at(x).localeCompare(at(y)));
+    if (srt === 'near') list = [...list.filter(o => o.t.date >= td), ...list.filter(o => o.t.date < td).reverse()];
+    const shown = list.slice(0, lim), byDay = srt === 'near' || srt === 'far';
+    const tile = (k, icon, n) => `<button type="button" class="stile st-${k}" data-act="bkf" data-v="${k}" aria-pressed="${f === k}"><span class="sti">${icon}</span><b class="num" data-count="${n}">${nf(n)}</b><span class="muted small">${T('bk_' + k)}</span></button>`;
+    const pill = o => { const b = o.b, due = Number(b.amount_due) || Number(b.price) || 0; return o.st === 'paid' ? `<span class="gpill ok">${ico('check')}${T('gc_paid')}</span>` : o.st === 'debt' ? `<span class="gpill due num">${T('bk_topay')}${due ? ' ' + nf(due) + ' ' + esc(b.currency || guestCur()) : ''}</span>` : o.st === 'cx' ? `<span class="gpill cx">${T('bk_cx1')}</span>` : o.st === 'free' ? `<span class="gpill free">${esc(T('free_guest'))}</span>` : ''; };
+    const card = o => { const b = o.b, t = o.t, q = [cleanName(b.guest) || b.guest, b.phone, b.ref, b.email, t.title, aliasOf(t.title)].filter(Boolean).join(' ').toLowerCase();
+      return `<button type="button" class="bkcard st-${o.st}" data-key="bk${b.id}" data-q="${esc(q)}" data-act="guest" data-id="${b.id}">${emblem(t, true)}<span class="bkbody"><span class="bktop"><b class="bkt">${esc(aliasOf(t.title))}</b>${pill(o)}</span><span class="muted small">${esc(cleanName(b.guest) || b.guest)} · ${esc(acText(b))}${b.pickup_addr ? ` · ${ico('pin')}${esc(placeName(b.pickup_addr))}` : ''}</span><span class="bkmeta">${o.noG ? `<span class="tag t-danger">${T('bk_noguide1')}</span>` : ''}${b.ref ? `<span class="num">#${esc(b.ref)}</span>` : ''}${sourceOf(b) ? `<span class="bksrc"><i></i>${esc(sourceOf(b))}</span>` : ''}${byDay ? (bk(o) ? `<span class="muted small">${ico('cal')}${esc(T('bk_booked', { d: fmtDay(bk(o).slice(0, 10)) }))}</span>` : '') : `<span class="muted small">${ico('cal')}${esc(fmtDay(t.date))}${t.start_time ? ' ' + esc(t.start_time) : ''}</span>`}</span></span></button>`; };
+    let out = '', last = '';
+    for (const o of shown) { const k = byDay ? o.t.date : bk(o).slice(0, 10); if (k !== last) { out += `<div class="bkday" data-key="bd${k}">${ico('cal')}<b>${k ? esc(fmt(k, { day: 'numeric', month: 'short' })) : '—'}</b><span class="muted">${k ? esc(fmt(k, { weekday: 'short' })) : ''}</span>${k === td ? `<span class="tpill next">${T('today')}</span>` : ''}</div>`; last = k; } out += card(o); }
+    return `<div class="bkpage">
+      <div class="stiles">${tile('all', ico('cal'), cnt('all'))}${tile('paid', ico('check'), cnt('paid'))}${tile('debt', msi('schedule'), cnt('debt'))}${tile('cx', '✕', cnt('cx'))}</div>
+      <div class="bkbar"><input class="inp" type="search" data-ch="bkq" value="${esc(state.bkQ || '')}" placeholder="${esc(T('bk_find'))}" aria-label="${esc(T('bk_find'))}"><label class="bksort"><span class="sr">${T('bk_sort')}</span><select class="inp" data-ch="bksort" aria-label="${esc(T('bk_sort'))}">${['near', 'far', 'new', 'old'].map(k => opt(k, T('bk_s_' + k), srt)).join('')}</select></label></div>
+      <div class="bkchips">${nNg ? `<button type="button" class="chipf warn" data-act="bkng" aria-pressed="${ng}">${ico('user')}${T('bk_noguide1')} <b class="num">${nNg}</b></button>` : ''}</div>
+      <span class="muted small">${T('bk_scope', { d: fmtDay(from) })}</span>
+      <div class="bklist">${out || `<div class="empty">${T('bk_none')}</div>`}</div>
+      ${list.length > lim ? `<button class="btn" data-act="bkmore">${T('bk_more', { n: list.length - lim })}</button>` : ''}</div>`;
+  }
   function adminBody() {
     const tab = state.adminTab, r = rules(), y = state.year;
     const groups = ADMIN_GROUPS, tabs = [...groups.flatMap(x => x[1]), 'guests'];
@@ -2806,6 +2898,7 @@
     if (tab === 'tickets') return h + ticketsAdminHtml();
     if (tab === 'dups') return h + dupsHtml();
     if (tab === 'achv') return h + achvTabHtml();
+    if (tab === 'bookings') return h + bookingsHtml();
     if (tab === 'money') return h + moneyHtml();
     if (tab === 'balance') return h + balanceHtml(state.balMonth || today().slice(0, 7));
     if (tab === 'avail') return h + holAdminHtml() + availHtml(state.availWk || addDays(monday(today()), 7));
@@ -3510,6 +3603,7 @@
     const text = [`${pname(id)} · ${mo}`, ...st.past.map(x => `${x.t.date} ${x.t.title}: ${x.pay} ${cur}`), `${T('total')}: ${st.total} ${cur}`].join('\n');
     return `${modal ? '' : '<div class="stmt">'}${modal ? `<div class="hdr"><h2>${esc(pname(id))} · ${esc(mo)}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>` : ''}
       ${(() => { const b = bigPay(st.base, mo); return `<div class="card earnhero"><span class="muted">${T(id === me().id ? 'eh_you' : 'eh_earns')}</span><b class="bignum num">${b.n} <span class="bigcur">${esc(b.cur)}</span></b><span class="muted small">${b.sub ? b.sub + ' · ' : ''}${T('tours_n')}: ${st.past.length}${st.up.length ? ' · ' + T('pd_up_line', { n: st.up.length, v: nf(st.upBase), c: esc(cur) }) : ''}</span></div>`; })()}
+      ${!modal && id === me().id ? dayRepMineHtml(id) : ''}
       ${(() => { const mm = !modal && id === me().id ? myMoneyHtml(id, mo) : ''; return mm || payDashHtml(id, mo, st, cur, modal); })()}
       ${modal ? '' : payAdjHtml(st, cur, id)}
       <div class="plist">${st.past.map(x => payRowHtml(x, id, cur)).join('') || (st.up.length ? '' : `<p class="muted">${T('no_tours_range')}</p>`)}</div>
@@ -3716,13 +3810,24 @@
     const x = t[td] || { n: 0, b: 0 }, w = from(6), mo = from(29);
     return `<details class="sect"><summary>${T('tr_title')}</summary><div class="f"><div class="row"><span>${T('tr_today')}</span><b class="num">${mb(x.b)} · ${x.n}</b></div><div class="row"><span>${T('tr_week')}</span><b class="num">${mb(w.b)} · ${w.n}</b></div><div class="row"><span>${T('tr_month')}</span><b class="num">${mb(mo.b)} · ${mo.n}</b></div><p class="muted small">${T('tr_note')}</p></div></details>`;
   }
+  /* 18 Nov (owner's screenshots): one card with every connection, its state and one button: Telegram, notifications, the app on the phone, password */
+  function connHtml(m, perm) {
+    const nOn = perm === 'granted' && !!state.pushSub, tgOk = !!m.telegram_id, inst = standalone();
+    const rowc = (cls, icon, title, ok, okTxt, noTxt, btn) => `<div class="cnrow"><span class="cni ${cls}">${icon}</span><span class="grow-l"><b>${title}</b><span class="cnst ${ok ? 'ok' : ''}">${ok ? ico('check') : ''}${ok ? okTxt : noTxt}</span></span>${btn}</div>`;
+    return `<div class="card setcard cncard"><span class="eyebrow">${T('cn_title')}</span>
+      ${rowc('tg', ico('tg'), 'Telegram', tgOk, T('cn_on'), T('cn_off'), `<button type="button" class="btn sm" data-act="jump" data-tab="profile" data-to="#me-tgbot">${T(tgOk ? 'cn_open' : 'cn_connect')}</button>`)}
+      ${rowc('nf', msi('notifications'), T('nf_title'), nOn, T('cn_on'), T('nf_tag_off'), `<button type="button" class="btn sm" data-act="jump" data-to=".nfcard">${T(nOn ? 'cn_open' : 'cn_turnon')}</button>`)}
+      ${rowc('ap', ico('grid'), T('cn_app'), inst, T('cn_inst'), T('cn_notinst'), inst ? '' : `<button type="button" class="btn sm" data-act="jump" data-to=".instcard, #inst">${T('cn_how')}</button>`)}
+      ${S.mode === 'supabase' ? `<form class="cnrow cnpw" data-form="setpw"><span class="cni pw">${msi('lock')}</span><span class="grow-l"><b>${T('cn_pw')}</b><input class="inp" name="password" type="password" minlength="8" autocomplete="new-password" placeholder="${esc(T('cn_pw_ph'))}" aria-label="${esc(T('cn_pw'))}"></span><button class="btn sm">${T('cn_pw_btn')}</button></form>` : ''}
+    </div>`;
+  }
   function settingsHtml(m, perm) {
-    return `<div class="cols"><div class="card f">
+    return `<div class="cols"><div class="list">${connHtml(m, perm)}<div class="card f">
       <label>${T('language')}<select id="me-lang" data-ch="lang">${opt('en', 'English', lang())}${opt('ru', 'Русский', lang())}${opt('ka', 'ქართული', lang())}</select></label>
       <div class="f" id="me-see"><b>${T('pf_title')}</b><div class="checks col"><label><input type="checkbox" data-ch="pref" data-k="game" ${gameOn() ? 'checked' : ''}>${T('pf_game')}</label>${gameOn() ? '' : `<span class="muted small" id="me-see-off">${T('pf_game_off')}</span>`}<label><input type="checkbox" data-ch="pref" data-k="photo" ${photoOn() ? 'checked' : ''}>${T('pf_photo')}</label><label><input type="checkbox" data-ch="pref" data-k="mood" ${pref('mood') !== 'off' ? 'checked' : ''}>${T('pf_mood')}</label><label><input type="checkbox" data-ch="pref" data-k="rate" ${pref('rate') !== 'off' ? 'checked' : ''}>${T('pf_rate')}</label></div><span class="muted small">${T('pf_note')}</span></div>
       <div class="f"><b>${T('ds_title')}</b>${displayHtml()}</div>
       ${notifCardHtml(perm)}<div class="checks col">${Object.keys(NOTE_GROUPS).map(g => `<label><input type="checkbox" id="mute-${g}" data-ch="mutepref" data-g="${g}" ${(m.mute || []).includes(g) ? '' : 'checked'}>${T('note_' + g)}</label>`).join('')}</div></div>
-      ${ticketCardHtml()}${trafficHtml()}</div><div class="list">${installCardHtml(true)}<div class="card f">
+      ${ticketCardHtml()}${trafficHtml()}</div></div><div class="list">${installCardHtml(true)}<div class="card f">
       <button class="btn" data-act="welcome">${T('wl_again')}</button>
       <details class="sect"><summary>${T('privacy_link')}</summary><p class="muted small">${T('privacy_text', { n: pv().guideDays })}</p></details>
       <button class="btn" data-act="signout">${T('signout')}</button>${testOn() ? `<button class="lnk" data-act="testinfo">${T('tb_title')}</button>` : ''}<span class="muted small num">${T('version')} ${APP_VERSION}${S.syncedAt ? ' · ' + T('updated_at', { time: new Intl.DateTimeFormat(LOCALES[lang()], { hour: '2-digit', minute: '2-digit' }).format(new Date(S.syncedAt)) }) : ''}</span></div></div></div>`;
@@ -3788,7 +3893,18 @@
 
   // The weekly money bar sits exactly on top of the bottom menu, whatever its height is on this phone and text size.
   function fitBars() { const n = document.querySelector('nav.tabs'); if (n && n.offsetHeight) document.documentElement.style.setProperty('--tabs-full', n.offsetHeight + 'px'); }
-  function render() { if (rendering) return; rendering = true; try { renderNow(); } finally { rendering = false; } fitBars(); if (state.modal && state.modal.type === 'paste') renderModal(); }
+  /* 18 Nov: totals in tiles count up from 0 the first time they appear (once per tile; skipped when the phone asks for less motion) */
+  const counted = new WeakSet();
+  function countUp(root) {
+    let calm = false; try { calm = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { /* old browser */ }
+    (root || document).querySelectorAll('[data-count]').forEach(el => {
+      if (counted.has(el)) return; counted.add(el); const to = Number(el.dataset.count); if (calm || !(to > 0) || to > 100000) return;
+      const fin = el.textContent, t0 = performance.now(), dur = Math.min(700, 300 + to * 4);
+      const step = t => { const k = Math.min(1, (t - t0) / dur), v = Math.round(to * (1 - Math.pow(1 - k, 3))); if (!el.isConnected) return; el.textContent = k < 1 ? String(v) : fin; if (k < 1) requestAnimationFrame(step); };
+      requestAnimationFrame(step);
+    });
+  }
+  function render() { if (rendering) return; rendering = true; try { renderNow(); } finally { rendering = false; } fitBars(); countUp($('#app')); if (state.modal && state.modal.type === 'paste') renderModal(); }
   function renderNow() {
     if (me() && me().active && maintHtml() === null) { const app = $('#app'); if (app) app.innerHTML = maintScreen(); return; }
     const t0 = performance.now(); memo = {};
@@ -3916,7 +4032,7 @@
     let pos = ''; if (pop) { let W = 460, vw = window.innerWidth, vh = window.innerHeight, left = m.at.right + 12 + W <= vw ? m.at.right + 12 : m.at.left - 12 - W >= 0 ? m.at.left - 12 - W : Math.max(12, (vw - W) / 2), top = Math.max(12, Math.min(m.at.top - 40, vh - 560)); if (m.pos) { left = m.pos.left; top = m.pos.top; } pos = ` style="left:${Math.round(left)}px;top:${Math.round(top)}px;max-height:${Math.round(vh - Math.max(12, top) - 12)}px"`; }
     morph(el, `<div class="overlay${pop ? ' popov' : ''}" data-act="backdrop"><div class="sheet${pop ? ' pop' : ''}${tview ? ' tview' : ''}" role="dialog" aria-modal="true"${pos}>${inner}</div></div>`);
     if (key !== modalKey) { const sh = el.querySelector('.sheet'); if (sh) sh.scrollTop = 0; modalKey = key; }
-    refreshTourWarn(); refreshOffWarn();
+    refreshTourWarn(); refreshOffWarn(); countUp(el);
   }
   // The tour card (computer view) can be dragged by its top bar to any place on the screen; the place is kept while the card stays open.
   (() => {
@@ -3950,8 +4066,8 @@
 
 
   // ---------- events ----------
-  const MONEY = window.FSMoney({ getMemo: () => memo, setMemo: v => { memo = v; }, db, state, S, T, me, isAdmin, run, toast, logAct, render, msi, esc, nf: (...a) => nf(...a), fmt, fmtDay, today, iso, opt, crew, pname, rules, rateOf, fxOn, manualRate, statKey, aliasOf, srcName, sourceOf, netOf, guestCur, live, statement, CURRENCIES, SOURCES, salaryHtml, payFor, extraPay, costOf, tourBookings, monthEnd, payFrom, avatar, shortName });
-  const { moneyHtml, myMoneyHtml, ruleCommission } = MONEY;
+  const MONEY = window.FSMoney({ getMemo: () => memo, setMemo: v => { memo = v; }, db, state, S, T, me, isAdmin, run, toast, logAct, render, msi, esc, nf: (...a) => nf(...a), fmt, fmtDay, today, iso, opt, crew, pname, rules, rateOf, fxOn, manualRate, statKey, aliasOf, srcName, sourceOf, netOf, guestCur, live, statement, CURRENCIES, SOURCES, salaryHtml, payFor, extraPay, costOf, tourBookings, monthEnd, payFrom, avatar, shortName, involves, stripEmail: x => stripEmail(x), addDays, person });
+  const { moneyHtml, myMoneyHtml, dayRepMineHtml, ruleCommission } = MONEY;
   const acts = {
     ...MONEY.acts,
     prelangb(el) { S.ls.set('fs-lang', el.dataset.v); render(); },
@@ -3968,12 +4084,20 @@
     pickday(el) { state.date = el.dataset.date; dayJump(window.matchMedia('(max-width:760px)').matches ? 'nearest' : 'none'); },
     tour(el) { let at = null; try { if (el.getBoundingClientRect && !state.modal) { const r = el.getBoundingClientRect(); if (r.width) at = { left: r.left, right: r.right, top: r.top }; } } catch (e) { /* no place */ } openTour(el.dataset.id); if (at && state.modal && state.modal.type === 'tour') { state.modal.at = at; renderModal(); } },
     newtour(el) { state.fabOpen = false; const who = el.dataset.who ? person(el.dataset.who) : null; const pre = {}; if (el.dataset.date) pre.date = el.dataset.date; if (who) pre[who.role === 'driver' ? 'driver_id' : 'guide_id'] = who.id; openTour(null, pre); },
-    touredit() { state.modal.edit = true; renderModal(); },
+    touredit(el) { state.modal.edit = true; if (el && el.dataset && el.dataset.add) { acts.badd(); setTimeout(() => { const g = [...document.querySelectorAll('#modal input[data-bf="guest"], .sheet input[data-bf="guest"]')].pop(); if (g) { g.focus(); g.scrollIntoView({ block: 'center' }); } }, 60); } else renderModal(); },   /* + Booking opens the editor with a new empty guest */
     bpall() { state.bpAll = true; render(); },
     async holset(el) { const m = me(); if (!m || isAdmin()) return; const d = (m.display && typeof m.display === 'object') ? m.display : {}, hol = { ...(d.hol || {}) }; hol[el.dataset.d] = Number(el.dataset.v); Object.keys(hol).forEach(k => { if (k < addDays(today(), -60)) delete hol[k]; }); await run(() => S.save('profiles', { ...stripEmail(m), display: { ...d, hol, holAt: new Date().toISOString() } })); render(); },
     holedit() { state.holEdit = true; render(); },
     holdone() { state.holEdit = false; toast(T('hol_thanks')); render(); },
     holremind() { const hs = holPeriods().filter(h => h.to >= today()), ids = holPeople().filter(p => hs.some(h => !holAnswered(p, h))).map(p => p.id); run(() => notify(ids, 'hol_remind', { from: hs[0].from, to: hs[hs.length - 1].to }), T('av_sent', { n: ids.length })); },
+    bkf(el) { state.bkF = el.dataset.v; state.bkLim = 60; render(); },
+    bkng() { state.bkNg = !state.bkNg; state.bkLim = 60; render(); },
+    bkmore() { state.bkLim = (state.bkLim || 60) + 60; render(); },
+    jump(el) { const go = () => setTimeout(() => { const t = document.querySelector(el.dataset.to); if (t) { t.scrollIntoView({ block: 'start', behavior: 'smooth' }); t.classList.add('flash'); setTimeout(() => t.classList.remove('flash'), 1200); } }, 60); if (el.dataset.tab && state.meTab !== el.dataset.tab) { state.meTab = el.dataset.tab; render(); } go(); },
+    d14go(el) { state.view = 'calendar'; state.date = el.dataset.v; render(); dayJump(); },   /* 18 Nov: tap a day in Team › next 14 days to open it */
+    d14f(el) { state.d14f = el.dataset.v; render(); },
+    pstep(el) { const m = state.modal; if (!m || m.type !== 'person') return; m.step = Number(el.dataset.v) || 1; const f = document.querySelector('.pform'); if (f) { f.className = f.className.replace(/step-\d/, 'step-' + m.step); document.querySelectorAll('.psteps [data-act=pstep]').forEach(b => { const k = Number(b.dataset.v); b.setAttribute('aria-selected', String(k === m.step)); b.classList.toggle('past', k < m.step); }); const nx = f.querySelector('.pacts [data-act=pstep]'); if (nx) { const order = [...document.querySelectorAll('.psteps [data-act=pstep]')].map(b => Number(b.dataset.v)), j = order.indexOf(m.step); if (j >= order.length - 1) nx.hidden = true; else { nx.hidden = false; nx.dataset.v = order[j + 1]; } } f.closest('.sheet, .modal, #modal') && (f.closest('.sheet, .modal, #modal').scrollTop = 0); } },
+    skall(el) { const m = state.modal; if (!m || m.type !== 'person') return; const on = el.dataset.v === '1', boxes = [...document.querySelectorAll('.pform [data-sk]')].filter(b => !b.closest('.skrow').hidden); boxes.forEach(b => { b.checked = on; b.closest('.skrow').classList.toggle('on', on); }); const s = new Set(m.draft.skills || []); boxes.forEach(b => (on ? s.add(b.dataset.sk) : s.delete(b.dataset.sk))); m.draft.skills = [...s]; const c = document.querySelector('.skcount'); if (c) c.textContent = m.draft.skills.length ? T('ps_n', { n: m.draft.skills.length, all: document.querySelectorAll('.pform [data-sk]').length }) : T('skills_all'); },
     help() { state.help = !state.help; render(); },
     offer(el) { state.modal = { type: 'offer', bid: el.dataset.b || null, back: state.modal }; renderModal(); },
     offercopy(el) { logOffer(el.dataset.tour, el.dataset.b); acts.copy(el); },
@@ -4000,6 +4124,7 @@
     },
     cashreset(el) { const rows = db.pay_adjustments.filter(x => x.user_id === el.dataset.id && x.month === el.dataset.m && isCashAdj(x)), back = state.modal; confirmDo(T('pd_auto_q'), T('pd_auto'), async () => { for (const x of rows) await S.remove('pay_adjustments', x.id); logAct(`Cash back to automatic: ${pname(el.dataset.id)}, ${el.dataset.m}`); state.modal = back; redoPay(); }, true); },
     pdel(el) { run(() => S.remove('personal_dates', el.dataset.id)); },
+    gedit(el) { openTour(el.dataset.id); if (state.modal) { state.modal.edit = true; renderModal(); } },   /* guest window › Booking: the tour editor with this guest */
     attend(el) {
       const m = state.modal, b = db.bookings.find(x => x.id === el.dataset.id); if (!b) return;
       const val = b.attendance === el.dataset.s ? null : el.dataset.s, t = db.tours.find(x => x.id === b.tour_id);
@@ -4080,7 +4205,7 @@
     },
     vastart() { const v = ($('#va-who') || {}).value; if (!v) return; clearCele(); { const n = document.querySelector('.bnote'); if (n) n.remove(); } state.viewAs = v; state.view = 'calendar'; state.adminTab = null; state.mine = true; render(); window.scrollTo(0, 0); },
     vaexit() { state.viewAs = null; state.view = 'admin'; state.mine = false; render(); window.scrollTo(0, 0); },
-    expnew(el) { state.modal = { type: 'exp', draft: { kind: 'meal', date: (el && el.dataset.date) || today(), tour_id: (el && el.dataset.tour) || '', currency: rules().currency || 'GEL' } }; renderModal(); },
+    expnew(el) { state.modal = { type: 'exp', draft: { kind: 'meal', date: (el && el.dataset.date) || today(), tour_id: (el && el.dataset.tour) || '', currency: 'GEL' } }; renderModal(); },   /* expenses in lari by default (owner, 17 Nov) */
     expdel(el) { return run(() => S.remove('expenses', el.dataset.id), T('saved')); },
     exppaid(el) { const x = (db.expenses || []).find(y => y.id === el.dataset.id); if (x) return run(() => S.save('expenses', { ...x, paid_back: true }), T('saved')); },
     xctake(el) { const t = db.tours.find(x => x.id === el.dataset.id); if (!t) return; { const busy = dayWork(me().id, t); if (busy.length) { toast(T('xc_busy', { what: workText(busy) })); return; } } { const gap = langGap(t, me(), el.dataset.role === 'driver' ? 'driver' : 'guide'); if (gap.length) { toast(T('xc_lang', { tour: gap.map(langUi).join(', '), mine: myLangs(me()).map(langUi).join(', ') })); return; } } const role = el.dataset.role === 'driver' ? 'driver_id' : 'guide_id';
@@ -4328,6 +4453,10 @@
     signout() { run(async () => { await S.signOut(); try { localStorage.removeItem('fs-hello'); } catch (e) { /* private mode */ } state.auth = 'signin'; }); }
   };
   const changes = {
+    skfind(el) { const q = el.value.trim().toLowerCase(); document.querySelectorAll('.pform .skrow').forEach(r => { r.hidden = !!q && !r.dataset.t.includes(q); }); },
+    d14q(el) { state.d14q = el.value; },
+    bkq(el) { state.bkQ = el.value; },
+    bksort(el) { state.bkSort = el.value; state.bkLim = 60; render(); },
     payhide0(el) { state.payHide0 = el.checked; render(); },
     carsrefresh() { const m = carsCur(); if (!m) return; carsSync(); carsRerender(m); },
     mycar(el) { if (!me()) return; const on = el.checked; run(async () => { const p = me(); await S.save('profiles', { ...stripEmail(p), vehicle: on ? (p.vehicle || 'own') : null }); if (on) { state.meTab = 'car'; state.carsTab = null; } else if (state.meTab === 'car') state.meTab = 'profile'; render(); }, T('saved')); },
@@ -4406,6 +4535,8 @@
   const forms = {
     async gcx(fd) { const b = db.bookings.find(x => x.id === fd.get('id')); if (!b || !isAdmin()) return; await gcxMark(b, String(fd.get('why') || '').trim()); state.modal = null; renderModal(); render(); toast(T('gcx_done')); },
     ...MONEY.forms,
+    async setpw(fd, form) { const pw = String(fd.get('password') || ''); if (pw.length < 8) { toast(T('cn_pw_short')); return; } await S.setPassword(pw); if (form) form.reset(); toast(T('cn_pw_done')); },
+    async clnote(fd, form) { const cl = db.clients.find(x => x.id === (form && form.dataset.id)); if (!cl || !isAdmin()) return; await S.save('clients', { ...cl, notes: String(fd.get('notes') || '').trim() || null }); toast(T('ac_note_saved')); renderModal(); },   /* guest window: lasting note about the guest (office) */
     async signin(fd) { await S.signIn(fd.get('email'), fd.get('password')); displayFromAccount(); state.mine = !isAdmin(); state.mode = 'week'; state.view = 'calendar'; checkBadges(); weekCheck(); setTimeout(xcNudge, 4000); },
     async signup(fd) { const inside = await S.signUp(fd.get('name'), fd.get('email'), fd.get('password')); if (!inside) { state.auth = 'signin'; state.authMsg = T('check_email'); } },
     async reset(fd) { await S.resetPassword(fd.get('email')); state.auth = 'signin'; state.authMsg = T('reset_sent'); },
@@ -4489,6 +4620,8 @@
   });
   document.addEventListener('change', ev => { const el = ev.target.closest('[data-ch]'); if (el && changes[el.dataset.ch]) changes[el.dataset.ch](el); });
   // client search: results while typing; Enter opens the first one; arrows move through the suggestions; Esc closes them
+  // Team › People · next 14 days and the person editor's tour list: filter while typing, no redraw.
+  document.addEventListener('input', ev => { const el = ev.target; if (!el || !el.dataset) return; if (el.dataset.ch === 'bkq') { state.bkQ = el.value; const q = el.value.trim().toLowerCase(); document.querySelectorAll('.bklist .bkcard').forEach(r => { r.hidden = !!q && !r.dataset.q.includes(q); }); document.querySelectorAll('.bklist .bkday').forEach(d => { let n = d.nextElementSibling, any = false; while (n && !n.classList.contains('bkday')) { if (!n.hidden) any = true; n = n.nextElementSibling; } d.hidden = !any; }); } else if (el.dataset.ch === 'd14q') { state.d14q = el.value; const q = el.value.trim().toLowerCase(); document.querySelectorAll('.d14row[data-q]').forEach(r => { r.hidden = !!q && !r.dataset.q.includes(q); }); } else if (el.dataset.ch === 'skfind') changes.skfind(el); });
   document.addEventListener('input', ev => {
     const el = ev.target; if (!el || el.id !== 'sideq') return; state.sideQ = el.value; const q = el.value.trim().toLowerCase();
     document.querySelectorAll('#sidepanel .cpp[data-n]').forEach(b => { b.hidden = !!q && !b.dataset.n.includes(q); });
@@ -4533,7 +4666,7 @@
     else if (el.dataset.cq) m.draft[el.dataset.cq] = el.checked;
     else if (el.dataset.cost) { const d = m.draft; if (!d.costs) { d.costs = { ...costOf(d.id).items }; d.costNote = costOf(d.id).note; } if (el.dataset.cost === 'note') d.costNote = el.value; else d.costs[el.dataset.cost] = el.value === '' ? null : Number(el.value); }
     else if (el.dataset.rg) { const s = new Set(m.draft.regions || []); el.checked ? s.add(el.dataset.rg) : s.delete(el.dataset.rg); m.draft.regions = [...s]; }
-    else if (el.dataset.sk) { const s = new Set(m.draft.skills || []); el.checked ? s.add(el.dataset.sk) : s.delete(el.dataset.sk); m.draft.skills = [...s]; }
+    else if (el.dataset.sk) { const s = new Set(m.draft.skills || []); el.checked ? s.add(el.dataset.sk) : s.delete(el.dataset.sk); m.draft.skills = [...s]; const r = el.closest('.skrow'); if (r) r.classList.toggle('on', el.checked); const c = document.querySelector('.skcount'); if (c) c.textContent = m.draft.skills.length ? T('ps_n', { n: m.draft.skills.length, all: document.querySelectorAll('.pform [data-sk]').length }) : T('skills_all'); }
 
     else if (el.dataset.as) { const s = new Set(m.draft.assignees); el.checked ? s.add(el.dataset.as) : s.delete(el.dataset.as); m.draft.assignees = [...s]; }
     if (m.type === 'off' && el.dataset.f === 'date_from' && m.draft.date_to < el.value) { m.draft.date_to = el.value; const to = $('#o-to'); if (to) to.value = el.value; }
@@ -4542,7 +4675,8 @@
   });
   document.addEventListener('submit', ev => {
     const f = ev.target.closest('[data-form]'); if (!f) return; ev.preventDefault();
-    const fn = forms[f.dataset.form]; if (fn) busyWhile(ev.submitter || f.querySelector('button.primary, button:not([type=button])'), run(() => fn(new FormData(f), f)));
+    const fn = forms[f.dataset.form]; if (!fn) return; const fd = new FormData(f); if (ev.submitter && ev.submitter.name) fd.set(ev.submitter.name, ev.submitter.value);   /* which button was pressed (Accept / Send back / Pay) */
+    busyWhile(ev.submitter || f.querySelector('button.primary, button:not([type=button])'), run(() => fn(fd, f)));
   });
   document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && state.modal) guardClose(closeModal); });
   // Calendar keys on a computer, as in Setmore: D day, W week, M month, A agenda, T whole team / mine. Never while typing or with a sheet open.
@@ -4700,7 +4834,7 @@
   // badges, medals and the new-badge moment live in game.js; every helper it needs is handed over here, after all of them exist.
   const { PH, askCardHtml, bName, badgeModalHtml, badgeNote, badgeOut, bankWaiting, celebrateHtml, checkBadges, clearCele, game, greetHtml, likesN, medal, medalInner, moodFace, moodKey, moodLineHtml, myPhoto, nf, phFail, phPath, photoPng, photoStripHtml, photosModalHtml, rateSkip, saveHello, shrink, starsOf, tierOf, titlesOf } = window.FSGame({ getMemo: () => memo, firstName, pref, hm, involves, endOf, myScore, aliasOf, fmtDay, render, pname, pdKind, offOn, holidayOn, trName, photoOn, avatar, isAdmin, logErr, D, IC, LOCALES, REGIONS, S, T, UNLOCKS, addDays, cleanName, countryName, daysBetween, db, esc, fmt, fx, gameOn, ico, initials, iso, kmOf, lang, live, me, monday, msi, payFor, person, personStats, phoneIso, regionsOf, renderModal, rules, staff, state, stripEmail, toast, today, tourDays, track, twin, waLink, walkOf, weeklySave });
   const DKEYS = { cardc: 'fs-cardc', fs: 'fs-fsize', theme: 'fs-theme', contrast: 'fs-contrast', accent: 'fs-accent', cur: 'fs-paycur' };
-  const ACCENTS = [['', '#314b3c'], ['sea', '#1f5f7a'], ['plum', '#5b3f7a'], ['terra', '#b8441c'], ['sky', '#5aa9e6'], ['mint', '#45b88a'], ['lilac', '#b39ddb'], ['rose', '#f28fad'], ['sun', '#f2c94c'], ['amber', '#f0901e']];
+  const ACCENTS = [['', '#2f6fdf'], ['sea', '#1f5f7a'], ['plum', '#5b3f7a'], ['sky', '#5aa9e6'], ['mint', '#45b88a'], ['lilac', '#b39ddb'], ['rose', '#f28fad'], ['sun', '#f2c94c']];   /* 18 Nov: terra and amber (orange) removed from the choice; a phone that had one keeps it until changed */
   const dget = k => { try { return localStorage.getItem(DKEYS[k]) || ''; } catch (e) { return ''; } };
   if (/iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) { const vp = document.querySelector('meta[name=viewport]'); if (vp) vp.setAttribute('content', 'width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover'); }
   document.documentElement.dataset.os = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ? 'ios' : /Android/i.test(navigator.userAgent) ? 'android' : 'other';
@@ -4723,7 +4857,7 @@
     if (S.recall && window.showDirectoryPicker && isAdmin()) S.recall('offdir').then(async h => { if (h && h.queryPermission) { OFFDIR.handle = h; OFFDIR.ok = (await h.queryPermission({ mode: 'readwrite' })) === 'granted'; } }).catch(() => {});
     if (S.remember) S.remember('lang', lang()); if ((S.pending || 0) > 0) setTimeout(() => toast(T('st_waiting_open', { n: S.pending || 0 })), 600);
     if (S.warming) { let warm = true; S.onChange((t, r, type) => { if (warm && type === 'STATE' && !S.warming) { warm = false; PH.asked.clear(); displayFromAccount(); saveHello(); weekCheck(); setTimeout(xcNudge, 4000); } }); }
-    if (S.mode === 'demo') window.__test = { dupClients, busy: () => busyScroll(), go: (v, sub) => { state.view = v; if (v === "me") state.meTab = sub; if (v === "admin") state.adminTab = sub; render(); }, money: { agg: mo => { const o = MONEY.agg(mo); return { paid: o.paid, net: o.net, team: o.team, profit: o.profit, bks: o.bks, priced: o.priced }; }, ledger: (id, mo) => { const L = MONEY.ledger(id, mo); return { total: L.total, bal: L.bal }; } }, parseSetmore, openTour: id => { openTour(id); }, placeholderName, isVip, netOf: b => netOf(b), myLangs, catFind: t => (catFind(t) || {}).id || null, parseBooking, pbMatch: pb => { const m = pbMatch(pb); return { tour: m.tour && m.tour.id, old: m.old && m.old.id }; }, fitIds: (t, role) => fitList(t, role).map(x => x.p ? x.p.id : x.id), catalogTitles: () => catalog().slice(0, 5).map(c => ({ id: String(c.id), title: c.title })), clientHits: (q, n) => clientHits(q, n).list.map(c => c.name), nf2, tmTxt, preTripMail: (tid, bid) => { const t = db.tours.find(x => x.id === tid); return preTripMail({ ...t, bookings: tourBookings(t.id) }, bid ? db.bookings.find(x => x.id === bid) : null); }, impPayDiff, impPayApply, setImp: v => { state.imp = v; state.impPay = null; }, getImpPay: () => state.impPay, setImpPay: v => { state.impPay = v; }, parseReview, isReview, rrHtml: id => revreqModalHtml({ id }), rrTours: () => db.tours.filter(t => tourBookings(t.id).some(b => b.guest)).map(t => t.id), trackOpen, flushUsage, tourPhase, dupClients, dupTours, parseBooking, T: (k, v) => T(k, v), payFor, setGrid: v => { state.wgrid = !!v; render(); }, dayBlock, tasksOnDay, withPhones, taskLineHtml, pushBanner, xcNudge, relayEmail, guestEmail, parseBooking, badgeNote: () => { const b = game(me().id).list.find(x => x.done); if (b) badgeNote([b]); }, checkBadges, newVersion: v => { state.newVersion = !!v; render(); }, pageFor: (title, kind) => { const u = pageFor({ title, kind }), m = /\/activity\/(\d+)/.exec(u); return m ? { id: Number(m[1]) } : null; } };          // for the automatic tests only
+    if (S.mode === 'demo') window.__test = { dupClients, today: () => today(), busy: () => busyScroll(), go: (v, sub) => { state.view = v; if (v === "me") state.meTab = sub; if (v === "admin") state.adminTab = sub; render(); }, money: { agg: mo => { const o = MONEY.agg(mo); return { paid: o.paid, net: o.net, team: o.team, profit: o.profit, bks: o.bks, priced: o.priced }; }, ledger: (id, mo) => { const L = MONEY.ledger(id, mo); return { total: L.total, bal: L.bal }; } }, parseSetmore, openTour: id => { openTour(id); }, placeholderName, isVip, netOf: b => netOf(b), myLangs, catFind: t => (catFind(t) || {}).id || null, parseBooking, pbMatch: pb => { const m = pbMatch(pb); return { tour: m.tour && m.tour.id, old: m.old && m.old.id }; }, fitIds: (t, role) => fitList(t, role).map(x => x.p ? x.p.id : x.id), catalogTitles: () => catalog().slice(0, 5).map(c => ({ id: String(c.id), title: c.title })), clientHits: (q, n) => clientHits(q, n).list.map(c => c.name), nf2, tmTxt, preTripMail: (tid, bid) => { const t = db.tours.find(x => x.id === tid); return preTripMail({ ...t, bookings: tourBookings(t.id) }, bid ? db.bookings.find(x => x.id === bid) : null); }, impPayDiff, impPayApply, setImp: v => { state.imp = v; state.impPay = null; }, getImpPay: () => state.impPay, setImpPay: v => { state.impPay = v; }, parseReview, isReview, rrHtml: id => revreqModalHtml({ id }), rrTours: () => db.tours.filter(t => tourBookings(t.id).some(b => b.guest)).map(t => t.id), trackOpen, flushUsage, tourPhase, dupClients, dupTours, parseBooking, T: (k, v) => T(k, v), payFor, setGrid: v => { state.wgrid = !!v; render(); }, dayBlock, tasksOnDay, withPhones, taskLineHtml, pushBanner, xcNudge, relayEmail, guestEmail, parseBooking, badgeNote: () => { const b = game(me().id).list.find(x => x.done); if (b) badgeNote([b]); }, checkBadges, newVersion: v => { state.newVersion = !!v; render(); }, pageFor: (title, kind) => { const u = pageFor({ title, kind }), m = /\/activity\/(\d+)/.exec(u); return m ? { id: Number(m[1]) } : null; } };          // for the automatic tests only
     if (me() && !isAdmin()) state.mine = true;
     displayFromAccount();
     try { history.scrollRestoration = 'manual'; } catch (e) { /* old browser */ }

@@ -109,8 +109,8 @@
       return getMemo()['g' + id] = { list, done, xp, level, base, next, km, walk, regs, partners, cur, prev, isD, isG, rep, weekNow, yearNow: per.y[td.slice(0, 4)] || 0 };
     }
     // ---------- medals: flat vector art drawn here, so they are sharp at any size and work offline ----------
-    const METAL = { bronze: ['#7d4a1e', '#b87333', '#e0a36b'], silver: ['#7c838b', '#b9bec4', '#eceef0'], gold: ['#a67c12', '#e2b340', '#f6d67a'] };   // rim, face, highlight
-    const RIBBON = { guide: '#f0901e', all: '#f0901e', master: '#a8500e', driver: '#3b5bbd', delica: '#3b5bbd', own: '#3b5bbd', geo: '#2f6b48', fun: '#6243bd', new: '#0f766e', now: '#0f766e', titles: '#20251f', secret: '#20251f' };
+    const METAL = { bronze: ['#7d4a1e', '#b87333', '#e0a36b'], silver: ['#7c838b', '#b9bec4', '#eceef0'], gold: ['#a67c12', '#9b4a7d', '#f6d67a'] };   // rim, face, highlight
+    const RIBBON = { guide: '#2f6fdf', all: '#2f6fdf', master: '#5b3a6e', driver: '#3b5bbd', delica: '#3b5bbd', own: '#3b5bbd', geo: '#2f6b48', fun: '#6243bd', new: '#0f766e', now: '#0f766e', titles: '#20251f', secret: '#20251f' };
     const mPoly = (n, r1, r2, rot) => [...Array(n * 2)].map((_, i) => { const a = Math.PI * i / n + (rot || 0), r = i % 2 ? r2 : r1; return (48 + r * Math.sin(a)).toFixed(1) + ',' + (62 - r * Math.cos(a)).toFixed(1); }).join(' ');
     const M_SHAPE = { seal: mPoly(16, 37, 33.5), burst: mPoly(12, 38, 31), hex: mPoly(3, 38, 38), shield: null };
     // Bronze, silver or gold: the place of a badge on its own ladder (50 / 100 / 250 tours), or how far a tour mastery has gone.
@@ -190,7 +190,7 @@
     }
     function celebrateHtml(m) {
       const b = game(me().id).list.find(x => x.k === m.k); if (!b) return '';
-      const cols = ['#f0901e', '#2f6b48', '#3b5bbd', '#20251f', '#e2b340', '#6243bd'], rib = RIBBON[b.track] || '#f0901e';
+      const cols = ['#2f6fdf', '#2f6b48', '#3b5bbd', '#20251f', '#9b4a7d', '#6243bd'], rib = RIBBON[b.track] || '#2f6fdf';
       const bits = [...Array(28)].map((_, i) => `<i style="left:${(i * 37) % 100}%;background:${cols[i % cols.length]};animation-delay:${(i % 9) * 0.12}s;animation-duration:${2.2 + (i % 5) * 0.35}s"></i>`).join('');
       // A gift box first: the person opens it with a tap, then the lid flies off and the medal comes out.
       const box = `<svg class="gbox" viewBox="0 0 200 190" aria-hidden="true"><g class="gbase"><rect x="30" y="86" width="140" height="94" rx="10" fill="#e9e3d2" stroke="#20251f" stroke-width="4"/><rect x="88" y="86" width="24" height="94" fill="${rib}" stroke="#20251f" stroke-width="4"/></g>
@@ -205,7 +205,7 @@
     const xml = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     function wrapText(s, max) { const out = []; let line = ''; for (const w of String(s).split(/\s+/)) { if ((line + ' ' + w).trim().length > max && line) { out.push(line); line = w; } else line = (line + ' ' + w).trim(); } if (line) out.push(line); return out.slice(0, 4); }
     function badgeSvg(b) {
-      const p = me(), colors = { titles: ['#20251f', '#f0901e'], fun: ['#20251f', '#ffffff'], geo: ['#2f6b48', '#ffffff'], driver: ['#3b5bbd', '#ffffff'], delica: ['#3b5bbd', '#ffffff'], own: ['#3b5bbd', '#ffffff'] }[b.track] || ['#f0901e', '#20251f'];
+      const p = me(), colors = { titles: ['#20251f', '#2f6fdf'], fun: ['#20251f', '#ffffff'], geo: ['#2f6b48', '#ffffff'], driver: ['#3b5bbd', '#ffffff'], delica: ['#3b5bbd', '#ffffff'], own: ['#3b5bbd', '#ffffff'] }[b.track] || ['#2f6fdf', '#20251f'];
       const title = wrapText(bName(b), 22), desc = wrapText(bDesc(b), 44), font = 'font-family="-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif"';
       const count = b.track === 'titles' ? `${nf(b.raw)} ${T('tours_n')}` : b.track === 'master' ? `×${nf(b.raw)}` : b.unit ? `${nf(b.raw)} ${b.unit}` : '';
       let y = 660;
