@@ -368,6 +368,7 @@
     task: 'Task', new_task: 'New task', edit_task: 'Edit task', task_for_tour: 'Task for this tour', f_open: 'Open', f_done: 'Done', f_all: 'All', no_tasks: 'No tasks here.',
     tn_booked: 'Booked as', cat_short: 'Short name (shown in the schedule)', cat_short_hint: 'e.g. Kazbegi 4x4',
     pl_google: 'Places from Google Maps',
+    off_waiting: 'Waiting for your answer:',
     tp_title: 'Choose a tour', tp_find: 'Find a tour', tp_blank: 'Empty tour (fill in yourself)', tp_seats: '{n} seats',
     tkl_more: 'Details', tkl_people: '{n} people', tkl_open: 'Open in Tasks',
     due: 'Due date', assignees: 'Who does it', pair_hint: 'Tick two people, for example the guide and the driver, to share one card.', done: 'Done', done_by: 'Done by {name}',

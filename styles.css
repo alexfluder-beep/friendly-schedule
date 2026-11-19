@@ -2384,3 +2384,8 @@ html[data-theme="dark"][data-accent="terra"],html[data-theme="dark"][data-accent
 .plrow b{font-weight:600}
 .plrow svg{flex:none;margin-top:3px;color:var(--action,#2f6fdf)}
 .plsrc{padding:2px 10px 4px;text-align:right}
+
+/* A time-off request waiting at the top of a person's profile */
+.offwait{gap:8px;border-color:var(--p-peach-e,#e9c9a8);background:var(--p-peach,#fdf3ea)}
+.offwait .bar{justify-content:flex-end}
+.exrow .btn.sm{margin-left:6px}

@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '26.11.19c';   /* from 18 Nov 2026 the version is the release date, year.month.day (owner); a second release the same day adds b, c */
+  const APP_VERSION = '26.11.19d';   /* from 18 Nov 2026 the version is the release date, year.month.day (owner); a second release the same day adds b, c */
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -546,7 +546,17 @@
     if (n.kind !== 'creq_new' || !t) return null; const name = (n.params || {}).name;
     return db.change_requests.filter(q => q.tour_id === t.id && pname(q.user_id) === name).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))[0] || null;
   }
+  // A time-off notice (19 Nov, owner): the request it is about, with Decline / Approve right in the notice, and Open = the person's profile.
+  function offNoteReq(n) {
+    if (!n || !['off_requested', 'sick_reported'].includes(n.kind)) return null; const p = n.params || {};
+    if (p.off_id) return db.time_off.find(o => o.id === p.off_id) || null;
+    const c = db.time_off.filter(o => o.date_from === p.from && o.date_to === (p.to || p.from) && pname(o.user_id) === p.name);
+    return c.find(o => o.status === 'pending') || c[0] || null;
+  }
+  const offBtns = o => o.status === 'pending' ? `<button type="button" class="btn sm danger" data-act="offdecide" data-id="${o.id}" data-s="declined">${msi('close')}${T('decline')}</button><button type="button" class="btn sm primary" data-act="offdecide" data-id="${o.id}" data-s="approved">${msi('check')}${T('approve')}</button>` : `<span class="tag ${o.status === 'approved' ? 't-ok' : 't-danger'}">${T(o.status)}</span>`;
   function noteActs(n) {
+    const o = isAdmin() && !state.viewAs ? offNoteReq(n) : null;
+    if (o) return `<div class="bar nacts">${offBtns(o)}<button class="btn sm" data-act="offprof" data-id="${o.user_id}">${msi('person')}${T('nt_open')}</button></div>`;
     const t = noteTour(n); if (!t) return '';
     const q = isAdmin() && !state.viewAs ? noteReq(n, t) : null;
     const ask = q ? (q.status === 'pending' ? `<div class="small">${esc(creqText(q))}</div><div class="bar nacts"><button class="btn sm" data-act="creqtcx" data-id="${q.id}">${msi('event_busy')}${T('creq_tcx')}</button><button class="btn sm danger" data-act="creqdecide" data-id="${q.id}" data-s="0">${msi('close')}${T('decline')}</button><button class="btn sm primary" data-act="creqdecide" data-id="${q.id}" data-s="1">${msi('check')}${T('approve')}</button></div>` : `<div><span class="tag ${q.status === 'approved' ? 't-ok' : 't-muted'}">${T(q.status)}</span></div>`) : '';
@@ -1947,6 +1957,7 @@
     const offs = old ? db.time_off.filter(o => o.user_id === d.id && o.status !== 'declined' && o.date_to >= today()).sort((x, y) => x.date_from.localeCompare(y.date_from)) : [];
     const cats = catalog().filter(c => c.id), sk = d.skills || [];
     return `<div class="hdr"><h2>${old ? esc(d.name || T('person_edit')) : T('add_person')}</h2><button class="iconbtn" data-act="close" aria-label="${T('close')}">✕</button></div>
+      ${old && isAdmin() ? offs.filter(o => o.status === 'pending').map(o => `<div class="card f offwait"><span><b>${T('off_waiting')}</b> ${offTag({ ...o, status: 'x' })} <span class="num">${esc(fmtRange(o.date_from, o.date_to))}</span></span><div class="bar">${offBtns(o)}</div></div>`).join('') : ''}
       <div class="psteps" role="tablist">${tabs.map(([k, l], i) => `<button type="button" role="tab" data-act="pstep" data-v="${k}" aria-selected="${step === k}" class="${k < step ? 'past' : ''}">${i + 1}. ${l}</button>`).join('')}</div>
       <form class="f pform step-${step}" data-form="person">
       <div class="pstep" data-s="1">
@@ -2103,7 +2114,7 @@
     const row = { id: old ? old.id : S.uid(), user_id: byAdmin ? (d.user_id || me().id) : me().id, date_from: d.date_from, date_to: d.date_to, type: d.type, status, note: d.note || null, created_at: old ? old.created_at : new Date().toISOString(), decided_by: byAdmin ? me().id : null };
     await S.save('time_off', row);
     logAct(`${T('request')}: ${pname(row.user_id)}, ${row.type}, ${row.date_from} to ${row.date_to}`);
-    const np = { name: pname(row.user_id), from: row.date_from, to: row.date_to };
+    const np = { name: pname(row.user_id), from: row.date_from, to: row.date_to, off_id: row.id };
     if (!byAdmin) await notify(admins(), d.type === 'sick' ? 'sick_reported' : 'off_requested', np);
     else await notify([row.user_id], 'off_approved', np);
     state.modal = null;
@@ -4292,6 +4303,7 @@
     cancelask(el) { state.modal = { type: 'cancel', id: el.dataset.id, back: state.modal }; renderModal(); },
     tourrestore(el) { const t = db.tours.find(x => x.id === el.dataset.id); if (t) run(() => setCancelled(t, false)).then(() => { openTour(t.id); }); },
     pnew() { state.modal = { type: 'person', isNew: true, draft: { name: '', role: 'guide', email: '', phone: '', languages: '', color: ['#6243bd', '#a8500c', '#1c7439', '#2f6f73', '#3b5bbd', '#7a5c00'][db.profiles.length % 6] } }; renderModal(); },
+    offprof(el) { const p = person(el.dataset.id); if (p) { state.modal = { type: 'person', draft: { ...p }, step: 3 }; renderModal(); } },
     pedit(el) { const p = person(el.dataset.id); if (p) { state.modal = { type: 'person', draft: { ...p } }; renderModal(); } },
     pdelete(el) { const p = person(el.dataset.id); if (!p) return; confirmDo(T('delete_person_q', { name: p.name }), T('delete_person'), async () => { await S.removePerson(p.id); logAct(`Removed person: ${p.name}`); toast(T('saved')); }); },
     invdel(el) { run(() => S.remove('invites', el.dataset.id)); },
@@ -4462,7 +4474,7 @@
       state.modal = null; openTour(null, pre); if (c && state.modal) state.modal.catApplied = c.title; },
     pstats(el) { state.modal = { type: 'pstats', from: el.dataset.from, to: el.dataset.to }; renderModal(); },
     tourclone(el) { const t = db.tours.find(x => x.id === el.dataset.id); if (!t) return; const { id, external_id, status, pax, adults, children, cancel_reason, created_at, ...keep } = t; openTour(null, { ...keep, pax: 1, adults: 1, children: 0, status: 'confirmed', external_id: null }); state.modal.touched = true; toast(T('clone_hint')); },
-    offdecide(el) { const o = db.time_off.find(x => x.id === el.dataset.id); logAct(`Time off ${el.dataset.s} for ${pname(o.user_id)}: ${o.date_from} to ${o.date_to}`); run(async () => { await S.save('time_off', { ...o, status: el.dataset.s, decided_by: me().id }); await notify([o.user_id], el.dataset.s === 'approved' ? 'off_approved' : 'off_declined', { from: o.date_from, to: o.date_to }); }); },
+    offdecide(el) { const o = db.time_off.find(x => x.id === el.dataset.id); logAct(`Time off ${el.dataset.s} for ${pname(o.user_id)}: ${o.date_from} to ${o.date_to}`); run(async () => { await S.save('time_off', { ...o, status: el.dataset.s, decided_by: me().id }); await notify([o.user_id], el.dataset.s === 'approved' ? 'off_approved' : 'off_declined', { from: o.date_from, to: o.date_to }); }).then(() => { if (state.modal && ['bell', 'person'].includes(state.modal.type)) renderModal(); }); },
     offdel(el) { confirmDo(T('confirm_remove'), T('remove'), () => S.remove('time_off', el.dataset.id)); },
     offopen(el) { const o = db.time_off.find(x => x.id === el.dataset.id); if (!o || !offCan(o)) return; state.modal = { type: 'off', draft: { id: o.id, user_id: o.user_id, type: o.type, date_from: o.date_from, date_to: o.date_to, note: o.note || '' } }; renderModal(); refreshOffWarn(); },
     taskfilter(el) { state.taskFilter = el.dataset.v; render(); },
@@ -4931,7 +4943,7 @@
     if (S.recall && window.showDirectoryPicker && isAdmin()) S.recall('offdir').then(async h => { if (h && h.queryPermission) { OFFDIR.handle = h; OFFDIR.ok = (await h.queryPermission({ mode: 'readwrite' })) === 'granted'; } }).catch(() => {});
     if (S.remember) S.remember('lang', lang()); if ((S.pending || 0) > 0) setTimeout(() => toast(T('st_waiting_open', { n: S.pending || 0 })), 600);
     if (S.warming) { let warm = true; S.onChange((t, r, type) => { if (warm && type === 'STATE' && !S.warming) { warm = false; PH.asked.clear(); displayFromAccount(); saveHello(); weekCheck(); holSync().catch(() => {}); setTimeout(xcNudge, 4000); } }); }
-    if (S.mode === 'demo') window.__test = { dupClients, holSync: () => holSync(), today: () => today(), busy: () => busyScroll(), go: (v, sub) => { state.view = v; if (v === "me") state.meTab = sub; if (v === "admin") state.adminTab = sub; render(); }, money: { agg: mo => { const o = MONEY.agg(mo); return { paid: o.paid, net: o.net, team: o.team, profit: o.profit, bks: o.bks, priced: o.priced }; }, ledger: (id, mo) => { const L = MONEY.ledger(id, mo); return { total: L.total, bal: L.bal }; } }, parseSetmore, openTour: id => { openTour(id); }, resetMemo: () => { memo = {}; }, modal: () => state.modal, renderModal: () => renderModal(), placeholderName, isVip, netOf: b => netOf(b), myLangs, catFind: t => (catFind(t) || {}).id || null, parseBooking, pbMatch: pb => { const m = pbMatch(pb); return { tour: m.tour && m.tour.id, old: m.old && m.old.id }; }, fitIds: (t, role) => fitList(t, role).map(x => x.p ? x.p.id : x.id), catalogTitles: () => catalog().slice(0, 5).map(c => ({ id: String(c.id), title: c.title })), clientHits: (q, n) => clientHits(q, n).list.map(c => c.name), nf2, tmTxt, preTripMail: (tid, bid) => { const t = db.tours.find(x => x.id === tid); return preTripMail({ ...t, bookings: tourBookings(t.id) }, bid ? db.bookings.find(x => x.id === bid) : null); }, impPayDiff, impPayApply, setImp: v => { state.imp = v; state.impPay = null; }, getImpPay: () => state.impPay, setImpPay: v => { state.impPay = v; }, parseReview, isReview, rrHtml: id => revreqModalHtml({ id }), rrTours: () => db.tours.filter(t => tourBookings(t.id).some(b => b.guest)).map(t => t.id), trackOpen, flushUsage, tourPhase, dupClients, dupTours, parseBooking, T: (k, v) => T(k, v), payFor, setGrid: v => { state.wgrid = !!v; render(); }, dayBlock, tasksOnDay, withPhones, taskLineHtml, pushBanner, xcNudge, relayEmail, guestEmail, parseBooking, badgeNote: () => { const b = game(me().id).list.find(x => x.done); if (b) badgeNote([b]); }, checkBadges, newVersion: v => { state.newVersion = !!v; render(); }, pageFor: (title, kind) => { const u = pageFor({ title, kind }), m = /\/activity\/(\d+)/.exec(u); return m ? { id: Number(m[1]) } : null; } };          // for the automatic tests only
+    if (S.mode === 'demo') window.__test = { dupClients, holSync: () => holSync(), today: () => today(), busy: () => busyScroll(), go: (v, sub) => { state.view = v; if (v === "me") state.meTab = sub; if (v === "admin") state.adminTab = sub; render(); }, money: { agg: mo => { const o = MONEY.agg(mo); return { paid: o.paid, net: o.net, team: o.team, profit: o.profit, bks: o.bks, priced: o.priced }; }, ledger: (id, mo) => { const L = MONEY.ledger(id, mo); return { total: L.total, bal: L.bal }; } }, parseSetmore, openTour: id => { openTour(id); }, resetMemo: () => { memo = {}; }, meId: () => me() && me().id, modal: () => state.modal, renderModal: () => renderModal(), placeholderName, isVip, netOf: b => netOf(b), myLangs, catFind: t => (catFind(t) || {}).id || null, parseBooking, pbMatch: pb => { const m = pbMatch(pb); return { tour: m.tour && m.tour.id, old: m.old && m.old.id }; }, fitIds: (t, role) => fitList(t, role).map(x => x.p ? x.p.id : x.id), catalogTitles: () => catalog().slice(0, 5).map(c => ({ id: String(c.id), title: c.title })), clientHits: (q, n) => clientHits(q, n).list.map(c => c.name), nf2, tmTxt, preTripMail: (tid, bid) => { const t = db.tours.find(x => x.id === tid); return preTripMail({ ...t, bookings: tourBookings(t.id) }, bid ? db.bookings.find(x => x.id === bid) : null); }, impPayDiff, impPayApply, setImp: v => { state.imp = v; state.impPay = null; }, getImpPay: () => state.impPay, setImpPay: v => { state.impPay = v; }, parseReview, isReview, rrHtml: id => revreqModalHtml({ id }), rrTours: () => db.tours.filter(t => tourBookings(t.id).some(b => b.guest)).map(t => t.id), trackOpen, flushUsage, tourPhase, dupClients, dupTours, parseBooking, T: (k, v) => T(k, v), payFor, setGrid: v => { state.wgrid = !!v; render(); }, dayBlock, tasksOnDay, withPhones, taskLineHtml, pushBanner, xcNudge, relayEmail, guestEmail, parseBooking, badgeNote: () => { const b = game(me().id).list.find(x => x.done); if (b) badgeNote([b]); }, checkBadges, newVersion: v => { state.newVersion = !!v; render(); }, pageFor: (title, kind) => { const u = pageFor({ title, kind }), m = /\/activity\/(\d+)/.exec(u); return m ? { id: Number(m[1]) } : null; } };          // for the automatic tests only
     if (me() && !isAdmin()) state.mine = true;
     displayFromAccount();
     try { history.scrollRestoration = 'manual'; } catch (e) { /* old browser */ }
