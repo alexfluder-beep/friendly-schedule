@@ -366,6 +366,8 @@
     my_requests: 'My requests', no_requests: 'No requests yet. Use "Time-off request" to ask for a day.', team_off: 'Team off soon', nobody_off: 'Nobody else is off in the coming days.',
     holidays: 'Company holidays', no_holidays: 'No holidays added yet.', approve: 'Approve', decline: 'Decline', person: 'Person', from: 'From', to: 'To', note: 'Note', bad_dates: 'Check the dates: the end is before the start.',
     task: 'Task', new_task: 'New task', edit_task: 'Edit task', task_for_tour: 'Task for this tour', f_open: 'Open', f_done: 'Done', f_all: 'All', no_tasks: 'No tasks here.',
+    tp_title: 'Choose a tour', tp_find: 'Find a tour', tp_blank: 'Empty tour (fill in yourself)', tp_seats: '{n} seats',
+    tkl_more: 'Details', tkl_people: '{n} people', tkl_open: 'Open in Tasks',
     due: 'Due date', assignees: 'Who does it', pair_hint: 'Tick two people, for example the guide and the driver, to share one card.', done: 'Done', done_by: 'Done by {name}',
     a_team: 'Team', a_holidays: 'Holidays', a_rules: 'Rules', a_reports: 'Reports', a_import: 'Setmore import', a_backup: 'Backup',
     name: 'Name', role: 'Role', colour: 'Colour', you: 'You', activate: 'Give access', deactivate: 'Remove access', add_person: 'Add person',
