@@ -7,7 +7,7 @@ export interface Db {
   lastRunAt(): Promise<string | null>; // newest agent_runs.at
   ping(): Promise<boolean>; // "select 1"
 }
-export interface Opts { key: string; db: Db; now?: () => number; log?: (line: string) => void; perMinute?: number }
+export interface Opts { key: string | string[];  /* one key, or several (each caller its own, so one can be switched off alone) */ db: Db; now?: () => number; log?: (line: string) => void; perMinute?: number }
 
 const enc = new TextEncoder();
 async function sameKey(given: string, real: string): Promise<boolean> {
@@ -67,6 +67,52 @@ const ROUTES: Record<string, Route> = {
   "/run-done": { method: "POST", run: (b, o) => { only(b, ["run", "summary"]); const run = text(b.run, 1, 20); if (!RUNS.includes(run)) bad(); return call(o, "agent_run_done", { run, summary: b.summary === undefined ? "" : text(b.summary, 0, 1000) }); } },
 };
 
+// ---------- /snapshot: one call for a whole daily check (19 Nov 2026) ----------
+// Changes, tours, conflicts and booking codes in one answer, kept short: empty fields dropped, repeated log lines merged,
+// screen activity and money lines left out (not schedule changes). Morning and evening get every tour in full;
+// 10:15 and 14:00 get a one-line list of all tours plus full rows only for tours with a flag or a mark.
+const TZ_MS = 4 * 3600e3; // Tbilisi is UTC+4 all year
+const RANGE: Record<string, [number, number, boolean]> = { early: [0, 1, true], "10:15": [0, 1, false], "14:00": [0, 0, false], evening: [1, 1, true] };
+const NOISE = /^(Email read:|Email booking opened to save:|Money:)/;
+type Row = Record<string, unknown>;
+const empty = (v: unknown) => v === null || v === undefined || v === "" || v === false || (Array.isArray(v) && v.length === 0);
+const lean = (r: Row): Row => Object.fromEntries(Object.entries(r).filter(([, v]) => !empty(v)));
+const tb = (iso: unknown) => { const t = Date.parse(String(iso)); return Number.isNaN(t) ? "" : new Date(t + TZ_MS).toISOString().slice(5, 16).replace("T", " "); };
+const arr = (v: unknown): Row[] => (Array.isArray(v) ? v as Row[] : []);
+function tourLine(r: Row): string {
+  const f = arr(r.flags).length ? " | flags: " + (r.flags as string[]).join(",") : "", m = arr(r.marks).length ? " | marks: " + (r.marks as string[]).join(",") : "";
+  return `${r.date} ${r.start_time ?? ""} | ${r.title} | ${[r.kind, r.language].filter(Boolean).join(" ")} | ${r.pax ?? 0}${Number(r.capacity) > 0 ? "/" + r.capacity : ""} pax | guide ${r.guide ?? "-"} | driver ${r.driver ?? "-"}${f}${m}${r.status && r.status !== "confirmed" ? " | " + r.status : ""}`;
+}
+export function changeLines(rows: Row[]): string[] {
+  const seen = new Map<string, { at: string; n: number; line: string }>();
+  for (const r of rows) {
+    const what = String(r.what ?? ""); if (NOISE.test(what)) continue;
+    const k = `${r.src}|${r.who ?? ""}|${what}`, o = seen.get(k);
+    if (o) { o.n++; if (String(r.at) > o.at) o.at = String(r.at); } else seen.set(k, { at: String(r.at), n: 1, line: `${r.src}${r.who ? " " + r.who : ""}: ${what}` });
+  }
+  const all = [...seen.values()].sort((a, b) => (a.at < b.at ? 1 : -1)), out = all.slice(0, 60).map(x => `${tb(x.at)} ${x.line}${x.n > 1 ? ` (x${x.n})` : ""}`);
+  if (all.length > 60) out.push(`... and ${all.length - 60} older lines not shown: ask /changes with the same since for all of them`);
+  return out;
+}
+async function snapshot(b: Row, o: Opts) {
+  only(b, ["run", "codes", "since"]); const run = text(b.run, 1, 20); if (!RANGE[run]) bad();
+  let codes: string[] = []; if (b.codes !== undefined) { if (!Array.isArray(b.codes) || b.codes.length > 50) bad(); codes = (b.codes as unknown[]).map(c => text(c, 4, 40, CODE)); }
+  const now = (o.now ?? Date.now)(); let since: string;
+  if (b.since !== undefined) { const s = text(b.since, 10, 40), t = Date.parse(s); if (!/^\d{4}-\d{2}-\d{2}T[\d:.]+(Z|[+-]\d{2}:?\d{2})$/.test(s) || Number.isNaN(t)) bad(); since = new Date(t).toISOString(); }
+  else if (run === "evening") since = new Date(Math.floor((now + TZ_MS) / 864e5) * 864e5 - TZ_MS).toISOString(); // the whole day since 00:00 Tbilisi
+  else { const last = await o.db.lastRunAt(); since = new Date(last ? Date.parse(last) - 10 * 60e3 : now - 6 * 3600e3).toISOString(); }
+  const [f, t, full] = RANGE[run];
+  const [board, changes, conflicts, refs] = await Promise.all([call(o, "agent_board", { d_from: f, d_to: t }), call(o, "agent_changes", { since }), call(o, "agent_conflicts", { days: 7 }), codes.length ? call(o, "agent_find_refs", { codes }) : Promise.resolve([])]);
+  const tours = arr(board), flagged = tours.filter(r => arr(r.flags).length), marked = tours.filter(r => arr(r.flags).length || arr(r.marks).length); // marked: flags or marks (pickup address, front seat...) need the full row
+  return {
+    run, since: tb(since) + " Tbilisi", days: [f, t],
+    tours: { count: tours.length, pax: tours.reduce((a, r) => a + (Number(r.pax) || 0), 0), flagged: flagged.length, lines: tours.map(tourLine), detail: (full ? tours : marked).map(lean) },
+    changes: changeLines(arr(changes)), conflicts: arr(conflicts).map(lean),
+    refs: arr(refs).map(r => (r.found ? lean(r) : { code: r.code, found: false })),
+  };
+}
+ROUTES["/snapshot"] = { method: "POST", run: snapshot };
+
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
 
 export function makeHandler(o: Opts) {
@@ -76,8 +122,9 @@ export function makeHandler(o: Opts) {
     const route = url.pathname.replace(/^.*\/agent-api(?=\/|$)/, "") || "/";
     let status = 500, body: unknown = { ok: false, error: "server_error" };
     try {
-      if (!o.key || o.key.length < 32) { status = 500; body = { ok: false, error: "not_configured" }; }
-      else if (!(await sameKey(req.headers.get("x-agent-key") ?? "", o.key))) { status = 401; body = { ok: false, error: "unauthorized" }; }
+      const keys = (Array.isArray(o.key) ? o.key : [o.key]).filter(k => k && k.length >= 32), given = req.headers.get("x-agent-key") ?? "";
+      if (!keys.length) { status = 500; body = { ok: false, error: "not_configured" }; }
+      else if (!(await Promise.all(keys.map(k => sameKey(given, k)))).some(Boolean)) { status = 401; body = { ok: false, error: "unauthorized" }; }
       else {
         const m = Math.floor(t0 / 60000); if (m !== win) { win = m; used = 0; }
         if (++used > per) { status = 429; body = { ok: false, error: "rate_limited" }; }

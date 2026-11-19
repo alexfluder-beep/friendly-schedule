@@ -34,6 +34,9 @@ A plain JavaScript PWA for Friendly.ge guides and drivers (replaces Setmore). Li
 - `tests/run-all.sh` runs with `TZ=UTC`: tests build dates with `toISOString()` (UTC) while the app uses the browser's local date; without it tests failed between 00:00 and 04:00 Tbilisi time. A single test run by hand needs `TZ=UTC` too; `window.__test.today()` gives the app's own date.
 - When editing a long one-line test, never insert a `//` comment mid-line (it hides the rest of the line); use `/* */`.
 
+- Never run git commands that change files in the working copy (`git stash`, `git checkout`, `git reset`): its git history is old (3.99), so they bring back old files. Releases go through the release clone only (19 Nov: a `git checkout sw.js` and a `git stash` had to be undone).
+- Function names: search app.js before adding one; a second `function x` silently replaces the first (19 Nov: a new `recountTour` replaced the one that leaves cancelled guests out; t131 caught it).
+
 ## Cleaning rules
 - Before deleting code, search every file (app, store, cute, catalog, index, sw) and long template lines; a dead-code scan once missed a real use (`titlesOf`). Delete, then run all tests.
 

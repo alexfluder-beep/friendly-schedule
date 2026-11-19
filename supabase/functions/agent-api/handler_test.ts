@@ -29,3 +29,47 @@ Deno.test("logs: route, status and time only", async () => { const { go, logs } 
 Deno.test("missing or short secret: refuse everything", async () => { const h = makeHandler({ key: "short", log: () => {}, db: { rpc: () => Promise.resolve({ data: [], error: null }), lastRunAt: () => Promise.resolve(null), ping: () => Promise.resolve(true) } }); const r = await h(new Request("https://x/functions/v1/agent-api/health", { headers: { "x-agent-key": "short" } })); eq(r.status, 500, "500"); });
 Deno.test("database error: 500 without detail", async () => { const h = makeHandler({ key: KEY, log: () => {}, db: { rpc: () => Promise.resolve({ data: null, error: { message: "relation secret" } }), lastRunAt: () => Promise.resolve(null), ping: () => Promise.resolve(true) } }); const r = await h(new Request("https://x/functions/v1/agent-api/conflicts", { method: "POST", headers: { "x-agent-key": KEY }, body: "{}" })); eq([r.status, await r.json()], [500, { ok: false, error: "db_error" }], "500"); });
 Deno.test("scrub keeps dates, times and booking codes", () => { eq(scrub({ a: "2026-11-18 08:30 GYG123456789 BR-1234567" }), { a: "2026-11-18 08:30 GYG123456789 BR-1234567" }, "kept"); });
+Deno.test("snapshot: one call, four lookups in parallel, short answer", async () => {
+  const calls: [string, Record<string, unknown>][] = [];
+  const data: Record<string, unknown> = {
+    agent_board: [{ date: "2026-11-19", start_time: "15:00", title: "Test walk", kind: "group", language: "EN", pax: 2, capacity: 10, guide: "Test Guide", driver: null, flags: [], marks: [], status: "confirmed", phone: "+995500000001" },
+                  { date: "2026-11-20", start_time: "08:30", title: "Test 4x4", kind: "group", pax: 7, capacity: 6, guide: null, flags: ["NO_GUIDE", "OVER_6_PER_CAR"], marks: ["front_seat"], status: "confirmed" }],
+    agent_changes: [{ at: "2026-11-19T05:51:00Z", src: "change", who: "Test Admin", what: "Changed tour: Test walk, 2026-11-19" }, { at: "2026-11-19T05:41:00Z", src: "change", who: "Test Admin", what: "Changed tour: Test walk, 2026-11-19" },
+                    { at: "2026-11-19T05:30:00Z", src: "change", who: "Test Admin", what: "Email read: ? new 999 Test/Guest" }, { at: "2026-11-19T05:20:00Z", src: "change", who: "Test Admin", what: "Money: paid Test 1 USD" },
+                    { at: "2026-11-19T05:10:00Z", src: "new_bookings", who: null, what: "1 bookings, 1 guests, source test@example.com" }],
+    agent_conflicts: [{ kind: "double", who: "Test Guide", date: "2026-11-20", detail: null }], agent_find_refs: [{ code: "TESTREF1", found: false, title: null }, { code: "TESTREF2", found: true, title: "Test walk", pax: 2, marks: [] }] };
+  const h = makeHandler({ key: KEY, log: () => {}, now: () => Date.parse("2026-11-19T06:00:00Z"), db: { rpc: (fn, a) => { calls.push([fn, a]); return Promise.resolve({ data: data[fn], error: null }); }, lastRunAt: () => Promise.resolve("2026-11-19T05:00:00Z"), ping: () => Promise.resolve(true) } });
+  const go = async (b: unknown) => { const r = await h(new Request("https://x.supabase.co/functions/v1/agent-api/snapshot", { method: "POST", headers: { "x-agent-key": KEY }, body: JSON.stringify(b) })); return { s: r.status, j: await r.json() }; };
+  const r = await go({ run: "10:15", codes: ["TESTREF1", "TESTREF2"] }); eq(r.s, 200, "status"); const d = r.j.data;
+  eq(calls.map(c => c[0]).sort(), ["agent_board", "agent_changes", "agent_conflicts", "agent_find_refs"], "four lookups");
+  eq(calls.find(c => c[0] === "agent_board")![1], { d_from: 0, d_to: 1 }, "10:15 range");
+  eq(calls.find(c => c[0] === "agent_changes")![1], { since: "2026-11-19T04:50:00.000Z" }, "since last run - 10 min");
+  eq(d.tours.count, 2, "count"); eq(d.tours.flagged, 1, "flagged"); eq(d.tours.detail.length, 1, "10:15: only flagged or marked in detail");
+  eq(d.tours.lines[0].includes("| 2/10 pax |"), true, "capacity shown"); eq(d.tours.lines[1], "2026-11-20 08:30 | Test 4x4 | group | 7/6 pax | guide - | driver - | flags: NO_GUIDE,OVER_6_PER_CAR | marks: front_seat", "line");
+  eq("driver" in d.tours.detail[0] || "phone" in d.tours.detail[0], false, "empty and phone fields dropped");
+  eq(d.changes, ["11-19 09:51 change Test Admin: Changed tour: Test walk, 2026-11-19 (x2)", "11-19 09:10 new_bookings: 1 bookings, 1 guests, source [email]"], "merged, noise out, Tbilisi time, e-mail masked");
+  eq(d.refs, [{ code: "TESTREF1", found: false }, { code: "TESTREF2", found: true, title: "Test walk", pax: 2 }], "refs short");
+  calls.length = 0; const e = await go({ run: "evening" }); eq(e.j.data.tours.detail.length, 2, "evening: all tours in full");
+  eq(calls.find(c => c[0] === "agent_board")![1], { d_from: 1, d_to: 1 }, "evening = tomorrow"); eq(calls.find(c => c[0] === "agent_changes")![1], { since: "2026-11-18T20:00:00.000Z" }, "evening = since 00:00 Tbilisi");
+  eq(calls.some(c => c[0] === "agent_find_refs"), false, "no codes = no lookup");
+  for (const b of [{ run: "noon" }, {}, { run: "early", codes: ["x'"] }, { run: "early", x: 1 }, { run: "early", since: "today" }]) eq((await go(b)).s, 400, "bad " + JSON.stringify(b));
+});
+Deno.test("two keys: either one opens, a short or empty second key is ignored", async () => {
+  const h = makeHandler({ key: [KEY, "b".repeat(40)], log: () => {}, db: { rpc: () => Promise.resolve({ data: [], error: null }), lastRunAt: () => Promise.resolve(null), ping: () => Promise.resolve(true) } });
+  const st = async (k: string) => (await h(new Request("https://x/functions/v1/agent-api/health", { headers: { "x-agent-key": k } }))).status;
+  eq([await st(KEY), await st("b".repeat(40)), await st("c".repeat(40))], [200, 200, 401], "either key");
+  const h2 = makeHandler({ key: [KEY, ""], log: () => {}, db: { rpc: () => Promise.resolve({ data: [], error: null }), lastRunAt: () => Promise.resolve(null), ping: () => Promise.resolve(true) } });
+  eq((await h2(new Request("https://x/functions/v1/agent-api/health", { headers: { "x-agent-key": "" } }))).status, 401, "empty key never opens");
+});
+Deno.test("snapshot line: no capacity set = just the guest count", async () => {
+  const h = makeHandler({ key: KEY, log: () => {}, now: () => Date.parse("2026-11-19T06:00:00Z"), db: { rpc: (fn) => Promise.resolve({ data: fn === "agent_board" ? [{ date: "2026-11-20", start_time: "09:00", title: "Test private", kind: "private", pax: 2, capacity: 0, guide: "Test Guide" }] : [], error: null }), lastRunAt: () => Promise.resolve(null), ping: () => Promise.resolve(true) } });
+  const r = await (await h(new Request("https://x/functions/v1/agent-api/snapshot", { method: "POST", headers: { "x-agent-key": KEY }, body: '{"run":"14:00"}' }))).json();
+  eq(r.data.tours.lines[0], "2026-11-20 09:00 | Test private | private | 2 pax | guide Test Guide | driver -", "line");
+});
+Deno.test("snapshot: marked tours get details at 10:15; over 60 change lines says how many more", async () => {
+  const ch = Array.from({ length: 65 }, (_, i) => ({ at: `2026-11-19T05:${String(i % 60).padStart(2, "0")}:${String(i).padStart(2, "0")}Z`, src: "change", who: "Test Admin", what: "Changed tour: Test " + i }));
+  const h = makeHandler({ key: KEY, log: () => {}, now: () => Date.parse("2026-11-19T06:00:00Z"), db: { rpc: (fn) => Promise.resolve({ data: fn === "agent_board" ? [{ title: "Plain", flags: [], marks: [] }, { title: "Pickup", flags: [], marks: ["pickup"], pickup: "Test street 1" }] : fn === "agent_changes" ? ch : [], error: null }), lastRunAt: () => Promise.resolve(null), ping: () => Promise.resolve(true) } });
+  const d = (await (await h(new Request("https://x/functions/v1/agent-api/snapshot", { method: "POST", headers: { "x-agent-key": KEY }, body: '{"run":"10:15"}' }))).json()).data;
+  eq(d.tours.detail.map((r: { title: string }) => r.title), ["Pickup"], "marked tour has details"); eq(d.tours.detail[0].pickup, "Test street 1", "address kept");
+  eq(d.changes.length, 61, "60 lines + note"); eq(d.changes[60].startsWith("... and 5 older lines"), true, "says how many more");
+});

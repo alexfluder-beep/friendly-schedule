@@ -4,7 +4,7 @@ Read-only HTTPS door to Friendly Schedule for Claude's scheduled checks
 (friendly-schedule-check, friendly-daily-ops). The Supabase connector stays as the fallback.
 
 - URL: `https://scqqmnwzglbgnvgzqifu.supabase.co/functions/v1/agent-api`
-- Every call needs the header `x-agent-key: <KEY>`. The key lives only in the Edge Function
+- Every call needs the header `x-agent-key: <KEY>`. Two keys are accepted: `AGENT_API_KEY` (Claude's scheduled checks) and, when set, `AGENT_API_KEY_BOT` (the Telegram bot), so either can be replaced alone. The key lives only in the Edge Function
   secret `AGENT_API_KEY` and in the agents' private setup. Never in the app, this repo, a page,
   a chat or a doc.
 - Deployed with `verify_jwt = false` (the key replaces the login check). No CORS: browsers can't call it.
@@ -34,6 +34,10 @@ curl -s "$A/changes" -H "x-agent-key: <KEY>" -H "Content-Type: application/json"
 
 # Double bookings and missing crews in the next N days (1..30, default 7)
 curl -s "$A/conflicts" -H "x-agent-key: <KEY>" -H "Content-Type: application/json" -d '{"days":7}'
+
+# Whole daily check in ONE call (19 Nov 2026): changes, tours (one line each + details), conflicts, optional booking codes.
+# run: early (today+tomorrow, all tours in full) | 10:15 (today+tomorrow, details only for flagged tours) | 14:00 (today) | evening (tomorrow; changes since 00:00)
+curl -s "$A/snapshot" -H "x-agent-key: <KEY>" -H "Content-Type: application/json" -d '{"run":"10:15","codes":["ABC12345"]}'
 
 # Guests on one tour: name, pax, marks, source, language, pickup (max 40, never phone or e-mail)
 curl -s "$A/guests" -H "x-agent-key: <KEY>" -H "Content-Type: application/json" -d '{"date":"2026-11-19","title":"Old Tbilisi"}'

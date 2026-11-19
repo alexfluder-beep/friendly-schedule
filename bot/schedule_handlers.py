@@ -224,6 +224,11 @@ def register(app: Application) -> None:
         tickets_handlers.register(app)
     except ImportError:      # tickets_handlers.py not copied: the rest keeps working
         log.info("tickets_handlers.py not found: /bug is off")
+    try:
+        import office_handlers   # office questions for admins (19 Nov): /board /ref /conflicts /seats
+        office_handlers.register(app)
+    except ImportError:      # office_handlers.py not copied: the rest keeps working
+        log.info("office_handlers.py not found: office commands are off")
 
 
 async def send_pending(app: Application) -> int:

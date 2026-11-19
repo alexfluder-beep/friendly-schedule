@@ -7,6 +7,7 @@ Team scheduling for guides and drivers: tours (private, group, customised), days
 With `config.js` left empty the app runs in **demo mode**: sample data, stored only in that browser, no login.
 
 ## What is included
+- 26.11.19: a booking moved to another tour takes its guests along (the old tour's count is redone, cancelled guests left out); failed update checks (no internet for a moment) are no longer reported as app problems; office commands for the Telegram bot (/board, /ref, /conflicts, /seats; admins only); agent API: one-call snapshot for the daily checks and a second key for the bot.
 - 26.11.18f: smaller updates: every app file has a fingerprint, and phones download only the files that changed (the first update after this one still downloads everything once).
 - 26.11.18e: on iPhone, screens switch without the slide (the bottom bar could be left in the middle of the page). New agent-api door (supabase/functions/agent-api) for Claude's scheduled checks: read-only, key-protected, no guest phones or e-mails.
 - 26.11.18d: Me › Settings in order of how often it is needed: language and display, phone notifications, report a problem, what I see, then connections, the app on the phone, data use, set-up guide, privacy and sign out.
