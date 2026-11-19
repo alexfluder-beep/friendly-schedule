@@ -7,6 +7,7 @@ Team scheduling for guides and drivers: tours (private, group, customised), days
 With `config.js` left empty the app runs in **demo mode**: sample data, stored only in that browser, no login.
 
 ## What is included
+- 26.11.19e: guide tour requests that can no longer happen close by themselves (date passed, tour cancelled or removed, someone else put on the tour) and the guide gets a notice with the reason; a request for a tour the person already has counts as done.
 - 26.11.19d: time-off and sick notices get Decline / Approve / Open buttons (Open = the person's profile, Time off page); a waiting request shows at the top of the person's profile with its own buttons; new notices carry the request id.
 - 26.11.19c: one standard look per tour (names linked in Back office › Tour names show the catalogue short name, colour and icon everywhere; "Booked as" keeps the original inside the tour; short-name field in the catalogue); Google Maps place search under the Pickup and guest-address fields (Supabase function `places`, key in the secret GOOGLE_PLACES_KEY).
 - 26.11.19b: shorter tasks on the calendar (only the reader's language, how-to text behind Details, the same task for several people as one line for the office); the + button sheet slides up like Setmore and Tour opens a searchable tour list that fills the new tour; phone day header with the counts on one line.

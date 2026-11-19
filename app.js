@@ -4,7 +4,7 @@
   const S = window.Store, db = S.db, CFG = window.APP_CONFIG || {};
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const APP_VERSION = '26.11.19d';   /* from 18 Nov 2026 the version is the release date, year.month.day (owner); a second release the same day adds b, c */
+  const APP_VERSION = '26.11.19e';   /* from 18 Nov 2026 the version is the release date, year.month.day (owner); a second release the same day adds b, c */
   // Busy periods: days off are not suggested here, and a request for these dates gets a warning. Admin edits them in Rules.
   const DEFAULT_PEAKS = `2026-12-20..2027-01-10 Christmas and New Year
 2027-01-05..2027-01-08 Orthodox Christmas
@@ -562,7 +562,7 @@
     const ask = q ? (q.status === 'pending' ? `<div class="small">${esc(creqText(q))}</div><div class="bar nacts"><button class="btn sm" data-act="creqtcx" data-id="${q.id}">${msi('event_busy')}${T('creq_tcx')}</button><button class="btn sm danger" data-act="creqdecide" data-id="${q.id}" data-s="0">${msi('close')}${T('decline')}</button><button class="btn sm primary" data-act="creqdecide" data-id="${q.id}" data-s="1">${msi('check')}${T('approve')}</button></div>` : `<div><span class="tag ${q.status === 'approved' ? 't-ok' : 't-muted'}">${T(q.status)}</span></div>`) : '';
     return `${ask}<div class="bar nacts"><button class="btn sm" data-act="tour" data-id="${t.id}">${msi('open_in_new')}${T('nt_open')}</button></div>`;
   }
-  function noteText(n) { const p = { ...(n.params || {}) }; if (p.date) p.date = fmtDay(p.date); if (p.from) p.range = fmtRange(p.from, p.to || p.from); if (n.kind === 'ticket_update' && p.status) p.status = T('tk_st_' + p.status); return T('n_' + n.kind, p); }
+  function noteText(n) { const p = { ...(n.params || {}) }; if (p.date) p.date = fmtDay(p.date); if (p.from) p.range = fmtRange(p.from, p.to || p.from); if (n.kind === 'ticket_update' && p.status) p.status = T('tk_st_' + p.status); if (n.kind === 'creq_closed' && p.why) p.why = T('creq_why_' + p.why); return T('n_' + n.kind, p); }
   let swReg = null;
   function systemNotify(text) {
     try {
@@ -1762,6 +1762,32 @@
     logAct(`Tour cancelled, ${all.length} request(s) closed: ${t.title}, ${t.date}`);
     return all.length;
   }
+  /* 19 Nov (owner): a tour request that can no longer happen closes by itself, and the guide is told why, like a cancelled tour:
+     the tour date has passed, the tour was cancelled or deleted, or someone else was put on the tour. A request to take a tour
+     the person already has counts as done. Runs on the office's phone (on opening, every 30 min, and a moment after a tour changes). */
+  const creqWhy = (q, t, td) => {
+    if (!t) return 'gone'; if (t.status === 'cancelled') return 'cancelled'; if (t.date < td) return 'passed';
+    const p = q.patch || {};
+    if (p.status === 'cancelled' || q.swap_with || q.cant) return '';
+    if (p.guide_id === q.user_id) return t.guide_id === q.user_id ? 'done' : t.guide_id ? 'taken' : '';
+    if (p.driver_id === q.user_id) return t.driver_id === q.user_id ? 'done' : t.driver_id ? 'taken' : '';
+    return '';
+  };
+  let creqBusy = false;
+  async function creqSweep() {
+    if (creqBusy || !isAdmin() || state.viewAs || S.offline || S.mode === 'demo' && !window.__creqSweepDemo) return 0; creqBusy = true; let n = 0;
+    try {
+      const td = today();
+      for (const q of db.change_requests.filter(x => x.status === 'pending')) {
+        const t = db.tours.find(x => x.id === q.tour_id), why = creqWhy(q, t, td); if (!why) continue;
+        await S.save('change_requests', { ...q, status: why === 'done' ? 'approved' : 'declined', decided_by: null });
+        if (why !== 'done') await notify([q.user_id], 'creq_closed', { title: t ? aliasOf(t.title) : '', date: t ? t.date : '', why });
+        logAct(`Change request closed (${why}): ${t ? t.title : ''}, ${pname(q.user_id)}`); n++;
+      }
+    } finally { creqBusy = false; }
+    return n;
+  }
+  let creqTimer = 0; const creqSoon = () => { clearTimeout(creqTimer); creqTimer = setTimeout(() => creqSweep().catch(() => {}), 1500); };
   async function decideCreq(id, ok) {
     const q = db.change_requests.find(x => x.id === id), t = db.tours.find(x => x.id === q.tour_id);
     if (ok && t && (q.patch || {}).status === 'cancelled') await setCancelled(t, true, q.message || '');
@@ -4906,6 +4932,7 @@
   // ---------- boot ----------
   let pending = false;
   S.onChange(() => { memo = {}; });
+  S.onChange((table, row, type) => { if ((table === 'tours' || table === 'change_requests') && type !== 'STATE' && isAdmin()) creqSoon(); });
   S.onChange((table, row, type, remote) => {
     if (remote && table === 'notifications' && type === 'INSERT' && me() && row.user_id === me().id) { const tx = noteText(row); toast(tx); if (document.hidden) systemNotify(tx); }
     if (remote && !pending) { pending = true; const later = () => { if (busyScroll()) { setTimeout(later, 400); return; } pending = false; render(); }; setTimeout(later, 150); }   /* never redraw under a moving finger (17 Nov) */
@@ -4943,7 +4970,7 @@
     if (S.recall && window.showDirectoryPicker && isAdmin()) S.recall('offdir').then(async h => { if (h && h.queryPermission) { OFFDIR.handle = h; OFFDIR.ok = (await h.queryPermission({ mode: 'readwrite' })) === 'granted'; } }).catch(() => {});
     if (S.remember) S.remember('lang', lang()); if ((S.pending || 0) > 0) setTimeout(() => toast(T('st_waiting_open', { n: S.pending || 0 })), 600);
     if (S.warming) { let warm = true; S.onChange((t, r, type) => { if (warm && type === 'STATE' && !S.warming) { warm = false; PH.asked.clear(); displayFromAccount(); saveHello(); weekCheck(); holSync().catch(() => {}); setTimeout(xcNudge, 4000); } }); }
-    if (S.mode === 'demo') window.__test = { dupClients, holSync: () => holSync(), today: () => today(), busy: () => busyScroll(), go: (v, sub) => { state.view = v; if (v === "me") state.meTab = sub; if (v === "admin") state.adminTab = sub; render(); }, money: { agg: mo => { const o = MONEY.agg(mo); return { paid: o.paid, net: o.net, team: o.team, profit: o.profit, bks: o.bks, priced: o.priced }; }, ledger: (id, mo) => { const L = MONEY.ledger(id, mo); return { total: L.total, bal: L.bal }; } }, parseSetmore, openTour: id => { openTour(id); }, resetMemo: () => { memo = {}; }, meId: () => me() && me().id, modal: () => state.modal, renderModal: () => renderModal(), placeholderName, isVip, netOf: b => netOf(b), myLangs, catFind: t => (catFind(t) || {}).id || null, parseBooking, pbMatch: pb => { const m = pbMatch(pb); return { tour: m.tour && m.tour.id, old: m.old && m.old.id }; }, fitIds: (t, role) => fitList(t, role).map(x => x.p ? x.p.id : x.id), catalogTitles: () => catalog().slice(0, 5).map(c => ({ id: String(c.id), title: c.title })), clientHits: (q, n) => clientHits(q, n).list.map(c => c.name), nf2, tmTxt, preTripMail: (tid, bid) => { const t = db.tours.find(x => x.id === tid); return preTripMail({ ...t, bookings: tourBookings(t.id) }, bid ? db.bookings.find(x => x.id === bid) : null); }, impPayDiff, impPayApply, setImp: v => { state.imp = v; state.impPay = null; }, getImpPay: () => state.impPay, setImpPay: v => { state.impPay = v; }, parseReview, isReview, rrHtml: id => revreqModalHtml({ id }), rrTours: () => db.tours.filter(t => tourBookings(t.id).some(b => b.guest)).map(t => t.id), trackOpen, flushUsage, tourPhase, dupClients, dupTours, parseBooking, T: (k, v) => T(k, v), payFor, setGrid: v => { state.wgrid = !!v; render(); }, dayBlock, tasksOnDay, withPhones, taskLineHtml, pushBanner, xcNudge, relayEmail, guestEmail, parseBooking, badgeNote: () => { const b = game(me().id).list.find(x => x.done); if (b) badgeNote([b]); }, checkBadges, newVersion: v => { state.newVersion = !!v; render(); }, pageFor: (title, kind) => { const u = pageFor({ title, kind }), m = /\/activity\/(\d+)/.exec(u); return m ? { id: Number(m[1]) } : null; } };          // for the automatic tests only
+    if (S.mode === 'demo') window.__test = { dupClients, holSync: () => holSync(), today: () => today(), busy: () => busyScroll(), go: (v, sub) => { state.view = v; if (v === "me") state.meTab = sub; if (v === "admin") state.adminTab = sub; render(); }, money: { agg: mo => { const o = MONEY.agg(mo); return { paid: o.paid, net: o.net, team: o.team, profit: o.profit, bks: o.bks, priced: o.priced }; }, ledger: (id, mo) => { const L = MONEY.ledger(id, mo); return { total: L.total, bal: L.bal }; } }, parseSetmore, openTour: id => { openTour(id); }, resetMemo: () => { memo = {}; }, meId: () => me() && me().id, creqSweep: () => creqSweep(), modal: () => state.modal, renderModal: () => renderModal(), placeholderName, isVip, netOf: b => netOf(b), myLangs, catFind: t => (catFind(t) || {}).id || null, parseBooking, pbMatch: pb => { const m = pbMatch(pb); return { tour: m.tour && m.tour.id, old: m.old && m.old.id }; }, fitIds: (t, role) => fitList(t, role).map(x => x.p ? x.p.id : x.id), catalogTitles: () => catalog().slice(0, 5).map(c => ({ id: String(c.id), title: c.title })), clientHits: (q, n) => clientHits(q, n).list.map(c => c.name), nf2, tmTxt, preTripMail: (tid, bid) => { const t = db.tours.find(x => x.id === tid); return preTripMail({ ...t, bookings: tourBookings(t.id) }, bid ? db.bookings.find(x => x.id === bid) : null); }, impPayDiff, impPayApply, setImp: v => { state.imp = v; state.impPay = null; }, getImpPay: () => state.impPay, setImpPay: v => { state.impPay = v; }, parseReview, isReview, rrHtml: id => revreqModalHtml({ id }), rrTours: () => db.tours.filter(t => tourBookings(t.id).some(b => b.guest)).map(t => t.id), trackOpen, flushUsage, tourPhase, dupClients, dupTours, parseBooking, T: (k, v) => T(k, v), payFor, setGrid: v => { state.wgrid = !!v; render(); }, dayBlock, tasksOnDay, withPhones, taskLineHtml, pushBanner, xcNudge, relayEmail, guestEmail, parseBooking, badgeNote: () => { const b = game(me().id).list.find(x => x.done); if (b) badgeNote([b]); }, checkBadges, newVersion: v => { state.newVersion = !!v; render(); }, pageFor: (title, kind) => { const u = pageFor({ title, kind }), m = /\/activity\/(\d+)/.exec(u); return m ? { id: Number(m[1]) } : null; } };          // for the automatic tests only
     if (me() && !isAdmin()) state.mine = true;
     displayFromAccount();
     try { history.scrollRestoration = 'manual'; } catch (e) { /* old browser */ }
@@ -4957,7 +4984,7 @@
     document.addEventListener('toggle', e => { const d = e.target; if (d && d.dataset && d.dataset.keep) { state.keep = state.keep || {}; state.keep[d.dataset.keep] = d.open; } }, true);
     { let tries = 0; const wl = () => { try { if (!(S.mode === 'supabase' || window.__fsSetupDemo) || window.__noWelcome || sessionStorage.getItem('fs-wl-later') || (Number(localStorage.getItem('fs-wl-n')) || 0) >= 3) return; if (state.modal || !me() || !me().active) { if (++tries < 40) setTimeout(wl, 2000); return; } if (welcomeSteps().some(x => !x.done)) acts.welcome(); } catch (e) { /* private mode */ } }; setTimeout(wl, 1800); }   // waits its turn behind any other pop-up
     { let seen = null; const topH = () => { const e = document.querySelector('.top'); if (!e || e === seen || !window.ResizeObserver) return; seen = e; new ResizeObserver(() => document.documentElement.style.setProperty('--toph', e.offsetHeight + 'px')).observe(e); }; topH(); setTimeout(topH, 1500); }   // the sticky back row sits right under the header, whatever its height
-    setTimeout(trackDevice, 3000); setTimeout(() => trackOpen(true), 3500); setTimeout(privacyAuto, 4000); checkBadges(); weekCheck(); holSync().catch(() => {}); setInterval(weekCheck, 30 * 60000); setTimeout(fxRefresh, 6000); setInterval(fxRefresh, 6 * 3600000);
+    setTimeout(trackDevice, 3000); setTimeout(() => trackOpen(true), 3500); setTimeout(privacyAuto, 4000); checkBadges(); weekCheck(); holSync().catch(() => {}); setTimeout(() => creqSweep().catch(() => {}), 5000); setInterval(weekCheck, 30 * 60000); setInterval(() => creqSweep().catch(() => {}), 30 * 60000); setTimeout(fxRefresh, 6000); setInterval(fxRefresh, 6 * 3600000);
     setInterval(() => { if (me() && me().active && !isAdmin() && state.view === 'calendar' && !state.modal && !document.hidden && !busyScroll()) render(); }, 5 * 60000);
     setInterval(() => { if (!document.hidden) document.querySelectorAll('.sage').forEach(e => { e.textContent = T('st_fresh', { age: ageText(e.dataset.at) }); }); }, 30000);
     if ('serviceWorker' in navigator && location.protocol === 'https:' && S.mode === 'supabase') { try { swReg = await navigator.serviceWorker.register('sw.js'); const had = !!navigator.serviceWorker.controller; const openedAt = Date.now(); navigator.serviceWorker.addEventListener('controllerchange', () => { if (!had) return; if (Date.now() - openedAt < 15000 && !state.modal && !document.querySelector('form [data-dirty], .qsave.on') && !(S.pending > 0)) { try { location.reload(); return; } catch (e) { /* banner instead */ } } state.newVersion = true; render(); }); document.addEventListener('visibilitychange', () => { if (!document.hidden) { try { swReg.update().catch(() => { /* no internet or a short GitHub hiccup while checking for a new version: it tries again later; not an app error (18 Nov) */ }); } catch (e) { /* later */ } } }); setInterval(() => { try { swReg.update().catch(() => { /* no internet or a short GitHub hiccup while checking for a new version: it tries again later; not an app error (18 Nov) */ }); } catch (e) { /* later */ } }, 30 * 60000); } catch (e) { /* no service worker here */ } }

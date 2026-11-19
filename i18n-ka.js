@@ -369,6 +369,7 @@
     tn_booked: 'დაჯავშნილია როგორც', cat_short: 'მოკლე სახელი (განრიგში)', cat_short_hint: 'მაგ. ყაზბეგი 4x4',
     pl_google: 'ადგილები Google Maps-იდან',
     off_waiting: 'ელოდება თქვენს პასუხს:',
+    n_creq_closed: 'თქვენი მოთხოვნა დაიხურა: {title}, {date} ({why})', creq_why_passed: 'ტურის თარიღი გავიდა', creq_why_cancelled: 'ტური გაუქმდა', creq_why_gone: 'ტური წაიშალა', creq_why_taken: 'ამ ტურზე სხვა დაინიშნა',
     tp_title: 'აირჩიეთ ტური', tp_find: 'ტურის ძებნა', tp_blank: 'ცარიელი ტური (თავად შევავსებ)', tp_seats: '{n} ადგილი',
     tkl_more: 'დეტალები', tkl_people: '{n} ადამიანი', tkl_open: 'დავალებებში გახსნა',
     due: 'ვადა', assignees: 'ვინ ასრულებს', pair_hint: 'მონიშნეთ ორი ადამიანი, მაგალითად გიდი და მძღოლი, და მათ ერთი საერთო ბარათი ექნებათ.', done: 'შესრულდა', done_by: 'შეასრულა: {name}',

@@ -369,6 +369,7 @@
     tn_booked: 'Забронирован как', cat_short: 'Короткое название (в расписании)', cat_short_hint: 'например, Казбеги 4x4',
     pl_google: 'Места из Google Карт',
     off_waiting: 'Ждёт вашего ответа:',
+    n_creq_closed: 'Ваш запрос закрыт: {title}, {date} ({why})', creq_why_passed: 'дата тура прошла', creq_why_cancelled: 'тур отменён', creq_why_gone: 'тур удалён', creq_why_taken: 'на этот тур назначен другой человек',
     tp_title: 'Выберите тур', tp_find: 'Найти тур', tp_blank: 'Пустой тур (заполню сам)', tp_seats: 'мест: {n}',
     tkl_more: 'Подробнее', tkl_people: 'Людей: {n}', tkl_open: 'Открыть в Задачах',
     due: 'Срок', assignees: 'Кто делает', pair_hint: 'Отметьте двоих, например гида и водителя, и у них будет одна общая карточка.', done: 'Готово', done_by: 'Выполнил(а): {name}',
