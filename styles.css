@@ -2375,3 +2375,12 @@ html[data-theme="dark"][data-accent="terra"],html[data-theme="dark"][data-accent
 }
 /* phone day header like Setmore: the date on its own line, the counts in one quiet line under it (19 Nov) */
 @media (max-width:760px){.dayhd>b:first-child{flex-basis:100%}.dayhd{row-gap:2px}}
+
+/* Place search list under address fields */
+.plsug{display:flex;flex-direction:column;gap:2px;margin:-4px 0 6px;padding:4px;background:#fff;border:1px solid var(--line,#dfe6ee);border-radius:12px;box-shadow:var(--shadow-s)}
+.plrow{display:flex;align-items:flex-start;gap:10px;width:100%;min-height:48px;padding:8px 10px;border:0;background:none;border-radius:8px;text-align:left;font:inherit;color:inherit;cursor:pointer}
+.plrow:hover,.plrow:focus-visible{background:var(--p-blue,#eaf1fd)}
+.plrow>span{display:flex;flex-direction:column;min-width:0}
+.plrow b{font-weight:600}
+.plrow svg{flex:none;margin-top:3px;color:var(--action,#2f6fdf)}
+.plsrc{padding:2px 10px 4px;text-align:right}

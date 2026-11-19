@@ -7,6 +7,7 @@ Team scheduling for guides and drivers: tours (private, group, customised), days
 With `config.js` left empty the app runs in **demo mode**: sample data, stored only in that browser, no login.
 
 ## What is included
+- 26.11.19c: one standard look per tour (names linked in Back office › Tour names show the catalogue short name, colour and icon everywhere; "Booked as" keeps the original inside the tour; short-name field in the catalogue); Google Maps place search under the Pickup and guest-address fields (Supabase function `places`, key in the secret GOOGLE_PLACES_KEY).
 - 26.11.19b: shorter tasks on the calendar (only the reader's language, how-to text behind Details, the same task for several people as one line for the office); the + button sheet slides up like Setmore and Tour opens a searchable tour list that fills the new tour; phone day header with the counts on one line.
 - 26.11.19: a booking moved to another tour takes its guests along (the old tour's count is redone, cancelled guests left out); failed update checks (no internet for a moment) are no longer reported as app problems; office commands for the Telegram bot (/board, /ref, /conflicts, /seats; admins only); agent API: one-call snapshot for the daily checks and a second key for the bot.
 - 26.11.18f: smaller updates: every app file has a fingerprint, and phones download only the files that changed (the first update after this one still downloads everything once).

@@ -278,6 +278,13 @@
     return db.clients.filter(c => !c.anonymised_at && last[c.id] && last[c.id] < cut).map(c => c.id);
   }
   const store = {
+    // Place search for address fields (Supabase function "places", Google Maps). Empty list when offline or not set up.
+    async places(q, lang, session) {
+      if (store.placesOff) return [];
+      if (mode !== 'supabase') return /test|demo|hotel/i.test(q) ? [{ name: 'Demo Hotel', addr: 'Demo Hotel, 1 Sample Street, Tbilisi, Georgia', url: 'https://www.google.com/maps/search/?api=1&query=Demo%20Hotel' }, { name: 'Sample Guesthouse', addr: 'Sample Guesthouse, 2 Test Lane, Tbilisi, Georgia', url: 'https://www.google.com/maps/search/?api=1&query=Sample%20Guesthouse' }] : [];
+      if (!sb || store.offline) return [];
+      try { const { data, error } = await sb.functions.invoke('places', { body: { q, lang, session } }); if (error) { if (error.context && error.context.status === 503) store.placesOff = true; return []; } return (data && data.places) || []; } catch (e) { return []; }
+    },
     trafficGet: () => { try { return JSON.parse(localStorage.getItem(TR_KEY) || '{}'); } catch (e) { return {}; } },
     mode, db, TABLES, uid, ls, offline: false, warming: false, pending: 0, failed: 0, cachedAt: null, loadedFrom: null, syncedAt: null, live: false, pulse,
     // Older years for reports and statistics.

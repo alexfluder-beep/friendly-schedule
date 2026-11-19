@@ -16,7 +16,8 @@ window.TOUR_CATALOG = [
   ],
   "pickup": "Europe Square, open parking next to the old tram cafe",
   "pickup_url": "https://maps.app.goo.gl/BB644YvAVizZHyBe6",
-  "url": "https://friendly.ge/en/activity/319104/3-day-tusheti-tour-explore-unspoiled-wilderness"
+  "url": "https://friendly.ge/en/activity/319104/3-day-tusheti-tour-explore-unspoiled-wilderness",
+  "short": "Tusheti 3 days"
  },
  {
   "id": 313703,
@@ -34,7 +35,8 @@ window.TOUR_CATALOG = [
   "pickup": "Europe Square, open parking next to the old tram cafe",
   "pickup_url": "https://maps.app.goo.gl/BB644YvAVizZHyBe6",
   "note": "Runs in summer only",
-  "url": "https://friendly.ge/en/activity/313703/4x4-kazbegi-truso-valley-small-group-day-trip-from-tbilisi"
+  "url": "https://friendly.ge/en/activity/313703/4x4-kazbegi-truso-valley-small-group-day-trip-from-tbilisi",
+  "short": "Kazbegi & Truso 4x4"
  },
  {
   "id": 318410,
@@ -48,7 +50,8 @@ window.TOUR_CATALOG = [
   "marks": [],
   "pickup": "Burberry shop entrance, Liberty (Freedom) Square",
   "pickup_url": "https://maps.app.goo.gl/bmN5SC89iotPt5pNA",
-  "url": "https://friendly.ge/en/activity/318410/alternative-walking-tour-new-tiflis-and-backstreets"
+  "url": "https://friendly.ge/en/activity/318410/alternative-walking-tour-new-tiflis-and-backstreets",
+  "short": "New Tiflis walk"
  },
  {
   "id": 348654,
@@ -65,7 +68,8 @@ window.TOUR_CATALOG = [
   ],
   "pickup": "Europe Square, open parking next to the old tram cafe",
   "pickup_url": "https://maps.app.goo.gl/BB644YvAVizZHyBe6",
-  "note": "Minimum age 6"
+  "note": "Minimum age 6",
+  "short": "Armenia: Haghpat & Sanahin"
  },
  {
   "id": 332826,
@@ -83,7 +87,8 @@ window.TOUR_CATALOG = [
   "pickup": "Paragraph Hotel",
   "pickup_url": "https://maps.app.goo.gl/1TyjAoFy2sCPUnqz8",
   "note": "Minimum age 12",
-  "url": "https://friendly.ge/en/activity/332826/brutalist-tbilisi-soviet-architecture-skybridges-real-life-small-group"
+  "url": "https://friendly.ge/en/activity/332826/brutalist-tbilisi-soviet-architecture-skybridges-real-life-small-group",
+  "short": "Brutal Tbilisi"
  },
  {
   "id": 307280,
@@ -101,7 +106,8 @@ window.TOUR_CATALOG = [
   ],
   "pickup": "Europe Square, open parking next to the old tram cafe",
   "pickup_url": "https://maps.app.goo.gl/BB644YvAVizZHyBe6",
-  "url": "https://friendly.ge/en/activity/307280/gareji-hidden-rainbow-mountains-off-road-group-tour-from-tbilisi"
+  "url": "https://friendly.ge/en/activity/307280/gareji-hidden-rainbow-mountains-off-road-group-tour-from-tbilisi",
+  "short": "Gareji & Rainbow 4x4"
  },
  {
   "id": 304789,
@@ -116,7 +122,8 @@ window.TOUR_CATALOG = [
    "cancellation",
    "pickup"
   ],
-  "url": "https://friendly.ge/en/activity/304789/old-tbilisi-walking-small-group-tour"
+  "url": "https://friendly.ge/en/activity/304789/old-tbilisi-walking-small-group-tour",
+  "short": "Old Tbilisi walk"
  },
  {
   "id": 335219,
@@ -133,7 +140,8 @@ window.TOUR_CATALOG = [
   ],
   "pickup": "Europe Square, open parking next to the old tram cafe",
   "pickup_url": "https://maps.app.goo.gl/BB644YvAVizZHyBe6",
-  "url": "https://friendly.ge/en/activity/335219/sabaduri-jvari-chronicles-half-day-group-winter-tour"
+  "url": "https://friendly.ge/en/activity/335219/sabaduri-jvari-chronicles-half-day-group-winter-tour",
+  "short": "Sabaduri & Jvari"
  },
  {
   "id": 304963,
@@ -145,7 +153,8 @@ window.TOUR_CATALOG = [
   "days": 1,
   "capacity": 0,
   "marks": [],
-  "url": "https://friendly.ge/en/activity/304963/explore-chiatura-katskhi-cableways-more-private-tour"
+  "url": "https://friendly.ge/en/activity/304963/explore-chiatura-katskhi-cableways-more-private-tour",
+  "short": "Chiatura & Katskhi"
  },
  {
   "id": 318656,
@@ -157,7 +166,8 @@ window.TOUR_CATALOG = [
   "days": 2,
   "capacity": 0,
   "marks": [],
-  "url": "https://friendly.ge/en/activity/318656/2-day-tour-chiatura-tskaltubo-urban-discovering"
+  "url": "https://friendly.ge/en/activity/318656/2-day-tour-chiatura-tskaltubo-urban-discovering",
+  "short": "Chiatura & Tskaltubo 2 days"
  },
  {
   "id": 305252,
@@ -169,7 +179,8 @@ window.TOUR_CATALOG = [
   "days": 1,
   "capacity": 0,
   "marks": [],
-  "url": "https://friendly.ge/en/activity/305252/dashbashi-canyon-and-didgori"
+  "url": "https://friendly.ge/en/activity/305252/dashbashi-canyon-and-didgori",
+  "short": "Dashbashi & Didgori"
  },
  {
   "id": 305008,
@@ -183,7 +194,8 @@ window.TOUR_CATALOG = [
   "marks": [
    "wine"
   ],
-  "url": "https://friendly.ge/en/activity/305008/david-gareji-rainbow-mountains-off-road-private-tour"
+  "url": "https://friendly.ge/en/activity/305008/david-gareji-rainbow-mountains-off-road-private-tour",
+  "short": "Gareji & Rainbow 4x4"
  },
  {
   "id": 305004,
@@ -197,7 +209,8 @@ window.TOUR_CATALOG = [
   "marks": [
    "wine"
   ],
-  "url": "https://friendly.ge/en/activity/305004/david-gareji-monastery-sighnaghi-rainbow-mountains-kakheti-highlights"
+  "url": "https://friendly.ge/en/activity/305004/david-gareji-monastery-sighnaghi-rainbow-mountains-kakheti-highlights",
+  "short": "Gareji & Sighnaghi"
  },
  {
   "id": 305017,
@@ -211,7 +224,8 @@ window.TOUR_CATALOG = [
   "marks": [
    "dropoff"
   ],
-  "url": "https://friendly.ge/en/activity/305017/highlights-of-armenia-dilijan-sevan-private-tour"
+  "url": "https://friendly.ge/en/activity/305017/highlights-of-armenia-dilijan-sevan-private-tour",
+  "short": "Dilijan & Sevan"
  },
  {
   "id": 305001,
@@ -223,7 +237,8 @@ window.TOUR_CATALOG = [
   "days": 1,
   "capacity": 0,
   "marks": [],
-  "url": "https://friendly.ge/en/activity/305001/alaverdi-telavi-sighnaghi-grand-kakheti"
+  "url": "https://friendly.ge/en/activity/305001/alaverdi-telavi-sighnaghi-grand-kakheti",
+  "short": "Grand Kakheti"
  },
  {
   "id": 326139,
@@ -235,7 +250,8 @@ window.TOUR_CATALOG = [
   "days": 1,
   "capacity": 0,
   "marks": [],
-  "url": "https://friendly.ge/en/activity/326139/winter-family-adventure-sabaduri-and-gudauri"
+  "url": "https://friendly.ge/en/activity/326139/winter-family-adventure-sabaduri-and-gudauri",
+  "short": "Gudauri & Sabaduri"
  },
  {
   "id": 305244,
@@ -248,7 +264,8 @@ window.TOUR_CATALOG = [
   "capacity": 0,
   "marks": [],
   "note": "Minimum age 12. Fitness activity",
-  "url": "https://friendly.ge/en/activity/305244/juta-kazbegi-one-day-hiking-tour"
+  "url": "https://friendly.ge/en/activity/305244/juta-kazbegi-one-day-hiking-tour",
+  "short": "Juta & Kazbegi hike"
  },
  {
   "id": 319732,
@@ -260,7 +277,8 @@ window.TOUR_CATALOG = [
   "days": 1,
   "capacity": 0,
   "marks": [],
-  "url": "https://friendly.ge/en/activity/319732/private-tour-kakheti-the-ultimate-foodie-experience"
+  "url": "https://friendly.ge/en/activity/319732/private-tour-kakheti-the-ultimate-foodie-experience",
+  "short": "Kakheti food tour"
  },
  {
   "id": 305000,
@@ -274,7 +292,8 @@ window.TOUR_CATALOG = [
   "marks": [
    "wine"
   ],
-  "url": "https://friendly.ge/en/activity/305000/kakheti-wine-history-culture-tour"
+  "url": "https://friendly.ge/en/activity/305000/kakheti-wine-history-culture-tour",
+  "short": "Kakheti wine tour"
  },
  {
   "id": 313704,
@@ -287,7 +306,8 @@ window.TOUR_CATALOG = [
   "capacity": 0,
   "marks": [],
   "note": "Runs in summer only",
-  "url": "https://friendly.ge/en/activity/313704/kazbegi-ananuri-truso-valley-4x4-private-tour"
+  "url": "https://friendly.ge/en/activity/313704/kazbegi-ananuri-truso-valley-4x4-private-tour",
+  "short": "Kazbegi & Truso 4x4"
  },
  {
   "id": 304944,
@@ -299,7 +319,8 @@ window.TOUR_CATALOG = [
   "days": 1,
   "capacity": 0,
   "marks": [],
-  "url": "https://friendly.ge/en/activity/304944/majestic-kazbegi-full-day-private-tour"
+  "url": "https://friendly.ge/en/activity/304944/majestic-kazbegi-full-day-private-tour",
+  "short": "Kazbegi day"
  },
  {
   "id": 305264,
@@ -313,7 +334,8 @@ window.TOUR_CATALOG = [
   "marks": [
    "private_room"
   ],
-  "url": "https://friendly.ge/en/activity/305264/mystical-khevsureti-in-2-days-tour"
+  "url": "https://friendly.ge/en/activity/305264/mystical-khevsureti-in-2-days-tour",
+  "short": "Khevsureti 2 days"
  },
  {
   "id": 304980,
@@ -325,7 +347,8 @@ window.TOUR_CATALOG = [
   "days": 1,
   "capacity": 0,
   "marks": [],
-  "url": "https://friendly.ge/en/activity/304980/mtskheta-and-tbilisi-two-capitals-in-one-day"
+  "url": "https://friendly.ge/en/activity/304980/mtskheta-and-tbilisi-two-capitals-in-one-day",
+  "short": "Mtskheta & Tbilisi"
  },
  {
   "id": 304833,
@@ -337,7 +360,8 @@ window.TOUR_CATALOG = [
   "days": 1,
   "capacity": 0,
   "marks": [],
-  "url": "https://friendly.ge/en/activity/304833/uncover-the-mysteries-of-mtskheta-private-half-day-tour"
+  "url": "https://friendly.ge/en/activity/304833/uncover-the-mysteries-of-mtskheta-private-half-day-tour",
+  "short": "Mtskheta half-day"
  },
  {
   "id": 304990,
@@ -349,7 +373,8 @@ window.TOUR_CATALOG = [
   "days": 1,
   "capacity": 0,
   "marks": [],
-  "url": "https://friendly.ge/en/activity/304990/mtskheta-gori-cave-town-private-tour"
+  "url": "https://friendly.ge/en/activity/304990/mtskheta-gori-cave-town-private-tour",
+  "short": "Mtskheta, Gori & Uplistsikhe"
  },
  {
   "id": 305012,
@@ -361,7 +386,8 @@ window.TOUR_CATALOG = [
   "days": 1,
   "capacity": 0,
   "marks": [],
-  "url": "https://friendly.ge/en/activity/305012/mtskheta-uplistsikhe-borjomi-best-of-georgia"
+  "url": "https://friendly.ge/en/activity/305012/mtskheta-uplistsikhe-borjomi-best-of-georgia",
+  "short": "Mtskheta, Uplistsikhe & Borjomi"
  },
  {
   "id": 320113,
@@ -373,7 +399,8 @@ window.TOUR_CATALOG = [
   "days": 1,
   "capacity": 0,
   "marks": [],
-  "url": "https://friendly.ge/en/activity/320113/northern-armenia-highlights-tour-from-tbilisi"
+  "url": "https://friendly.ge/en/activity/320113/northern-armenia-highlights-tour-from-tbilisi",
+  "short": "Northern Armenia"
  },
  {
   "id": 304802,
@@ -388,7 +415,8 @@ window.TOUR_CATALOG = [
    "wine",
    "pickup"
   ],
-  "url": "https://friendly.ge/en/activity/304802/explore-old-tbilisi-private-walking-tour"
+  "url": "https://friendly.ge/en/activity/304802/explore-old-tbilisi-private-walking-tour",
+  "short": "Old Tbilisi walk"
  },
  {
   "id": 333149,
@@ -402,7 +430,8 @@ window.TOUR_CATALOG = [
   "marks": [
    "wine"
   ],
-  "url": "https://friendly.ge/en/activity/333149/rainbow-mountains-gareji-martkopi-tbilisi-national-park-private-tour"
+  "url": "https://friendly.ge/en/activity/333149/rainbow-mountains-gareji-martkopi-tbilisi-national-park-private-tour",
+  "short": "Gareji, Rainbow & Martkopi"
  },
  {
   "id": 318495,
@@ -414,7 +443,8 @@ window.TOUR_CATALOG = [
   "days": 1,
   "capacity": 0,
   "marks": [],
-  "url": "https://friendly.ge/en/activity/318495/sabaduri-chronicles-and-jvari-half-day-private-tour"
+  "url": "https://friendly.ge/en/activity/318495/sabaduri-chronicles-and-jvari-half-day-private-tour",
+  "short": "Sabaduri & Jvari"
  },
  {
   "id": 304986,
@@ -426,7 +456,8 @@ window.TOUR_CATALOG = [
   "days": 1,
   "capacity": 0,
   "marks": [],
-  "url": "https://friendly.ge/en/activity/304986/brutal-tbilisi-soviet-modernism-concrete-private-tour"
+  "url": "https://friendly.ge/en/activity/304986/brutal-tbilisi-soviet-modernism-concrete-private-tour",
+  "short": "Brutal Tbilisi"
  },
  {
   "id": 326137,
@@ -438,7 +469,8 @@ window.TOUR_CATALOG = [
   "days": 1,
   "capacity": 0,
   "marks": [],
-  "url": "https://friendly.ge/en/activity/326137/tbilisi-holiday-magic-new-year-edition-walking-tour"
+  "url": "https://friendly.ge/en/activity/326137/tbilisi-holiday-magic-new-year-edition-walking-tour",
+  "short": "New Year walk"
  },
  {
   "id": 338164,
@@ -452,7 +484,8 @@ window.TOUR_CATALOG = [
   "marks": [
    "cancellation"
   ],
-  "url": "https://friendly.ge/en/activity/338164/after-dark-tbilisi-brutalist-city-night-tour-18"
+  "url": "https://friendly.ge/en/activity/338164/after-dark-tbilisi-brutalist-city-night-tour-18",
+  "short": "Tbilisi night tour"
  },
  {
   "id": 305013,
@@ -464,7 +497,8 @@ window.TOUR_CATALOG = [
   "days": 1,
   "capacity": 0,
   "marks": [],
-  "url": "https://friendly.ge/en/activity/305013/vardzia-rabati-castle-borjomi-private-tour"
+  "url": "https://friendly.ge/en/activity/305013/vardzia-rabati-castle-borjomi-private-tour",
+  "short": "Vardzia & Borjomi"
  },
  {
   "id": 320186,
@@ -476,7 +510,8 @@ window.TOUR_CATALOG = [
   "days": 2,
   "capacity": 0,
   "marks": [],
-  "url": "https://friendly.ge/en/activity/320186/tour-to-yerevan-sevan-dilijan-armenia-from-tbilisi-2-days"
+  "url": "https://friendly.ge/en/activity/320186/tour-to-yerevan-sevan-dilijan-armenia-from-tbilisi-2-days",
+  "short": "Yerevan, Sevan & Dilijan 2 days"
  },
  {
   "id": 305020,
@@ -487,7 +522,8 @@ window.TOUR_CATALOG = [
   "duration": "1 day",
   "days": 1,
   "capacity": 0,
-  "marks": []
+  "marks": [],
+  "short": "Kutaisi airport transfer"
  },
  {
   "id": 323741,
@@ -498,7 +534,8 @@ window.TOUR_CATALOG = [
   "duration": "",
   "days": 1,
   "capacity": 0,
-  "marks": []
+  "marks": [],
+  "short": "Transfer to Armenia"
  },
  {
   "id": 305021,
@@ -510,7 +547,8 @@ window.TOUR_CATALOG = [
   "days": 1,
   "capacity": 0,
   "marks": [],
-  "url": "https://friendly.ge/en/activity/305021/private-transfer-tbilisi-to-gudauri-stepantsminda"
+  "url": "https://friendly.ge/en/activity/305021/private-transfer-tbilisi-to-gudauri-stepantsminda",
+  "short": "Transfer to Gudauri / Kazbegi"
  },
  {
   "id": 304917,
@@ -522,7 +560,8 @@ window.TOUR_CATALOG = [
   "days": 1,
   "capacity": 0,
   "marks": [],
-  "url": "https://friendly.ge/en/activity/304917/tbilisi-airport-private-transfer-online"
+  "url": "https://friendly.ge/en/activity/304917/tbilisi-airport-private-transfer-online",
+  "short": "Tbilisi airport transfer"
  },
  {
   "id": 305241,
@@ -533,7 +572,8 @@ window.TOUR_CATALOG = [
   "duration": "",
   "days": 1,
   "capacity": 0,
-  "marks": []
+  "marks": [],
+  "short": "Transfer to Batumi"
  },
  {
   "id": 305242,
@@ -544,6 +584,7 @@ window.TOUR_CATALOG = [
   "duration": "",
   "days": 1,
   "capacity": 0,
-  "marks": []
+  "marks": [],
+  "short": "Transfer to Borjomi / Bakuriani"
  }
 ];

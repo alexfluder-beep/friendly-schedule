@@ -1,0 +1,24 @@
+// Place search under the pickup field (owner, 19 Nov: "map search, option A"). Demo mode gives invented places only.
+const { chromium } = require('playwright');
+(async () => { const b = await chromium.launch(); const errs = []; let bad = 0; const ok = (c, m) => { console.log(c ? '  ok  ' : '  FAIL', m); if (!c) bad = 1; };
+  const p = await (await b.newContext({ viewport: { width: 400, height: 900 } })).newPage(); p.on('pageerror', e => errs.push(e.message));
+  await p.addInitScript(() => { window.__noCelebrate = true; try { localStorage.setItem('fs-test-seen', '1'); } catch (e) {} });
+  await p.goto('http://localhost:8765/index.html'); await p.waitForSelector('.strip');
+  await p.evaluate(async () => { const td = window.__test.today(); await window.Store.save('tours', { id: 'zpl1', date: td, start_time: '06:15', title: 'Test place tour', kind: 'private', status: 'confirmed', adults: 1, children: 0, pax: 1, capacity: 0 }); window.__test.go('calendar'); });
+  await p.waitForTimeout(400);
+  await p.evaluate(() => window.__test.openTour('zpl1')); await p.waitForTimeout(400);
+  await p.evaluate(() => { const e = document.querySelector('#modal [data-act=touredit]'); if (e) e.click(); }); await p.waitForTimeout(400);
+  await p.evaluate(() => document.querySelectorAll('#modal details').forEach(d => d.open = true));
+  await p.fill('#t-pickup', 'ab'); await p.waitForTimeout(600);
+  ok(!(await p.$('.plsug')), 'two letters: no search');
+  await p.fill('#t-pickup', 'demo hot'); await p.waitForTimeout(700);
+  const rows = await p.$$eval('.plsug .plrow', r => r.map(x => x.innerText.replace(/\s+/g, ' ').trim()));
+  ok(rows.length === 2 && /Demo Hotel/.test(rows[0]), 'places listed: ' + JSON.stringify(rows));
+  ok(await p.evaluate(() => /Google Maps/.test(document.querySelector('.plsug .plsrc').textContent)), 'source line shown');
+  await p.click('.plsug .plrow >> nth=0'); await p.waitForTimeout(300);
+  ok(await p.inputValue('#t-pickup') === 'Demo Hotel, 1 Sample Street, Tbilisi, Georgia', 'pick fills the address');
+  ok(/google\.com\/maps/.test(await p.inputValue('#t-pickurl')), 'pick fills the map link');
+  ok(!(await p.$('.plsug')), 'list closes after the pick');
+  await p.fill('#t-pickup', 'nothing like it'); await p.waitForTimeout(700);
+  ok(!(await p.$('.plsug')), 'no match: no list');
+  ok(!errs.length, 'errors ' + errs.join('|')); await b.close(); process.exit(bad); })();
