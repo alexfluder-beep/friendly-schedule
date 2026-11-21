@@ -4,7 +4,7 @@ const { chromium } = require('playwright');
   const p = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage(); p.on('pageerror', e => errs.push(e.message));
   await p.addInitScript(() => { window.__noCelebrate = true; try { localStorage.setItem('fs-test-seen', '1'); } catch (e) {} });
   await p.goto('http://localhost:8765/index.html'); await p.waitForSelector('.strip'); await p.selectOption('#demo-as', { label: 'Mariam (sample) · Guide' }); await p.waitForTimeout(700);
-  ok(await p.locator('.verchip').count() === 1, 'version chip shown to a guide');
+  /* 21 Nov (owner): the version label is for admins only */ ok(await p.locator('.verchip').count() === 0, 'no version chip for a guide');
   const mo = await p.evaluate(() => { const db = window.Store.db, pid = db.profiles.find(x => /Mariam/.test(x.name)).id, base = db.tours.find(t => t.guide_id === pid), td = new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10), up = new Date(Date.now() + 5 * 864e5).toISOString().slice(0, 10), mo = td.slice(0, 7);
     db.tours = db.tours.filter(t => !(t.guide_id === pid && t.date.slice(0, 7) === mo)); const mk = (id, date, pay) => db.tours.push({ ...base, id, date, date_to: null, guide_pay: pay, driver_id: null, status: 'confirmed', title: 'Owed test ' + id }); mk('zpast', td, 500); mk('zfut', up > td && up.slice(0, 7) === mo ? up : td, 300); db.pay_adjustments = db.pay_adjustments.filter(x => !(x.user_id === pid && x.month === mo)); db.bookings.forEach(x => { if (x.tour_id === 'zpast' || x.tour_id === 'zfut') x.payment = null; }); window.__fut = up.slice(0, 7) === mo; return mo; });
   const fut = await p.evaluate(() => window.__fut);

@@ -21,7 +21,8 @@ A plain JavaScript PWA for Friendly.ge guides and drivers (replaces Setmore). Li
 1. Set `APP_VERSION` in app.js to the release date, year.month.day (`'26.11.18'`; a second release the same day adds b, c; owner 18 Nov) and bump `CACHE` in sw.js; add a README bullet. A new file must be added to `index.html` and to the `SHELL` list in sw.js.
 2. Run `sh tests/run-all.sh` (all tests, a throw-away demo copy, sample data). New tests go in `tests/` with invented data only; they need `window.__noCelebrate = true` and localStorage `fs-test-seen`.
 3. Secret scan, copy files into the release clone, then in the release clone run `python3 tools/shell-hash.py` (writes each file's fingerprint into `SHELL` in sw.js, so phones download only changed files; a new file in `SHELL` needs a `'name': ''` entry first), commit, push.
-4. Ask the owner to confirm the version shows on the live site.
+4. Two addresses (21 Nov): `main` of `alexfluder-beep/friendly-schedule` serves the old address alexfluder-beep.github.io/friendly-schedule (no CNAME file: a CNAME there would forward the old address and strand phones installed from it). team.friendly.ge is served by the renamed project `alexfluder-beep/friendly-team` (remote `team` in the release clone): after pushing `main`, run `git checkout -B team-pages main && cp /tmp/CNAME.team CNAME` (one line: `team.friendly.ge`) `&& git add CNAME && git commit -m "team.friendly.ge address" && git push -f team team-pages:main && git checkout main`. Never put CNAME on `main`.
+5. Check the version on both addresses, then ask the owner to confirm.
 
 ## Test rules
 - Sample data lies around today, so a test must not assume a demo person already has a finished tour: save one with `S.save('tours', …)` first (t82 failed every Monday until this was done).

@@ -1,0 +1,26 @@
+// Version label only for admins; pulling a tour sheet down moves it as one piece and closes it (owner, 21 Nov). Invented data only.
+const { chromium } = require('playwright');
+(async () => { const b = await chromium.launch(); const errs = []; let bad = 0; const ok = (c, m) => { console.log(c ? '  ok  ' : '  FAIL', m); if (!c) bad = 1; };
+  const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true }); const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message));
+  await p.addInitScript(() => { window.__noCelebrate = true; try { localStorage.setItem('fs-test-seen', '1'); } catch (e) {} });
+  await p.goto('http://localhost:8765/index.html'); await p.waitForSelector('.strip');
+  await p.selectOption('#demo-as', { label: 'Sample Admin · Admin' }); await p.waitForTimeout(600);
+  ok(await p.locator('.verchip').count() === 1, 'admin sees the version label');
+  await p.selectOption('#demo-as', { label: 'Nino (sample) · Guide' }); await p.waitForTimeout(600);
+  ok(await p.locator('.verchip').count() === 0, 'guide does not see the version label');
+  await p.evaluate(() => window.__test.go('me')); await p.waitForTimeout(300);
+  ok(!/Version \d/.test(await p.evaluate(() => document.body.innerText)), 'no version on the guide\'s Me page');
+  await p.selectOption('#demo-as', { label: 'Sample Admin · Admin' }); await p.waitForTimeout(600);
+  await p.evaluate(async () => { const td = window.__test.today(); await window.Store.save('tours', { id: 'zpull', date: td, start_time: '11:00', title: 'Test pull tour', kind: 'group', status: 'confirmed', adults: 1, children: 0, pax: 1, capacity: 0 }); window.__test.go('calendar'); });
+  await p.waitForTimeout(300); await p.evaluate(() => window.__test.openTour('zpull')); await p.waitForTimeout(500);
+  const box = await p.locator('.overlay .sheet').boundingBox(); ok(!!box, 'tour sheet open');
+  const cdp = await ctx.newCDPSession(p); const x = box.x + box.width / 2, y0 = box.y + 40;
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: y0 }] });
+  for (let i = 1; i <= 8; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y0 + i * 10 }] });
+  const mid = await p.evaluate(() => { const s = document.querySelector('.overlay .sheet'), bar = s.querySelector('.addbk'); return { tr: s.style.transform, barIn: !bar || bar.getBoundingClientRect().bottom <= s.getBoundingClientRect().bottom + 1 }; });
+  ok(/translateY\((7|8)\dpx\)/.test(mid.tr), 'sheet follows the finger: ' + mid.tr);
+  ok(mid.barIn, 'the + Booking bar stays inside the moving sheet');
+  for (let i = 9; i <= 16; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y0 + i * 10 }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await p.waitForTimeout(500);
+  ok(await p.evaluate(() => !window.__test.modal()), 'pulled far enough: sheet closes');
+  ok(!errs.length, 'errors ' + errs.join('|')); await b.close(); process.exit(bad); })();
