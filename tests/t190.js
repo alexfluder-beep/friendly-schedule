@@ -1,0 +1,24 @@
+// "Needs you" card on the office home screen (owner, 21 Nov). Invented people, tours and dates only.
+const { chromium } = require('playwright');
+(async () => { const b = await chromium.launch(); const errs = []; let bad = 0; const ok = (c, m) => { console.log(c ? '  ok  ' : '  FAIL', m); if (!c) bad = 1; };
+  const p = await (await b.newContext({ viewport: { width: 400, height: 900 } })).newPage(); p.on('pageerror', e => errs.push(e.message));
+  await p.addInitScript(() => { window.__noCelebrate = true; try { localStorage.setItem('fs-test-seen', '1'); } catch (e) {} });
+  await p.goto('http://localhost:8765/index.html'); await p.waitForSelector('.strip');
+  await p.evaluate(async () => { const S = window.Store, td = window.__test.today(), me = window.__test.meId(); const add = n => { const d = new Date(td + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+    const g = S.db.profiles.find(x => x.role === 'guide' && x.id !== me);
+    await S.save('tours', { id: 'zny1', date: add(1), start_time: '09:00', title: 'Test needs tour', kind: 'group', status: 'confirmed', adults: 3, children: 0, pax: 3, capacity: 8, guide_id: null });
+    await S.save('change_requests', { id: 'zny-q', tour_id: 'zny1', user_id: g.id, patch: { guide_id: g.id }, cant: false, message: '', swap_with: null, agreed: false, status: 'pending', created_at: new Date().toISOString(), decided_by: null });
+    await S.save('time_off', { id: 'zny-o', user_id: g.id, date_from: add(9), date_to: add(9), type: 'dayoff', status: 'pending', note: null, created_at: new Date().toISOString(), decided_by: null });
+    window.__test.go('calendar'); });
+  await p.waitForTimeout(500);
+  ok(await p.locator('.nycard').count() === 1, 'Needs you card on the home screen');
+  ok(await p.locator('.nycard [data-act=creqdecide][data-id="zny-q"]').count() === 2, 'tour request with Decline and Approve');
+  ok(await p.locator('.nycard [data-act=offdecide][data-id="zny-o"]').count() === 2, 'time-off request with Decline and Approve');
+  ok(await p.locator('.nycard [data-act=tour][data-id="zny1"]').count() >= 1, 'tour with no guide listed');
+  await p.click('.nycard [data-act=offdecide][data-id="zny-o"][data-s=approved]'); await p.waitForTimeout(600);
+  ok(await p.evaluate(() => window.Store.db.time_off.find(o => o.id === 'zny-o').status === 'approved'), 'approved from the card');
+  ok(await p.locator('.nycard [data-act=offdecide][data-id="zny-o"]').count() === 0, 'answered request leaves the card');
+  await p.click('.nycard [data-act=creqdecide][data-id="zny-q"][data-s="1"]'); await p.waitForTimeout(800);
+  ok(await p.evaluate(() => { const t = window.Store.db.tours.find(x => x.id === 'zny1'), q = window.Store.db.change_requests.find(x => x.id === 'zny-q'); return q.status === 'approved' && !!t.guide_id; }), 'approving the request puts the guide on the tour');
+  ok(await p.locator('.nycard [data-act=tour][data-id="zny1"]').count() === 0, 'tour leaves the no-guide list');
+  ok(!errs.length, 'errors ' + errs.join('|')); await b.close(); process.exit(bad); })();

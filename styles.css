@@ -2389,3 +2389,14 @@ html[data-theme="dark"][data-accent="terra"],html[data-theme="dark"][data-accent
 .offwait{gap:8px;border-color:var(--p-peach-e,#e9c9a8);background:var(--p-peach,#fdf3ea)}
 .offwait .bar{justify-content:flex-end}
 .exrow .btn.sm{margin-left:6px}
+
+/* "Needs you" card on the office home screen */
+.nycard{border-color:var(--p-blue-e,#c9d9f5)}
+.nysec{display:flex;flex-direction:column;gap:6px;padding:8px 0;border-top:1px solid var(--line,#e3e9f0)}
+.nysec:first-of-type{border-top:0}
+.nyrow{display:flex;align-items:center;gap:10px;min-height:48px}
+.nyrow .lnk{display:flex;flex-direction:column;align-items:flex-start;text-align:left;min-width:0}
+.nyrow .lnk .small{white-space:normal}
+.nyrow .bar{flex:none;gap:6px}
+.nyrow .bar .btn.sm{min-width:48px;min-height:44px;justify-content:center;padding:0 10px}
+.nyrow .lnk b{font-size:1rem}

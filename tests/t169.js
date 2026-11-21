@@ -20,6 +20,6 @@ const { chromium, devices } = require('playwright');
   ok(await p.evaluate(() => { const d = document.createElement('div'); d.style.width = '1200px'; d.style.height = '2px'; document.querySelector('main').appendChild(d); const w = document.documentElement.scrollWidth; d.remove(); return w <= innerWidth; }), 'a 1200 px element does not widen the page');
   // sticky day row still sticks
   await p.evaluate(() => document.querySelector('.tabs [data-v=calendar]').click()); await p.waitForTimeout(500);
-  const st = await p.evaluate(async () => { const s = [...document.querySelectorAll('.strip.sroll')].find(x => x.offsetParent); const pos = getComputedStyle(s).position; scrollTo(0, 900); await new Promise(r => setTimeout(r, 300)); return { pos, top: Math.round(s.getBoundingClientRect().top), sy: scrollY }; });
+  const st = await p.evaluate(async () => { const s = [...document.querySelectorAll('.strip.sroll')].find(x => x.offsetParent); const pos = getComputedStyle(s).position; /* 21 Nov: scroll past wherever the row is (the office "Needs you" card sits above it) */ scrollTo(0, s.getBoundingClientRect().top + scrollY + 600); await new Promise(r => setTimeout(r, 300)); return { pos, top: Math.round(s.getBoundingClientRect().top), sy: scrollY }; });
   ok(st.pos !== 'sticky' || (st.sy > 0 && st.top >= 0 && st.top < 200), 'the day row stays at the top while scrolling: ' + JSON.stringify(st));
   ok(!errs.length, 'errors ' + errs.join('|')); await b.close(); process.exit(bad); })();

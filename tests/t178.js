@@ -6,13 +6,14 @@ const { chromium, devices } = require('playwright');
   await p.addInitScript(() => { window.__noCelebrate = true; try { localStorage.setItem('fs-test-seen', '1'); } catch (e) {} });
   await p.goto('http://localhost:8765/index.html'); await p.waitForSelector('.strip'); await p.selectOption('#demo-as', { label: 'Sample Admin · Admin' }); await p.waitForTimeout(600);
   const g = await p.evaluate(async () => { const S = window.Store, gd = S.db.profiles.find(x => x.role === 'guide' && x.active !== false), td = window.__test.today();
-    await S.save('tours', { id: 'zs1', title: 'Zz Seats Tour', date: td, start_time: '10:00', kind: 'group', status: 'confirmed', capacity: 10, pax: 3, adults: 3, children: 0, guide_id: gd.id, driver_id: null, guide_pay: 40 });
+  /* 21 Nov: pay 400 so the day payout stays above the cash taken (100 USD) whatever the day's exchange rate; at 40 it failed once real rates loaded. */
+    await S.save('tours', { id: 'zs1', title: 'Zz Seats Tour', date: td, start_time: '10:00', kind: 'group', status: 'confirmed', capacity: 10, pax: 3, adults: 3, children: 0, guide_id: gd.id, driver_id: null, guide_pay: 400 });
     await S.save('bookings', { id: 'zsb1', tour_id: 'zs1', guest: 'Test Guest A', pax: 2, adults: 2, children: 0, payment: 'prepaid', price: 100, currency: 'USD', source: 'Viator', attendance: null, marks: [] });
     await S.save('bookings', { id: 'zsb2', tour_id: 'zs1', guest: 'Test Guest B', pax: 1, adults: 1, children: 0, payment: 'cash', amount_due: 50, price: 50, currency: 'GEL', source: 'Direct', attendance: null, marks: [] });
     return { id: gd.id, name: gd.name, td }; });
   // 1. Team: People · next 14 days
   await p.evaluate(() => window.__test.go('team')); await p.waitForTimeout(400);
-  ok(await p.locator('#tm-days14').count() === 1 && await p.evaluate(() => document.querySelector('#tm-days14').getBoundingClientRect().top < document.querySelector('#tm-needs').getBoundingClientRect().top), 'Team starts with People · next 14 days');
+  ok(await p.locator('#tm-days14').count() === 1 && await p.evaluate(() => document.querySelector('#tm-days14').getBoundingClientRect().top < document.querySelector('#tm-today').getBoundingClientRect().top), 'Team starts with People · next 14 days');
   const row = p.locator('.d14row', { hasText: g.name }); ok(await row.count() === 1 && await row.locator('.d14c').count() === 14, '14 days for each person');
   ok(await row.locator('.d14c').first().evaluate(e => e.classList.contains('busy')), 'today is busy for the guide with the test tour');
   await p.fill('[data-ch=d14q]', 'zz seats'); await p.waitForTimeout(300); ok(await p.locator('.d14row:visible').count() === 1, 'search by tour name finds the guide');

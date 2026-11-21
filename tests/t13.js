@@ -5,7 +5,7 @@ const { chromium, devices } = require('playwright');
   const as = async l => { await p.selectOption('#demo-as', { label: l }); await p.waitForTimeout(250); };
   await p.goto('http://localhost:8765/index.html'); await p.waitForSelector('.strip');
   // pinned strip
-  await p.evaluate(() => window.scrollTo(0, 900)); await p.waitForTimeout(300);
+  await p.evaluate(() => { const s = [...document.querySelectorAll('.strip')].find(x => x.offsetParent); window.scrollTo(0, (s ? s.getBoundingClientRect().top + scrollY : 0) + 600); }); await p.waitForTimeout(300);
   const top = await p.evaluate(() => { const s = document.querySelector('.strip').getBoundingClientRect(), h = document.querySelector('header.top').getBoundingClientRect(); return [Math.round(s.top), Math.round(h.bottom)]; });
   ok(Math.abs(top[0] - top[1]) <= 8, 'week strip stays pinned under the header while scrolling ' + top); await p.screenshot({ path: S + '/v16-strip.png' });
   ok(await p.evaluate(() => { const b = document.querySelector('.strip [aria-pressed=true]'); return b && b.dataset.date !== Store.me && true; }), 'a day stays marked while scrolling');
